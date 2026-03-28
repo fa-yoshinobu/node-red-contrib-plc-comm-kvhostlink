@@ -1,0 +1,66 @@
+<script type="text/javascript">
+RED.nodes.registerType("kvhostlink-write", {
+  category: "KV Host Link",
+  color: "#f29d7e",
+  defaults: {
+    name: { value: "" },
+    connection: { value: "", type: "kvhostlink-connection", required: true },
+    updates: { value: "" },
+    updatesType: { value: "str" },
+    errorHandling: { value: "throw" },
+    metadataMode: { value: "full" }
+  },
+  inputs: 1,
+  outputs: 1,
+  icon: "font-awesome/fa-upload",
+  label: function() {
+    return this.name || "KV Host Link Write";
+  },
+  oneditprepare: function() {
+    if (RED.editor && typeof RED.editor.createTypedInput === "function") {
+      $("#node-input-updates").typedInput({
+        default: this.updatesType || "str",
+        typeField: $("#node-input-updatesType"),
+        types: ["str", "msg", "flow", "global", "env"]
+      });
+    }
+  }
+});
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-write">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name">
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection">
+  </div>
+  <div class="form-row">
+    <label for="node-input-updates"><i class="fa fa-edit"></i> Updates</label>
+    <input type="text" id="node-input-updates" placeholder='{"DM100":123,"DM101:S":-5,"DM50.3":true}'>
+    <input type="hidden" id="node-input-updatesType">
+  </div>
+  <div class="form-row">
+    <label for="node-input-errorHandling"><i class="fa fa-warning"></i> Error</label>
+    <select id="node-input-errorHandling">
+      <option value="throw">Throw</option>
+      <option value="msg">msg.error</option>
+      <option value="output2">Second output</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-metadataMode"><i class="fa fa-info-circle"></i> Metadata</label>
+    <select id="node-input-metadataMode">
+      <option value="full">Full</option>
+      <option value="minimal">Minimal</option>
+      <option value="off">Off</option>
+    </select>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-write">
+  <p>Write KEYENCE KV Host Link addresses using the high-level helper format.</p>
+  <p>Examples: <code>{"DM100":123}</code>, <code>{"DM101:S":-5}</code>, <code>{"DM50.3":true}</code>, <code>{"DM200,4":[1,2,3,4]}</code>.</p>
+</script>

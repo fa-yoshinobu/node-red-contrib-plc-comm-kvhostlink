@@ -1,0 +1,75 @@
+<script type="text/javascript">
+RED.nodes.registerType("kvhostlink-read", {
+  category: "KV Host Link",
+  color: "#f5bba7",
+  defaults: {
+    name: { value: "" },
+    connection: { value: "", type: "kvhostlink-connection", required: true },
+    addresses: { value: "" },
+    addressesType: { value: "str" },
+    outputMode: { value: "object" },
+    errorHandling: { value: "throw" },
+    metadataMode: { value: "full" }
+  },
+  inputs: 1,
+  outputs: 1,
+  icon: "font-awesome/fa-download",
+  label: function() {
+    return this.name || "KV Host Link Read";
+  },
+  oneditprepare: function() {
+    if (RED.editor && typeof RED.editor.createTypedInput === "function") {
+      $("#node-input-addresses").typedInput({
+        default: this.addressesType || "str",
+        typeField: $("#node-input-addressesType"),
+        types: ["str", "msg", "flow", "global", "env"]
+      });
+    }
+  }
+});
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-read">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name">
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection">
+  </div>
+  <div class="form-row">
+    <label for="node-input-addresses"><i class="fa fa-list"></i> Addresses</label>
+    <input type="text" id="node-input-addresses" placeholder="DM100, DM101:S, DM102:D, DM104:F, DM50.3">
+    <input type="hidden" id="node-input-addressesType">
+  </div>
+  <div class="form-row">
+    <label for="node-input-outputMode"><i class="fa fa-sign-out"></i> Output</label>
+    <select id="node-input-outputMode">
+      <option value="object">Object</option>
+      <option value="array">Array</option>
+      <option value="value">Single value</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-errorHandling"><i class="fa fa-warning"></i> Error</label>
+    <select id="node-input-errorHandling">
+      <option value="throw">Throw</option>
+      <option value="msg">msg.error</option>
+      <option value="output2">Second output</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-metadataMode"><i class="fa fa-info-circle"></i> Metadata</label>
+    <select id="node-input-metadataMode">
+      <option value="full">Full</option>
+      <option value="minimal">Minimal</option>
+      <option value="off">Off</option>
+    </select>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-read">
+  <p>Read KEYENCE KV Host Link addresses using the high-level helper format.</p>
+  <p>Examples: <code>DM100</code>, <code>DM100:S</code>, <code>DM100:D</code>, <code>DM100:F</code>, <code>DM50.3</code>, <code>DM200,10</code>.</p>
+</script>
