@@ -1,0 +1,56 @@
+﻿{
+  "name": "@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink",
+  "version": "0.2.0",
+  "description": "Node-RED nodes for KEYENCE KV Host Link communication over TCP/UDP.",
+  "author": "fa-yoshinobu",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "docsrc/",
+    "examples/",
+    "lib/",
+    "nodes/"
+  ],
+  "keywords": [
+    "node-red",
+    "node-red-contrib",
+    "node-red-flow",
+    "keyence",
+    "kv",
+    "kv-hostlink",
+    "hostlink",
+    "upper-link",
+    "plc"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/issues"
+  },
+  "homepage": "https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node test/run-tests.js",
+    "check": "node test/run-tests.js",
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "node-red": {
+    "version": ">=3.0.0",
+    "nodes": {
+      "kvhostlink-connection": "nodes/kvhostlink-connection.js",
+      "kvhostlink-read": "nodes/kvhostlink-read.js",
+      "kvhostlink-write": "nodes/kvhostlink-write.js"
+    }
+  }
+}
+

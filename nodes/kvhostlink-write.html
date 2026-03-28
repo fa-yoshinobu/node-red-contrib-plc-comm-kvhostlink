@@ -1,0 +1,178 @@
+﻿<script type="text/javascript">
+  const KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE = /^[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?$/i;
+
+  function kvGetWriteCurrentType(typeSelector, fallback) {
+    const field = $(typeSelector);
+    if (field.length > 0 && field.val()) {
+      return field.val();
+    }
+    return fallback || "str";
+  }
+
+  function kvValidateWriteReferencePath(value) {
+    return Boolean(String(value == null ? "" : value).trim());
+  }
+
+  function kvValidateWriteAddress(address) {
+    return KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE.test(String(address || "").trim());
+  }
+
+  function kvValidateWriteLiteral(value) {
+    const text = String(value == null ? "" : value).trim();
+    if (!text) {
+      return true;
+    }
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return false;
+      }
+      return Object.keys(parsed).every(kvValidateWriteAddress);
+    } catch (_error) {
+    }
+
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex <= 0) {
+        return false;
+      }
+      if (!kvValidateWriteAddress(trimmed.slice(0, separatorIndex).trim())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function kvValidateWriteSourceField(value, typeSelector, literalValidator, fallbackType) {
+    const type = kvGetWriteCurrentType(typeSelector, fallbackType);
+    if (!type || type === "str") {
+      return literalValidator(value);
+    }
+    return kvValidateWriteReferencePath(value);
+  }
+
+  function setupKvWriteSourceField(sourceId, typeId, literalId, hiddenId) {
+    const sourceField = $(sourceId);
+    const typeField = $(typeId);
+    const literalField = $(literalId);
+    const literalRow = literalField.closest(".form-row");
+
+    sourceField.typedInput({
+      default: "str",
+      typeField: typeField,
+      types: ["msg", "flow", "global", "env", "str"]
+    });
+
+    const refresh = function () {
+      const type = sourceField.typedInput("type");
+      const isLiteral = type === "str";
+      literalRow.toggle(isLiteral);
+      if (isLiteral) {
+        sourceField.typedInput("value", literalField.val());
+      }
+      $(hiddenId).val(isLiteral ? literalField.val() : sourceField.typedInput("value"));
+    };
+
+    sourceField.on("change", refresh);
+    literalField.on("change keyup", refresh);
+    refresh();
+    return refresh;
+  }
+
+  RED.nodes.registerType("kvhostlink-write", {
+    category: "KV Host Link",
+    color: "#f29d7e",
+    defaults: {
+      name: { value: "" },
+      connection: { value: "", type: "kvhostlink-connection", required: true },
+      updates: {
+        value: "",
+        validate: function (value) {
+          return kvValidateWriteSourceField(value, "#node-input-updatesType", kvValidateWriteLiteral, this && this.updatesType);
+        }
+      },
+      updatesType: { value: "str", required: true },
+      errorHandling: { value: "throw", required: true },
+      metadataMode: { value: "full", required: true },
+      outputs: { value: 1 }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-upload",
+    label: function () {
+      return this.name || "KV Host Link Write";
+    },
+    oneditprepare: function () {
+      const sourceField = $("#node-input-updatesSource");
+      const literalField = $("#node-input-updatesLiteral");
+      literalField.val(this.updates || "");
+      sourceField.val(this.updates || "");
+      $("#node-input-updatesType").val(this.updatesType || "str");
+      const refreshUpdates = setupKvWriteSourceField(
+        "#node-input-updatesSource",
+        "#node-input-updatesType",
+        "#node-input-updatesLiteral",
+        "#node-input-updates"
+      );
+      refreshUpdates();
+    },
+    oneditsave: function () {
+      const sourceField = $("#node-input-updatesSource");
+      const type = sourceField.typedInput("type");
+      $("#node-input-updatesType").val(type);
+      $("#node-input-updates").val(type === "str" ? $("#node-input-updatesLiteral").val() : sourceField.typedInput("value"));
+      this.outputs = $("#node-input-errorHandling").val() === "output2" ? 2 : 1;
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-write">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-updatesSource"><i class="fa fa-sign-in"></i> Source</label>
+    <input type="hidden" id="node-input-updatesType" />
+    <input type="text" id="node-input-updatesSource" style="width: 70%;" />
+    <input type="hidden" id="node-input-updates" />
+  </div>
+  <div class="form-row" id="node-input-updatesLiteralRow">
+    <label for="node-input-updatesLiteral"><i class="fa fa-pencil"></i> Static updates</label>
+    <textarea id="node-input-updatesLiteral" style="height: 140px;" placeholder="{&quot;DM100&quot;:123,&quot;DM110:S&quot;:-5,&quot;DM150.3&quot;:true}&#10;&#10;or&#10;DM100=123&#10;DM160,4=[1,2,3,4]"></textarea>
+  </div>
+  <div class="form-row">
+    <label for="node-input-metadataMode"><i class="fa fa-database"></i> Metadata</label>
+    <select id="node-input-metadataMode">
+      <option value="full">Full msg.kvhostlink</option>
+      <option value="minimal">Minimal msg.kvhostlink</option>
+      <option value="off">Do not modify msg.kvhostlink</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-errorHandling"><i class="fa fa-exclamation"></i> Errors</label>
+    <select id="node-input-errorHandling">
+      <option value="throw">Throw</option>
+      <option value="msg">msg.error</option>
+      <option value="output2">Second output</option>
+    </select>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-write">
+  <p>Writes one or more KEYENCE KV Host Link values using the high-level helper API.</p>
+  <p>Preferred dynamic input is <code>msg.payload</code> or <code>msg.updates</code> as an object, for example <code>{ "DM100": 123, "DM110:S": -5, "DM150.3": true }</code>.</p>
+  <p>Count-qualified addresses expect arrays, for example <code>{ "DM160,4": [1,2,3,4], "R200,4": [true,false,true,true] }</code>.</p>
+  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects or <code>address=value</code> lines.</p>
+  <p>You can also send a single write with <code>msg.address</code>, optional <code>msg.dtype</code>, and the value in <code>msg.value</code> or <code>msg.payload</code>. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix.</p>
+  <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
+</script>

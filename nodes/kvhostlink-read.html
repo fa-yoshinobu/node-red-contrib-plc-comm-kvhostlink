@@ -1,0 +1,185 @@
+﻿<script type="text/javascript">
+  const KVHOSTLINK_ADDRESS_TOKEN_RE = /[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?/iy;
+
+  function kvGetCurrentType(typeSelector, fallback) {
+    const field = $(typeSelector);
+    if (field.length > 0 && field.val()) {
+      return field.val();
+    }
+    return fallback || "str";
+  }
+
+  function kvValidateReferencePath(value, allowEmpty) {
+    const text = String(value == null ? "" : value).trim();
+    return allowEmpty ? true : Boolean(text);
+  }
+
+  function kvTokenizeAddressList(text) {
+    const result = [];
+    let index = 0;
+    const source = String(text || "");
+
+    while (index < source.length) {
+      while (index < source.length && /[\s,;]+/.test(source[index])) {
+        index += 1;
+      }
+      if (index >= source.length) {
+        break;
+      }
+      KVHOSTLINK_ADDRESS_TOKEN_RE.lastIndex = index;
+      const match = KVHOSTLINK_ADDRESS_TOKEN_RE.exec(source);
+      if (!match || match.index !== index) {
+        return null;
+      }
+      result.push(match[0].trim());
+      index = KVHOSTLINK_ADDRESS_TOKEN_RE.lastIndex;
+    }
+
+    return result;
+  }
+
+  function kvValidateAddressLiteral(value) {
+    const text = String(value == null ? "" : value).trim();
+    if (!text) {
+      return true;
+    }
+    return Array.isArray(kvTokenizeAddressList(text));
+  }
+
+  function kvValidateSourceField(value, typeSelector, literalValidator, fallbackType) {
+    const type = kvGetCurrentType(typeSelector, fallbackType);
+    if (!type || type === "str") {
+      return literalValidator(value);
+    }
+    return kvValidateReferencePath(value, false);
+  }
+
+  function setupKvSourceField(sourceId, typeId, literalId, hiddenId) {
+    const sourceField = $(sourceId);
+    const typeField = $(typeId);
+    const literalField = $(literalId);
+    const literalRow = literalField.closest(".form-row");
+
+    sourceField.typedInput({
+      default: "str",
+      typeField: typeField,
+      types: ["msg", "flow", "global", "env", "str"]
+    });
+
+    const refresh = function () {
+      const type = sourceField.typedInput("type");
+      const isLiteral = type === "str";
+      literalRow.toggle(isLiteral);
+      if (isLiteral) {
+        sourceField.typedInput("value", literalField.val());
+      }
+      $(hiddenId).val(isLiteral ? literalField.val() : sourceField.typedInput("value"));
+    };
+
+    sourceField.on("change", refresh);
+    literalField.on("change keyup", refresh);
+    refresh();
+    return refresh;
+  }
+
+  RED.nodes.registerType("kvhostlink-read", {
+    category: "KV Host Link",
+    color: "#f5bba7",
+    defaults: {
+      name: { value: "" },
+      connection: { value: "", type: "kvhostlink-connection", required: true },
+      addresses: {
+        value: "",
+        validate: function (value) {
+          return kvValidateSourceField(value, "#node-input-addressesType", kvValidateAddressLiteral, this && this.addressesType);
+        }
+      },
+      addressesType: { value: "str", required: true },
+      outputMode: { value: "object", required: true },
+      errorHandling: { value: "throw", required: true },
+      metadataMode: { value: "full", required: true },
+      outputs: { value: 1 }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-download",
+    label: function () {
+      return this.name || "KV Host Link Read";
+    },
+    oneditprepare: function () {
+      const sourceField = $("#node-input-addressesSource");
+      const literalField = $("#node-input-addressesLiteral");
+      literalField.val(this.addresses || "");
+      sourceField.val(this.addresses || "");
+      $("#node-input-addressesType").val(this.addressesType || "str");
+      const refreshAddresses = setupKvSourceField(
+        "#node-input-addressesSource",
+        "#node-input-addressesType",
+        "#node-input-addressesLiteral",
+        "#node-input-addresses"
+      );
+      refreshAddresses();
+    },
+    oneditsave: function () {
+      const sourceField = $("#node-input-addressesSource");
+      const type = sourceField.typedInput("type");
+      $("#node-input-addressesType").val(type);
+      $("#node-input-addresses").val(type === "str" ? $("#node-input-addressesLiteral").val() : sourceField.typedInput("value"));
+      this.outputs = $("#node-input-errorHandling").val() === "output2" ? 2 : 1;
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-read">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-addressesSource"><i class="fa fa-sign-in"></i> Source</label>
+    <input type="hidden" id="node-input-addressesType" />
+    <input type="text" id="node-input-addressesSource" style="width: 70%;" />
+    <input type="hidden" id="node-input-addresses" />
+  </div>
+  <div class="form-row" id="node-input-addressesLiteralRow">
+    <label for="node-input-addressesLiteral"><i class="fa fa-list"></i> Addresses</label>
+    <textarea id="node-input-addressesLiteral" style="height: 140px;" placeholder="DM100&#10;DM110:S&#10;DM120:D&#10;DM150.3&#10;DM160,4"></textarea>
+  </div>
+  <div class="form-row">
+    <label for="node-input-outputMode"><i class="fa fa-sign-out"></i> Output</label>
+    <select id="node-input-outputMode">
+      <option value="object">Object payload</option>
+      <option value="array">Array in address order</option>
+      <option value="value">Single value when one address</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-metadataMode"><i class="fa fa-database"></i> Metadata</label>
+    <select id="node-input-metadataMode">
+      <option value="full">Full msg.kvhostlink</option>
+      <option value="minimal">Minimal msg.kvhostlink</option>
+      <option value="off">Do not modify msg.kvhostlink</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-errorHandling"><i class="fa fa-exclamation"></i> Errors</label>
+    <select id="node-input-errorHandling">
+      <option value="throw">Throw</option>
+      <option value="msg">msg.error</option>
+      <option value="output2">Second output</option>
+    </select>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-read">
+  <p>Reads one or more KEYENCE KV Host Link addresses and writes the result to <code>msg.payload</code>.</p>
+  <p>Supported forms include <code>DM100</code>, <code>DM110:S</code>, <code>DM120:D</code>, <code>DM130:L</code>, <code>DM140:F</code>, <code>DM150.3</code>, <code>DM160,4</code>, <code>R200,4</code>, <code>T10:D</code>, and <code>C10:D</code>.</p>
+  <p>Output can be an object keyed by address, an array in address order, or a single scalar when exactly one address is requested.</p>
+  <p>Metadata can emit full <code>msg.kvhostlink</code>, a minimal object with item count only, or leave <code>msg.kvhostlink</code> unchanged.</p>
+  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, <code>msg.addresses</code> or a string/array in <code>msg.payload</code> still take priority.</p>
+  <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
+</script>

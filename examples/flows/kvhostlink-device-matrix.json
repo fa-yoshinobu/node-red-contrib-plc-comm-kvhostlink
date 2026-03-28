@@ -1,0 +1,480 @@
+[
+    {
+        "id": "tab-kvhostlink-device-matrix",
+        "type": "tab",
+        "label": "KV Host Link Device Matrix",
+        "disabled": false,
+        "info": "High-level one-by-one sample for KEYENCE KV Host Link device families. Edit the catalog in the function node before deploy if your PLC uses different ranges."
+    },
+    {
+        "id": "comment-kvhostlink-device-matrix-main",
+        "type": "comment",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "High-level one-by-one read/write sample with persistent JSONL logging and timeout tracking",
+        "info": "",
+        "x": 350,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "comment-kvhostlink-device-matrix-edit",
+        "type": "comment",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Edit the catalog in 'Prepare next device sample' before deploy. Completed results append to logs/kvhostlink-device-matrix-<session>.jsonl",
+        "info": "",
+        "x": 400,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "inject-device-matrix-reset",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Reset sequence + history",
+        "props": [
+            {
+                "p": "mode",
+                "v": "reset",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 140,
+        "wires": [
+            [
+                "function-device-matrix-router"
+            ]
+        ]
+    },
+    {
+        "id": "inject-device-matrix-catalog",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Show catalog",
+        "props": [
+            {
+                "p": "mode",
+                "v": "catalog",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 110,
+        "y": 180,
+        "wires": [
+            [
+                "function-device-matrix-router"
+            ]
+        ]
+    },
+    {
+        "id": "inject-device-matrix-read",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Read next device",
+        "props": [
+            {
+                "p": "mode",
+                "v": "readNext",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 220,
+        "wires": [
+            [
+                "function-device-matrix-router"
+            ]
+        ]
+    },
+    {
+        "id": "inject-device-matrix-write",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Write next device",
+        "props": [
+            {
+                "p": "mode",
+                "v": "writeNext",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 260,
+        "wires": [
+            [
+                "function-device-matrix-router"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-router",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Prepare next device sample (edit catalog here)",
+        "func": "const catalog = [\n    { code: 'R', address: 'R10', value: true, note: 'bit decimal' },\n    { code: 'B', address: 'B10', value: true, note: 'bit hexadecimal' },\n    { code: 'MR', address: 'MR10', value: true, note: 'bit decimal' },\n    { code: 'LR', address: 'LR10', value: true, note: 'bit decimal' },\n    { code: 'CR', address: 'CR10', value: true, note: 'bit decimal' },\n    { code: 'VB', address: 'VB10', value: true, note: 'bit hexadecimal' },\n    { code: 'DM', address: 'DM100', value: 123, note: 'word decimal' },\n    { code: 'EM', address: 'EM100', value: 123, note: 'word decimal' },\n    { code: 'FM', address: 'FM100', value: 123, note: 'word decimal' },\n    { code: 'ZF', address: 'ZF100', value: 123, note: 'word decimal' },\n    { code: 'W', address: 'W10', value: 123, note: 'word hexadecimal address' },\n    { code: 'TM', address: 'TM10', value: 123, note: 'timer monitor word' },\n    { code: 'Z', address: 'Z1', value: 1, note: 'index register word' },\n    { code: 'T', address: 'T10', value: 12345, note: 'timer set/current dword' },\n    { code: 'TC', address: 'TC10', value: 12345, note: 'timer current/contact family' },\n    { code: 'TS', address: 'TS10', value: 12345, note: 'timer current/contact family' },\n    { code: 'C', address: 'C10', value: 12345, note: 'counter set/current dword' },\n    { code: 'CC', address: 'CC10', value: 12345, note: 'counter current/contact family' },\n    { code: 'CS', address: 'CS10', value: 12345, note: 'counter current/contact family' },\n    { code: 'CM', address: 'CM10', value: 123, note: 'control memory word' },\n    { code: 'VM', address: 'VM100', value: 123, note: 'variable memory word' },\n    { code: 'X', address: 'X10', value: true, note: 'bit hexadecimal address' },\n    { code: 'Y', address: 'Y10', value: true, note: 'bit hexadecimal address' },\n    { code: 'M', address: 'M10', value: true, note: 'bit decimal alias' },\n    { code: 'L', address: 'L10', value: true, note: 'bit decimal alias' },\n    { code: 'D', address: 'D100', value: 123, note: 'word decimal alias' },\n    { code: 'E', address: 'E100', value: 123, note: 'word decimal alias' },\n    { code: 'F', address: 'F10', value: 123, note: 'word decimal alias' },\n    { code: 'DM', label: 'DM signed', address: 'DM110:S', value: -22, note: 'signed 16-bit' },\n    { code: 'DM', label: 'DM dword', address: 'DM120:D', value: 987654321, note: 'unsigned 32-bit' },\n    { code: 'DM', label: 'DM long', address: 'DM130:L', value: -2023406815, note: 'signed 32-bit' },\n    { code: 'DM', label: 'DM float', address: 'DM140:F', value: 45.5, note: 'float32' },\n    { code: 'DM', label: 'DM bit-in-word', address: 'DM150.3', value: true, note: 'bit in word' },\n    { code: 'DM', label: 'DM array', address: 'DM160,4', value: [1, 2, 3, 4], note: 'word array' },\n    { code: 'R', label: 'R array', address: 'R200,4', value: [true, false, true, true], note: 'bit array' }\n];\n\nconst total = catalog.length;\nconst readKey = 'kvhostlinkDeviceMatrixReadIndex';\nconst writeKey = 'kvhostlinkDeviceMatrixWriteIndex';\nconst resultsKey = 'kvhostlinkDeviceMatrixResults';\nconst pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst sessionKey = 'kvhostlinkDeviceMatrixSessionId';\nconst logPathKey = 'kvhostlinkDeviceMatrixLogPath';\nconst timeoutKey = 'kvhostlinkDeviceMatrixTimeoutMs';\nconst totalKey = 'kvhostlinkDeviceMatrixTotalCatalog';\nconst action = String(msg.mode || 'catalog');\n\nflow.set(totalKey, total);\nflow.set('kvhostlinkDeviceMatrixCatalog', catalog);\nif (!flow.get(timeoutKey)) {\n    flow.set(timeoutKey, 5000);\n}\n\nfunction makeSessionId() {\n    return new Date().toISOString().replace(/[:.]/g, '-');\n}\n\nfunction ensureSessionId(reset) {\n    let sessionId = flow.get(sessionKey);\n    if (reset || !sessionId) {\n        sessionId = makeSessionId();\n        flow.set(sessionKey, sessionId);\n    }\n    return sessionId;\n}\n\nfunction ensureLogPath(sessionId, reset) {\n    let logPath = flow.get(logPathKey);\n    if (reset || !logPath) {\n        logPath = 'logs/kvhostlink-device-matrix-' + sessionId + '.jsonl';\n        flow.set(logPathKey, logPath);\n    }\n    return logPath;\n}\n\nfunction getPendingMap() {\n    return Object.assign({}, flow.get(pendingKey) || {});\n}\n\nfunction getResults() {\n    return Array.from(flow.get(resultsKey) || []);\n}\n\nfunction buildSummary() {\n    const results = getResults();\n    const pending = getPendingMap();\n    const summary = {\n        kind: 'summary',\n        sessionId: ensureSessionId(false),\n        logPath: ensureLogPath(ensureSessionId(false), false),\n        totalCatalog: total,\n        completed: results.length,\n        ok: 0,\n        ng: 0,\n        mismatch: 0,\n        timeout: 0,\n        pending: Object.keys(pending).length,\n        pendingIds: Object.keys(pending)\n    };\n    for (const entry of results) {\n        if (entry.status === 'OK') {\n            summary.ok += 1;\n        } else {\n            summary.ng += 1;\n            if (entry.status === 'MISMATCH') {\n                summary.mismatch += 1;\n            }\n            if (entry.status === 'TIMEOUT') {\n                summary.timeout += 1;\n            }\n        }\n    }\n    return summary;\n}\n\nfunction registerPending(kind, index, entry) {\n    const sessionId = ensureSessionId(false);\n    const logPath = ensureLogPath(sessionId, false);\n    const now = new Date().toISOString();\n    const displayLabel = entry.label || entry.code;\n    const requestId = kind + '-' + displayLabel + '-' + String(index + 1) + '-' + String(Date.now());\n    const pending = getPendingMap();\n    const record = {\n        kind: 'result',\n        requestId: requestId,\n        sessionId: sessionId,\n        logPath: logPath,\n        operation: kind,\n        action: kind === 'write' ? 'write-readback' : 'read',\n        deviceCode: entry.code,\n        sampleLabel: entry.label || entry.code,\n        address: entry.address,\n        note: entry.note,\n        sequence: {\n            index: index + 1,\n            total: total\n        },\n        status: 'PENDING',\n        phase: kind === 'write' ? 'WRITE_PENDING' : 'READ_PENDING',\n        ok: null,\n        expectedValue: kind === 'write' ? entry.value : null,\n        writeValue: kind === 'write' ? entry.value : null,\n        writeStatus: kind === 'write' ? 'PENDING' : 'SKIPPED',\n        readValue: null,\n        readStatus: 'PENDING',\n        readbackStatus: kind === 'write' ? 'PENDING' : 'SKIPPED',\n        error: null,\n        startedAt: now,\n        updatedAt: now,\n        finishedAt: null\n    };\n    pending[requestId] = record;\n    flow.set(pendingKey, pending);\n    return record;\n}\n\nif (action === 'reset') {\n    const sessionId = ensureSessionId(true);\n    const logPath = ensureLogPath(sessionId, true);\n    flow.set(readKey, 0);\n    flow.set(writeKey, 0);\n    flow.set(resultsKey, []);\n    flow.set(pendingKey, {});\n    return [null, null, {\n        payload: {\n            kind: 'reset',\n            sessionId: sessionId,\n            logPath: logPath,\n            totalCatalog: total,\n            timeoutMs: flow.get(timeoutKey),\n            note: 'In-memory history cleared. Completed results append to the JSONL log file.'\n        }\n    }];\n}\n\nif (action === 'catalog') {\n    const sessionId = ensureSessionId(false);\n    const logPath = ensureLogPath(sessionId, false);\n    return [null, null, {\n        payload: {\n            kind: 'catalog',\n            sessionId: sessionId,\n            logPath: logPath,\n            totalCatalog: total,\n            timeoutMs: flow.get(timeoutKey),\n            entries: catalog,\n            summary: buildSummary()\n        }\n    }];\n}\n\nif (action === 'readNext') {\n    const index = Number(flow.get(readKey) || 0) % total;\n    const entry = catalog[index];\n    flow.set(readKey, index + 1);\n    const record = registerPending('read', index, entry);\n    return [\n        {\n            topic: 'read:' + (entry.label || entry.code),\n            action: 'read',\n            requestId: record.requestId,\n            deviceSample: entry,\n            sequence: record.sequence,\n            startedAt: record.startedAt,\n            addresses: [entry.address]\n        },\n        null,\n        { payload: record }\n    ];\n}\n\nif (action === 'writeNext') {\n    const index = Number(flow.get(writeKey) || 0) % total;\n    const entry = catalog[index];\n    flow.set(writeKey, index + 1);\n    const record = registerPending('write', index, entry);\n    const updates = {};\n    updates[entry.address] = entry.value;\n    return [\n        null,\n        {\n            topic: 'write:' + (entry.label || entry.code),\n            action: 'write',\n            requestId: record.requestId,\n            deviceSample: entry,\n            sequence: record.sequence,\n            startedAt: record.startedAt,\n            payload: updates\n        },\n        { payload: record }\n    ];\n}\n\nnode.error('Unknown mode: ' + action, msg);\nreturn null;",
+        "outputs": 3,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 200,
+        "wires": [
+            [
+                "read-device-matrix"
+            ],
+            [
+                "write-device-matrix"
+            ],
+            [
+                "debug-device-matrix-status"
+            ]
+        ]
+    },
+    {
+        "id": "read-device-matrix",
+        "type": "kvhostlink-read",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Read one sample",
+        "connection": "cfg-kvhostlink-device-matrix",
+        "addresses": "addresses",
+        "addressesType": "msg",
+        "outputMode": "value",
+        "errorHandling": "output2",
+        "x": 760,
+        "y": 180,
+        "wires": [
+            [
+                "function-device-matrix-format-read-ok"
+            ],
+            [
+                "function-device-matrix-format-read-error"
+            ]
+        ]
+    },
+    {
+        "id": "write-device-matrix",
+        "type": "kvhostlink-write",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Write one sample",
+        "connection": "cfg-kvhostlink-device-matrix",
+        "updates": "payload",
+        "updatesType": "msg",
+        "errorHandling": "output2",
+        "x": 760,
+        "y": 280,
+        "wires": [
+            [
+                "function-device-matrix-format-write-ok"
+            ],
+            [
+                "function-device-matrix-format-write-error"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-format-read-ok",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Finalize read result",
+        "func": "const resultsKey = 'kvhostlinkDeviceMatrixResults';\nconst pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst totalKey = 'kvhostlinkDeviceMatrixTotalCatalog';\nconst sessionKey = 'kvhostlinkDeviceMatrixSessionId';\nconst logPathKey = 'kvhostlinkDeviceMatrixLogPath';\nconst sample = msg.deviceSample || {};\nconst pending = Object.assign({}, flow.get(pendingKey) || {});\nconst results = Array.from(flow.get(resultsKey) || []);\nconst total = Number(flow.get(totalKey) || 0);\nconst now = new Date().toISOString();\nconst address = sample.address || ((msg.kvhostlink && Array.isArray(msg.kvhostlink.addresses) && msg.kvhostlink.addresses[0]) || null);\n\nfunction valuesMatch(expected, actual) {\n    if (typeof expected === 'boolean') {\n        if (typeof actual === 'boolean') {\n            return expected === actual;\n        }\n        if (actual === 0 || actual === 1) {\n            return Boolean(actual) === expected;\n        }\n        if (actual === 'true' || actual === 'false') {\n            return (actual === 'true') === expected;\n        }\n    }\n    return JSON.stringify(actual) === JSON.stringify(expected);\n}\n\nfunction buildSummary() {\n    const summary = {\n        kind: 'summary',\n        sessionId: flow.get(sessionKey) || null,\n        logPath: flow.get(logPathKey) || null,\n        totalCatalog: total,\n        completed: results.length,\n        ok: 0,\n        ng: 0,\n        mismatch: 0,\n        timeout: 0,\n        pending: Object.keys(pending).length,\n        pendingIds: Object.keys(pending)\n    };\n    for (const entry of results) {\n        if (entry.status === 'OK') {\n            summary.ok += 1;\n        } else {\n            summary.ng += 1;\n            if (entry.status === 'MISMATCH') {\n                summary.mismatch += 1;\n            }\n            if (entry.status === 'TIMEOUT') {\n                summary.timeout += 1;\n            }\n        }\n    }\n    return summary;\n}\n\nconst record = Object.assign({\n    kind: 'result',\n    requestId: msg.requestId || ('read-' + ((sample.label || sample.code) || 'unknown') + '-' + String(Date.now())),\n    sessionId: flow.get(sessionKey) || null,\n    logPath: flow.get(logPathKey) || null,\n    operation: msg.action === 'write-readback' ? 'write' : 'read',\n    action: msg.action || 'read',\n    deviceCode: sample.code || null,\n    sampleLabel: sample.label || sample.code || null,\n    address: address,\n    note: sample.note || '',\n    sequence: msg.sequence || null,\n    status: 'PENDING',\n    phase: 'DONE',\n    ok: null,\n    expectedValue: null,\n    writeValue: null,\n    writeStatus: msg.action === 'write-readback' ? 'UNKNOWN' : 'SKIPPED',\n    readValue: null,\n    readStatus: 'PENDING',\n    readbackStatus: msg.action === 'write-readback' ? 'PENDING' : 'SKIPPED',\n    error: null,\n    startedAt: msg.startedAt || now,\n    updatedAt: now,\n    finishedAt: now\n}, pending[msg.requestId] || {});\n\nrecord.updatedAt = now;\nrecord.finishedAt = now;\nrecord.phase = 'DONE';\nrecord.address = address;\nrecord.deviceCode = sample.code || record.deviceCode;\nrecord.sampleLabel = sample.label || record.sampleLabel || record.deviceCode;\nrecord.note = sample.note || record.note || '';\nrecord.sequence = msg.sequence || record.sequence || null;\nrecord.readValue = msg.payload;\nrecord.error = null;\n\nif (msg.action === 'write-readback') {\n    const matched = valuesMatch(record.expectedValue, msg.payload);\n    record.writeStatus = record.writeStatus === 'OK' ? 'OK' : 'UNKNOWN';\n    record.readStatus = matched ? 'OK' : 'MISMATCH';\n    record.readbackStatus = matched ? 'OK' : 'MISMATCH';\n    record.status = matched ? 'OK' : 'MISMATCH';\n    record.ok = matched;\n    if (!matched) {\n        record.error = 'Readback mismatch';\n    }\n} else {\n    record.writeStatus = 'SKIPPED';\n    record.readStatus = 'OK';\n    record.readbackStatus = 'SKIPPED';\n    record.status = 'OK';\n    record.ok = true;\n}\n\nif (record.requestId && Object.prototype.hasOwnProperty.call(pending, record.requestId)) {\n    delete pending[record.requestId];\n}\nresults.push(record);\nflow.set(pendingKey, pending);\nflow.set(resultsKey, results);\n\nreturn [\n    { payload: record },\n    { payload: results },\n    { payload: buildSummary() },\n    { filename: flow.get(logPathKey), payload: JSON.stringify(record) }\n];",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 160,
+        "wires": [
+            [
+                "debug-device-matrix-latest"
+            ],
+            [
+                "debug-device-matrix-history"
+            ],
+            [
+                "debug-device-matrix-summary"
+            ],
+            [
+                "file-device-matrix-log"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-format-read-error",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Finalize read error",
+        "func": "const resultsKey = 'kvhostlinkDeviceMatrixResults';\nconst pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst totalKey = 'kvhostlinkDeviceMatrixTotalCatalog';\nconst sessionKey = 'kvhostlinkDeviceMatrixSessionId';\nconst logPathKey = 'kvhostlinkDeviceMatrixLogPath';\nconst sample = msg.deviceSample || {};\nconst pending = Object.assign({}, flow.get(pendingKey) || {});\nconst results = Array.from(flow.get(resultsKey) || []);\nconst total = Number(flow.get(totalKey) || 0);\nconst now = new Date().toISOString();\nconst address = sample.address || ((msg.kvhostlink && Array.isArray(msg.kvhostlink.addresses) && msg.kvhostlink.addresses[0]) || null);\n\nfunction buildSummary() {\n    const summary = {\n        kind: 'summary',\n        sessionId: flow.get(sessionKey) || null,\n        logPath: flow.get(logPathKey) || null,\n        totalCatalog: total,\n        completed: results.length,\n        ok: 0,\n        ng: 0,\n        mismatch: 0,\n        timeout: 0,\n        pending: Object.keys(pending).length,\n        pendingIds: Object.keys(pending)\n    };\n    for (const entry of results) {\n        if (entry.status === 'OK') {\n            summary.ok += 1;\n        } else {\n            summary.ng += 1;\n            if (entry.status === 'MISMATCH') {\n                summary.mismatch += 1;\n            }\n            if (entry.status === 'TIMEOUT') {\n                summary.timeout += 1;\n            }\n        }\n    }\n    return summary;\n}\n\nconst record = Object.assign({\n    kind: 'result',\n    requestId: msg.requestId || ('read-' + ((sample.label || sample.code) || 'unknown') + '-' + String(Date.now())),\n    sessionId: flow.get(sessionKey) || null,\n    logPath: flow.get(logPathKey) || null,\n    operation: msg.action === 'write-readback' ? 'write' : 'read',\n    action: msg.action || 'read',\n    deviceCode: sample.code || null,\n    sampleLabel: sample.label || sample.code || null,\n    address: address,\n    note: sample.note || '',\n    sequence: msg.sequence || null,\n    status: 'NG',\n    phase: 'DONE',\n    ok: false,\n    expectedValue: null,\n    writeValue: null,\n    writeStatus: msg.action === 'write-readback' ? 'UNKNOWN' : 'SKIPPED',\n    readValue: null,\n    readStatus: 'NG',\n    readbackStatus: msg.action === 'write-readback' ? 'NG' : 'SKIPPED',\n    error: null,\n    startedAt: msg.startedAt || now,\n    updatedAt: now,\n    finishedAt: now\n}, pending[msg.requestId] || {});\n\nrecord.updatedAt = now;\nrecord.finishedAt = now;\nrecord.phase = 'DONE';\nrecord.address = address;\nrecord.deviceCode = sample.code || record.deviceCode;\nrecord.sampleLabel = sample.label || record.sampleLabel || record.deviceCode;\nrecord.note = sample.note || record.note || '';\nrecord.sequence = msg.sequence || record.sequence || null;\nrecord.ok = false;\nrecord.status = 'NG';\nrecord.readValue = null;\nrecord.error = msg.error && msg.error.message ? msg.error.message : String(msg.error || 'Unknown read error');\n\nif (msg.action === 'write-readback') {\n    record.writeStatus = record.writeStatus === 'OK' ? 'OK' : 'UNKNOWN';\n    record.readStatus = 'NG';\n    record.readbackStatus = 'NG';\n} else {\n    record.writeStatus = 'SKIPPED';\n    record.readStatus = 'NG';\n    record.readbackStatus = 'SKIPPED';\n}\n\nif (record.requestId && Object.prototype.hasOwnProperty.call(pending, record.requestId)) {\n    delete pending[record.requestId];\n}\nresults.push(record);\nflow.set(pendingKey, pending);\nflow.set(resultsKey, results);\n\nreturn [\n    { payload: record },\n    { payload: results },\n    { payload: buildSummary() },\n    { filename: flow.get(logPathKey), payload: JSON.stringify(record) }\n];",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 200,
+        "wires": [
+            [
+                "debug-device-matrix-latest"
+            ],
+            [
+                "debug-device-matrix-history"
+            ],
+            [
+                "debug-device-matrix-summary"
+            ],
+            [
+                "file-device-matrix-log"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-format-write-ok",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Mark write ok + read back",
+        "func": "const pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst pending = Object.assign({}, flow.get(pendingKey) || {});\nconst now = new Date().toISOString();\nconst sample = msg.deviceSample || {};\nconst updates = (msg.kvhostlink && msg.kvhostlink.updates) || msg.payload || {};\nconst address = sample.address || Object.keys(updates)[0] || null;\nconst writeValue = address && Object.prototype.hasOwnProperty.call(updates, address) ? updates[address] : null;\nconst record = pending[msg.requestId];\n\nif (record) {\n    record.phase = 'READBACK_PENDING';\n    record.writeStatus = 'OK';\n    record.writeValue = writeValue;\n    record.expectedValue = writeValue;\n    record.updatedAt = now;\n    pending[msg.requestId] = record;\n    flow.set(pendingKey, pending);\n}\n\nmsg.writeRequest = updates;\nmsg.action = 'write-readback';\nmsg.addresses = [address];\ndelete msg.payload;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 240,
+        "wires": [
+            [
+                "read-device-matrix"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-format-write-error",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Finalize write error",
+        "func": "const resultsKey = 'kvhostlinkDeviceMatrixResults';\nconst pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst totalKey = 'kvhostlinkDeviceMatrixTotalCatalog';\nconst sessionKey = 'kvhostlinkDeviceMatrixSessionId';\nconst logPathKey = 'kvhostlinkDeviceMatrixLogPath';\nconst sample = msg.deviceSample || {};\nconst pending = Object.assign({}, flow.get(pendingKey) || {});\nconst results = Array.from(flow.get(resultsKey) || []);\nconst total = Number(flow.get(totalKey) || 0);\nconst now = new Date().toISOString();\nconst updates = (msg.kvhostlink && msg.kvhostlink.updates) || msg.payload || {};\nconst address = sample.address || Object.keys(updates)[0] || null;\n\nfunction buildSummary() {\n    const summary = {\n        kind: 'summary',\n        sessionId: flow.get(sessionKey) || null,\n        logPath: flow.get(logPathKey) || null,\n        totalCatalog: total,\n        completed: results.length,\n        ok: 0,\n        ng: 0,\n        mismatch: 0,\n        timeout: 0,\n        pending: Object.keys(pending).length,\n        pendingIds: Object.keys(pending)\n    };\n    for (const entry of results) {\n        if (entry.status === 'OK') {\n            summary.ok += 1;\n        } else {\n            summary.ng += 1;\n            if (entry.status === 'MISMATCH') {\n                summary.mismatch += 1;\n            }\n            if (entry.status === 'TIMEOUT') {\n                summary.timeout += 1;\n            }\n        }\n    }\n    return summary;\n}\n\nconst record = Object.assign({\n    kind: 'result',\n    requestId: msg.requestId || ('write-' + ((sample.label || sample.code) || 'unknown') + '-' + String(Date.now())),\n    sessionId: flow.get(sessionKey) || null,\n    logPath: flow.get(logPathKey) || null,\n    operation: 'write',\n    action: 'write-readback',\n    deviceCode: sample.code || null,\n    sampleLabel: sample.label || sample.code || null,\n    address: address,\n    note: sample.note || '',\n    sequence: msg.sequence || null,\n    status: 'NG',\n    phase: 'DONE',\n    ok: false,\n    expectedValue: address && Object.prototype.hasOwnProperty.call(updates, address) ? updates[address] : null,\n    writeValue: address && Object.prototype.hasOwnProperty.call(updates, address) ? updates[address] : null,\n    writeStatus: 'NG',\n    readValue: null,\n    readStatus: 'SKIPPED',\n    readbackStatus: 'SKIPPED',\n    error: null,\n    startedAt: msg.startedAt || now,\n    updatedAt: now,\n    finishedAt: now\n}, pending[msg.requestId] || {});\n\nrecord.updatedAt = now;\nrecord.finishedAt = now;\nrecord.phase = 'DONE';\nrecord.address = address;\nrecord.deviceCode = sample.code || record.deviceCode;\nrecord.sampleLabel = sample.label || record.sampleLabel || record.deviceCode;\nrecord.note = sample.note || record.note || '';\nrecord.sequence = msg.sequence || record.sequence || null;\nrecord.ok = false;\nrecord.status = 'NG';\nrecord.writeStatus = 'NG';\nrecord.readStatus = 'SKIPPED';\nrecord.readbackStatus = 'SKIPPED';\nrecord.error = msg.error && msg.error.message ? msg.error.message : String(msg.error || 'Unknown write error');\n\nif (record.requestId && Object.prototype.hasOwnProperty.call(pending, record.requestId)) {\n    delete pending[record.requestId];\n}\nresults.push(record);\nflow.set(pendingKey, pending);\nflow.set(resultsKey, results);\n\nreturn [\n    { payload: record },\n    { payload: results },\n    { payload: buildSummary() },\n    { filename: flow.get(logPathKey), payload: JSON.stringify(record) }\n];",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 320,
+        "wires": [
+            [
+                "debug-device-matrix-latest"
+            ],
+            [
+                "debug-device-matrix-history"
+            ],
+            [
+                "debug-device-matrix-summary"
+            ],
+            [
+                "file-device-matrix-log"
+            ]
+        ]
+    },
+    {
+        "id": "debug-device-matrix-status",
+        "type": "debug",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Catalog / pending",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 780,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "debug-device-matrix-latest",
+        "type": "debug",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Latest device result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1300,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "debug-device-matrix-history",
+        "type": "debug",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Completed result history",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1290,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "cfg-kvhostlink-device-matrix",
+        "type": "kvhostlink-connection",
+        "name": "KV PLC TCP",
+        "host": "192.168.250.100",
+        "port": "8501",
+        "transport": "tcp",
+        "timeout": "3000",
+        "appendLfOnSend": false
+    },
+    {
+        "id": "inject-device-matrix-summary",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Show summary",
+        "props": [
+            {
+                "p": "mode",
+                "v": "summary",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 100,
+        "y": 300,
+        "wires": [
+            [
+                "function-device-matrix-summary"
+            ]
+        ]
+    },
+    {
+        "id": "inject-device-matrix-timeout",
+        "type": "inject",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Timeout sweep (auto 1s)",
+        "props": [
+            {
+                "p": "mode",
+                "v": "timeoutSweep",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 120,
+        "y": 340,
+        "wires": [
+            [
+                "function-device-matrix-timeout"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-summary",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Show current matrix summary",
+        "func": "const results = Array.from(flow.get('kvhostlinkDeviceMatrixResults') || []);\nconst pending = Object.assign({}, flow.get('kvhostlinkDeviceMatrixPendingById') || {});\nconst total = Number(flow.get('kvhostlinkDeviceMatrixTotalCatalog') || 0);\nconst summary = {\n    kind: 'summary',\n    sessionId: flow.get('kvhostlinkDeviceMatrixSessionId') || null,\n    logPath: flow.get('kvhostlinkDeviceMatrixLogPath') || null,\n    totalCatalog: total,\n    completed: results.length,\n    ok: 0,\n    ng: 0,\n    mismatch: 0,\n    timeout: 0,\n    pending: Object.keys(pending).length,\n    pendingIds: Object.keys(pending),\n    pendingEntries: Object.values(pending)\n};\nfor (const entry of results) {\n    if (entry.status === 'OK') {\n        summary.ok += 1;\n    } else {\n        summary.ng += 1;\n        if (entry.status === 'MISMATCH') {\n            summary.mismatch += 1;\n        }\n        if (entry.status === 'TIMEOUT') {\n            summary.timeout += 1;\n        }\n    }\n}\nmsg.payload = summary;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 300,
+        "wires": [
+            [
+                "debug-device-matrix-summary"
+            ]
+        ]
+    },
+    {
+        "id": "function-device-matrix-timeout",
+        "type": "function",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Finalize timed out operations",
+        "func": "const resultsKey = 'kvhostlinkDeviceMatrixResults';\nconst pendingKey = 'kvhostlinkDeviceMatrixPendingById';\nconst totalKey = 'kvhostlinkDeviceMatrixTotalCatalog';\nconst sessionKey = 'kvhostlinkDeviceMatrixSessionId';\nconst logPathKey = 'kvhostlinkDeviceMatrixLogPath';\nconst timeoutMs = Number(flow.get('kvhostlinkDeviceMatrixTimeoutMs') || 5000);\nconst pending = Object.assign({}, flow.get(pendingKey) || {});\nconst results = Array.from(flow.get(resultsKey) || []);\nconst total = Number(flow.get(totalKey) || 0);\nconst nowMs = Date.now();\nconst timedOut = [];\n\nfunction buildSummary() {\n    const summary = {\n        kind: 'summary',\n        sessionId: flow.get(sessionKey) || null,\n        logPath: flow.get(logPathKey) || null,\n        totalCatalog: total,\n        completed: results.length,\n        ok: 0,\n        ng: 0,\n        mismatch: 0,\n        timeout: 0,\n        pending: Object.keys(pending).length,\n        pendingIds: Object.keys(pending)\n    };\n    for (const entry of results) {\n        if (entry.status === 'OK') {\n            summary.ok += 1;\n        } else {\n            summary.ng += 1;\n            if (entry.status === 'MISMATCH') {\n                summary.mismatch += 1;\n            }\n            if (entry.status === 'TIMEOUT') {\n                summary.timeout += 1;\n            }\n        }\n    }\n    return summary;\n}\n\nfor (const requestId of Object.keys(pending)) {\n    const record = pending[requestId];\n    const started = Date.parse(record.updatedAt || record.startedAt || '');\n    if (!Number.isFinite(started)) {\n        continue;\n    }\n    if ((nowMs - started) < timeoutMs) {\n        continue;\n    }\n\n    const finishedAt = new Date().toISOString();\n    const timedOutRecord = Object.assign({}, record, {\n        status: 'TIMEOUT',\n        phase: 'DONE',\n        ok: false,\n        error: 'No completion within ' + String(timeoutMs) + ' ms',\n        updatedAt: finishedAt,\n        finishedAt: finishedAt\n    });\n\n    if (timedOutRecord.operation === 'write') {\n        if (timedOutRecord.writeStatus === 'PENDING') {\n            timedOutRecord.writeStatus = 'TIMEOUT';\n            timedOutRecord.readStatus = 'SKIPPED';\n            timedOutRecord.readbackStatus = 'SKIPPED';\n        } else {\n            timedOutRecord.readStatus = 'TIMEOUT';\n            timedOutRecord.readbackStatus = 'TIMEOUT';\n        }\n    } else {\n        timedOutRecord.writeStatus = 'SKIPPED';\n        timedOutRecord.readStatus = 'TIMEOUT';\n        timedOutRecord.readbackStatus = 'SKIPPED';\n    }\n\n    delete pending[requestId];\n    results.push(timedOutRecord);\n    timedOut.push(timedOutRecord);\n}\n\nif (timedOut.length === 0) {\n    return null;\n}\n\nflow.set(pendingKey, pending);\nflow.set(resultsKey, results);\n\nreturn [\n    timedOut.map(function (entry) { return { payload: entry }; }),\n    [{ payload: results }],\n    [{ payload: buildSummary() }],\n    timedOut.map(function (entry) {\n        return {\n            filename: flow.get(logPathKey),\n            payload: JSON.stringify(entry)\n        };\n    })\n];",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 340,
+        "wires": [
+            [
+                "debug-device-matrix-latest"
+            ],
+            [
+                "debug-device-matrix-history"
+            ],
+            [
+                "debug-device-matrix-summary"
+            ],
+            [
+                "file-device-matrix-log"
+            ]
+        ]
+    },
+    {
+        "id": "debug-device-matrix-summary",
+        "type": "debug",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Run summary",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1290,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "file-device-matrix-log",
+        "type": "file",
+        "z": "tab-kvhostlink-device-matrix",
+        "name": "Append JSONL result log",
+        "filename": "filename",
+        "filenameType": "msg",
+        "appendNewline": true,
+        "createDir": true,
+        "overwriteFile": "false",
+        "encoding": "none",
+        "x": 1310,
+        "y": 400,
+        "wires": []
+    }
+]

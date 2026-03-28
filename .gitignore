@@ -1,0 +1,9 @@
+﻿node_modules/
+.npm-cache/
+.nodered-runtime-test/
+logs/
+*.tgz
+.nodered-runtime-test-*/
+.nodered-published-smoke-*/
+nr-published-smoke-*/
+

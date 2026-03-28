@@ -1,0 +1,76 @@
+﻿name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+        node-version:
+          - 18
+          - 20
+          - 22
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Show tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Run tests
+        run: npm test
+
+      - name: Validate package contents
+        run: npm pack --dry-run
+
+  windows-smoke:
+    name: windows-latest / Node 20
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Show tool versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+
+      - name: Run tests
+        shell: pwsh
+        run: npm test
+
+      - name: Validate package contents
+        shell: pwsh
+        run: npm pack --dry-run

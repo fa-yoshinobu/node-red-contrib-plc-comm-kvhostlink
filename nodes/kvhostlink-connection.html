@@ -1,0 +1,73 @@
+﻿<script type="text/javascript">
+  function kvValidateIntegerInRange(value, min, max) {
+    const text = String(value == null ? "" : value).trim();
+    if (!/^\d+$/.test(text)) {
+      return false;
+    }
+    const parsed = Number.parseInt(text, 10);
+    return Number.isInteger(parsed) && parsed >= min && parsed <= max;
+  }
+
+  RED.nodes.registerType("kvhostlink-connection", {
+    category: "config",
+    defaults: {
+      name: { value: "" },
+      host: { value: "", required: true },
+      port: {
+        value: 8501,
+        required: true,
+        validate: function (value) {
+          return kvValidateIntegerInRange(value, 1, 65535);
+        }
+      },
+      transport: { value: "tcp", required: true },
+      timeout: {
+        value: 3000,
+        required: true,
+        validate: function (value) {
+          return kvValidateIntegerInRange(value, 1, 2147483647);
+        }
+      },
+      appendLfOnSend: { value: false }
+    },
+    label: function () {
+      return this.name || `${this.host || "kv"}:${this.port || 8501}`;
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-connection">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-config-input-name" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-host"><i class="fa fa-globe"></i> Host</label>
+    <input type="text" id="node-config-input-host" placeholder="192.168.250.100" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-port"><i class="fa fa-plug"></i> Port</label>
+    <input type="text" id="node-config-input-port" placeholder="8501" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-transport"><i class="fa fa-exchange"></i> Transport</label>
+    <select id="node-config-input-transport">
+      <option value="tcp">TCP</option>
+      <option value="udp">UDP</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout ms</label>
+    <input type="text" id="node-config-input-timeout" placeholder="3000" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-appendLfOnSend"><i class="fa fa-terminal"></i> Append LF</label>
+    <input type="checkbox" id="node-config-input-appendLfOnSend" style="width:auto;" />
+  </div>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-connection">
+  <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
+  <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
+  <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>
+</script>
