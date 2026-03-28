@@ -24,7 +24,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Release information
 
 - package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.1.0`
+- package version: `0.2.0`
 - npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
 - Node-RED requirement: `>=3.0.0`
 - Node.js requirement: `>=18`
@@ -116,5 +116,6 @@ Supported high-level timer and counter scalar forms:
 
 - `AT` remains pending support and is tracked in [TODO.md](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md).
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
+
 
 
