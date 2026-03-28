@@ -1,0 +1,152 @@
+[
+  {
+    "id": "tab-kv-array",
+    "type": "tab",
+    "label": "KV Host Link Array Read Write",
+    "disabled": false,
+    "info": "Array flow for word and bit count access."
+  },
+  {
+    "id": "comment-kv-array",
+    "type": "comment",
+    "z": "tab-kv-array",
+    "name": "Array sample: word and bit count forms",
+    "info": "",
+    "x": 260,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "inject-kv-array-read",
+    "type": "inject",
+    "z": "tab-kv-array",
+    "name": "Read array sample",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 120,
+    "y": 120,
+    "wires": [
+      [
+        "read-kv-array"
+      ]
+    ]
+  },
+  {
+    "id": "inject-kv-array-write",
+    "type": "inject",
+    "z": "tab-kv-array",
+    "name": "Write array sample",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"DM160,4\":[1,2,3,4],\"R200,4\":[true,false,true,true]}",
+    "payloadType": "json",
+    "x": 120,
+    "y": 180,
+    "wires": [
+      [
+        "write-kv-array"
+      ]
+    ]
+  },
+  {
+    "id": "read-kv-array",
+    "type": "kvhostlink-read",
+    "z": "tab-kv-array",
+    "name": "Read arrays",
+    "connection": "cfg-kv-array",
+    "addresses": "DM160,4\nR200,4",
+    "addressesType": "str",
+    "outputMode": "object",
+    "errorHandling": "output2",
+    "metadataMode": "minimal",
+    "x": 390,
+    "y": 120,
+    "wires": [
+      [
+        "debug-kv-array-read"
+      ],
+      [
+        "debug-kv-array-error"
+      ]
+    ]
+  },
+  {
+    "id": "write-kv-array",
+    "type": "kvhostlink-write",
+    "z": "tab-kv-array",
+    "name": "Write arrays",
+    "connection": "cfg-kv-array",
+    "updates": "payload",
+    "updatesType": "msg",
+    "errorHandling": "output2",
+    "metadataMode": "minimal",
+    "x": 390,
+    "y": 180,
+    "wires": [
+      [
+        "read-kv-array"
+      ],
+      [
+        "debug-kv-array-error"
+      ]
+    ]
+  },
+  {
+    "id": "debug-kv-array-read",
+    "type": "debug",
+    "z": "tab-kv-array",
+    "name": "Array result",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 650,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "debug-kv-array-error",
+    "type": "debug",
+    "z": "tab-kv-array",
+    "name": "Array flow error",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 650,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "cfg-kv-array",
+    "type": "kvhostlink-connection",
+    "name": "KV PLC TCP",
+    "host": "192.168.250.100",
+    "port": "8501",
+    "transport": "tcp",
+    "timeout": "3000",
+    "appendLfOnSend": false
+  }
+]

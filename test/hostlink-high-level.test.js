@@ -178,7 +178,7 @@ test("poll reuses compiled read plan", async () => {
   await iterator.return();
 });
 
-test("writeNamed supports scalar, bit-in-word, and array writes", async () => {
+test("writeNamed batches consecutive writes and keeps special cases correct", async () => {
   const calls = [];
   const fakeClient = {
     async read() {
@@ -190,23 +190,38 @@ test("writeNamed supports scalar, bit-in-word, and array writes", async () => {
     async writeConsecutive(device, values, options = {}) {
       calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat: options.dataFormat || "" });
     },
+    async writeSetValueConsecutive(device, values, options = {}) {
+      calls.push({ kind: "writeSetValueConsecutive", device, values: Array.from(values), dataFormat: options.dataFormat || "" });
+    },
   };
 
   await writeNamed(fakeClient, {
     DM100: 123,
-    "DM101:S": -5,
+    DM101: 456,
+    "DM102:S": -5,
+    "DM103:S": -6,
     "DM200:F": 2.5,
+    "DM202:F": 3.5,
     "DM50.3": true,
     "DM300,3": [1, 2, 3],
-    "R20,4": [true, false, true, false],
+    R20: true,
+    R21: false,
+    "R30,4": [true, false, true, false],
+    "T10:D": 111,
+    "T11:D": 222,
+    "C10:D": 333,
+    "C11:D": 444
   });
 
   assert.deepEqual(calls, [
-    { kind: "write", device: "DM100", value: 123, dataFormat: ".U" },
-    { kind: "write", device: "DM101", value: -5, dataFormat: ".S" },
-    { kind: "writeConsecutive", device: "DM200", values: [0, 16416], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "DM100", values: [123, 456], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "DM102", values: [-5, -6], dataFormat: ".S" },
+    { kind: "writeConsecutive", device: "DM200", values: [0, 16416, 0, 16480], dataFormat: ".U" },
     { kind: "write", device: "DM50", value: 8, dataFormat: ".U" },
     { kind: "writeConsecutive", device: "DM300", values: [1, 2, 3], dataFormat: ".U" },
-    { kind: "writeConsecutive", device: "R20", values: [1, 0, 1, 0], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R20", values: [1, 0], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R30", values: [1, 0, 1, 0], dataFormat: "" },
+    { kind: "writeSetValueConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
+    { kind: "writeSetValueConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
   ]);
 });

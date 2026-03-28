@@ -16,11 +16,13 @@ concurrency:
 
 jobs:
   test:
-    name: Node ${{ matrix.node-version }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - ubuntu-latest
         node-version:
           - 18
           - 20
@@ -44,4 +46,31 @@ jobs:
         run: npm test
 
       - name: Validate package contents
+        run: npm pack --dry-run
+
+  windows-smoke:
+    name: windows-latest / Node 20
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Show tool versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+
+      - name: Run tests
+        shell: pwsh
+        run: npm test
+
+      - name: Validate package contents
+        shell: pwsh
         run: npm pack --dry-run

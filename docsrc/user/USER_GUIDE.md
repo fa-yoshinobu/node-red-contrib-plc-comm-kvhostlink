@@ -1,11 +1,12 @@
 ﻿# User Guide
 
-## Quick start
+## Start here
 
 1. Install `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` into `~/.node-red`.
-2. Restart Node-RED and add one `kvhostlink-connection` config node.
-3. Start with `kvhostlink-read` and a safe address such as `DM100`, `DM110:S`, or `DM160,4`.
-4. Use `kvhostlink-write` only after confirming the target PLC and test ranges.
+2. Restart Node-RED and create one `kvhostlink-connection` config node.
+3. Import `kvhostlink-basic-read-write.json` first.
+4. After scalar read/write works, import `kvhostlink-typed-read-write.json` and `kvhostlink-array-read-write.json`.
+5. Use `kvhostlink-device-matrix.json` for one-by-one verification only after the first three flows are stable.
 
 ## Address forms
 
@@ -23,6 +24,9 @@
 ## Example flows
 
 - [Example Flows](../../examples/flows/README.md)
+- [kvhostlink-basic-read-write.json](../../examples/flows/kvhostlink-basic-read-write.json)
+- [kvhostlink-typed-read-write.json](../../examples/flows/kvhostlink-typed-read-write.json)
+- [kvhostlink-array-read-write.json](../../examples/flows/kvhostlink-array-read-write.json)
 - [kvhostlink-device-matrix.json](../../examples/flows/kvhostlink-device-matrix.json)
 
 The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
@@ -34,4 +38,9 @@ The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<sess
 ## Known limitations
 
 - `AT` is still tracked as pending support.
-- Timer and counter semantics are exposed through high-level scalar helpers, but the current sample set is still focused on matrix verification rather than workflow-specific examples.
+- `kvhostlink-device-matrix.json` is intended for validation and debugging, not as the first flow for a new user.
+
+## Runtime smoke test
+
+- A local Node-RED runtime smoke test loaded kvhostlink-basic-read-write.json from an isolated userDir and reached Started flows.
+

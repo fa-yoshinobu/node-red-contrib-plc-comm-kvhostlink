@@ -17,10 +17,9 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 
 1. Install the package into your Node-RED user directory and restart Node-RED.
 2. Add one `kvhostlink-connection` config node and set `host`, `port`, and `transport`.
-3. Add `kvhostlink-read` and start with safe addresses such as `DM100`, `DM110:S`, or `DM160,4`.
-4. When read works, add `kvhostlink-write` and validate with known-safe test devices before moving to production addresses.
-
-If you are working from this repository, import the debug flow under [examples/flows](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/README.md) first.
+3. Import [`kvhostlink-basic-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json) for the first smoke test.
+4. When scalar read/write works, move to [`kvhostlink-typed-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json) and [`kvhostlink-array-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json).
+5. Use [`kvhostlink-device-matrix.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json) only after the basics are stable.
 
 ## Release information
 
@@ -62,7 +61,9 @@ npm install /path/to/node-red-contrib-plc-comm-kvhostlink
 - `kvhostlink-write` powered by the high-level helper API
 - high-level scalar, signed, dword, long, float, bit-in-word, and `,count` forms
 - matrix-style debug flow with JSONL result logging
-- Local tests for protocol parsing and high-level helper behavior
+- beginner-oriented sample flows for scalar, typed, and array patterns
+- local tests for protocol parsing and high-level helper behavior
+- local Node-RED runtime smoke test confirmed the basic flow loads and starts successfully
 
 Supported high-level address forms include:
 
@@ -102,11 +103,18 @@ Supported high-level timer and counter scalar forms:
 
 ## Example flows
 
+- [kvhostlink-basic-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json)
+  First-step scalar read/write flow.
+- [kvhostlink-typed-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json)
+  Signed, dword, long, float, and bit-in-word examples.
+- [kvhostlink-array-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json)
+  `,count` read/write examples for words and bits.
 - [kvhostlink-device-matrix.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json)
   High-level matrix-style verification flow. Completed results are appended to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
 
 ## Known limitations
 
 - `AT` remains pending support and is tracked in [TODO.md](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md).
-- The current sample set is smaller than the SLMP package. This package currently ships the matrix-style verification flow first.
-- The package is publishable, but the documentation and sample coverage are not yet as broad as `node-red-contrib-plc-comm-slmp`.
+- The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
+
+

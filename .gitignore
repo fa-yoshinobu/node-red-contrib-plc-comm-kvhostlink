@@ -3,3 +3,5 @@
 .nodered-runtime-test/
 logs/
 *.tgz
+.nodered-runtime-test-*/
+
