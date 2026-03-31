@@ -1,152 +1,158 @@
 [
-  {
-    "id": "tab-kv-typed",
-    "type": "tab",
-    "label": "KV Host Link Typed Read Write",
-    "disabled": false,
-    "info": "Typed scalar flow for signed, dword, long, float, and bit-in-word access."
-  },
-  {
-    "id": "comment-kv-typed",
-    "type": "comment",
-    "z": "tab-kv-typed",
-    "name": "Typed sample: signed, dword, float, bit-in-word",
-    "info": "",
-    "x": 290,
-    "y": 40,
-    "wires": []
-  },
-  {
-    "id": "inject-kv-typed-read",
-    "type": "inject",
-    "z": "tab-kv-typed",
-    "name": "Read typed sample",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 120,
-    "y": 120,
-    "wires": [
-      [
-        "read-kv-typed"
-      ]
-    ]
-  },
-  {
-    "id": "inject-kv-typed-write",
-    "type": "inject",
-    "z": "tab-kv-typed",
-    "name": "Write typed sample",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"DM110:S\":-22,\"DM120:D\":987654321,\"DM130:L\":-2023406815,\"DM140:F\":45.5,\"DM150.3\":true}",
-    "payloadType": "json",
-    "x": 120,
-    "y": 180,
-    "wires": [
-      [
-        "write-kv-typed"
-      ]
-    ]
-  },
-  {
-    "id": "read-kv-typed",
-    "type": "kvhostlink-read",
-    "z": "tab-kv-typed",
-    "name": "Read typed values",
-    "connection": "cfg-kv-typed",
-    "addresses": "DM110:S\nDM120:D\nDM130:L\nDM140:F\nDM150.3",
-    "addressesType": "str",
-    "outputMode": "object",
-    "errorHandling": "output2",
-    "metadataMode": "minimal",
-    "x": 410,
-    "y": 120,
-    "wires": [
-      [
-        "debug-kv-typed-read"
-      ],
-      [
-        "debug-kv-typed-error"
-      ]
-    ]
-  },
-  {
-    "id": "write-kv-typed",
-    "type": "kvhostlink-write",
-    "z": "tab-kv-typed",
-    "name": "Write typed values",
-    "connection": "cfg-kv-typed",
-    "updates": "payload",
-    "updatesType": "msg",
-    "errorHandling": "output2",
-    "metadataMode": "minimal",
-    "x": 410,
-    "y": 180,
-    "wires": [
-      [
-        "read-kv-typed"
-      ],
-      [
-        "debug-kv-typed-error"
-      ]
-    ]
-  },
-  {
-    "id": "debug-kv-typed-read",
-    "type": "debug",
-    "z": "tab-kv-typed",
-    "name": "Typed result",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "x": 670,
-    "y": 120,
-    "wires": []
-  },
-  {
-    "id": "debug-kv-typed-error",
-    "type": "debug",
-    "z": "tab-kv-typed",
-    "name": "Typed flow error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "true",
-    "targetType": "full",
-    "x": 670,
-    "y": 200,
-    "wires": []
-  },
-  {
-    "id": "cfg-kv-typed",
-    "type": "kvhostlink-connection",
-    "name": "KV PLC TCP",
-    "host": "192.168.250.100",
-    "port": "8501",
-    "transport": "tcp",
-    "timeout": "3000",
-    "appendLfOnSend": false
-  }
+    {
+        "id":  "tab-kv-typed",
+        "type":  "tab",
+        "label":  "KV Host Link Typed Read Write",
+        "disabled":  false,
+        "info":  "Typed scalar flow for signed, dword, long, float, and bit-in-word access. Use canonical uppercase addresses in the examples. The flow nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior."
+    },
+    {
+        "id":  "comment-kv-typed",
+        "type":  "comment",
+        "z":  "tab-kv-typed",
+        "name":  "Typed sample: signed, dword, float, bit-in-word",
+        "info":  "",
+        "x":  290,
+        "y":  40,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "inject-kv-typed-read",
+        "type":  "inject",
+        "z":  "tab-kv-typed",
+        "name":  "Read typed sample",
+        "props":  [
+                      {
+                          "p":  "payload"
+                      }
+                  ],
+        "repeat":  "",
+        "crontab":  "",
+        "once":  false,
+        "onceDelay":  0.1,
+        "topic":  "",
+        "payload":  "",
+        "payloadType":  "date",
+        "x":  120,
+        "y":  120,
+        "wires":  [
+                      [
+                          "read-kv-typed"
+                      ]
+                  ]
+    },
+    {
+        "id":  "inject-kv-typed-write",
+        "type":  "inject",
+        "z":  "tab-kv-typed",
+        "name":  "Write typed sample",
+        "props":  [
+                      {
+                          "p":  "payload"
+                      }
+                  ],
+        "repeat":  "",
+        "crontab":  "",
+        "once":  false,
+        "onceDelay":  0.1,
+        "topic":  "",
+        "payload":  "{\"DM110:S\":-22,\"DM120:D\":987654321,\"DM130:L\":-2023406815,\"DM140:F\":45.5,\"DM150.3\":true}",
+        "payloadType":  "json",
+        "x":  120,
+        "y":  180,
+        "wires":  [
+                      [
+                          "write-kv-typed"
+                      ]
+                  ]
+    },
+    {
+        "id":  "read-kv-typed",
+        "type":  "kvhostlink-read",
+        "z":  "tab-kv-typed",
+        "name":  "Read typed values",
+        "connection":  "cfg-kv-typed",
+        "addresses":  "DM110:S\nDM120:D\nDM130:L\nDM140:F\nDM150.3",
+        "addressesType":  "str",
+        "outputMode":  "object",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "x":  410,
+        "y":  120,
+        "wires":  [
+                      [
+                          "debug-kv-typed-read"
+                      ],
+                      [
+                          "debug-kv-typed-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "write-kv-typed",
+        "type":  "kvhostlink-write",
+        "z":  "tab-kv-typed",
+        "name":  "Write typed values",
+        "connection":  "cfg-kv-typed",
+        "updates":  "payload",
+        "updatesType":  "msg",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "x":  410,
+        "y":  180,
+        "wires":  [
+                      [
+                          "read-kv-typed"
+                      ],
+                      [
+                          "debug-kv-typed-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "debug-kv-typed-read",
+        "type":  "debug",
+        "z":  "tab-kv-typed",
+        "name":  "Typed result",
+        "active":  true,
+        "tosidebar":  true,
+        "console":  false,
+        "tostatus":  false,
+        "complete":  "payload",
+        "targetType":  "msg",
+        "x":  670,
+        "y":  120,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "debug-kv-typed-error",
+        "type":  "debug",
+        "z":  "tab-kv-typed",
+        "name":  "Typed flow error",
+        "active":  true,
+        "tosidebar":  true,
+        "console":  false,
+        "tostatus":  false,
+        "complete":  "true",
+        "targetType":  "full",
+        "x":  670,
+        "y":  200,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "cfg-kv-typed",
+        "type":  "kvhostlink-connection",
+        "name":  "KV PLC TCP",
+        "host":  "192.168.250.100",
+        "port":  "8501",
+        "transport":  "tcp",
+        "timeout":  "3000",
+        "appendLfOnSend":  false
+    }
 ]

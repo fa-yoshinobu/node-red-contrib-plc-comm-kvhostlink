@@ -1,152 +1,158 @@
 [
-  {
-    "id": "tab-kv-basic",
-    "type": "tab",
-    "label": "KV Host Link Basic Read Write",
-    "disabled": false,
-    "info": "Starter flow for scalar KEYENCE KV Host Link read and write."
-  },
-  {
-    "id": "comment-kv-basic",
-    "type": "comment",
-    "z": "tab-kv-basic",
-    "name": "Start here: scalar read/write smoke test",
-    "info": "",
-    "x": 270,
-    "y": 40,
-    "wires": []
-  },
-  {
-    "id": "inject-kv-basic-read",
-    "type": "inject",
-    "z": "tab-kv-basic",
-    "name": "Read DM100",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 120,
-    "y": 120,
-    "wires": [
-      [
-        "read-kv-basic"
-      ]
-    ]
-  },
-  {
-    "id": "inject-kv-basic-write",
-    "type": "inject",
-    "z": "tab-kv-basic",
-    "name": "Write DM100=123",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"DM100\":123}",
-    "payloadType": "json",
-    "x": 130,
-    "y": 180,
-    "wires": [
-      [
-        "write-kv-basic"
-      ]
-    ]
-  },
-  {
-    "id": "read-kv-basic",
-    "type": "kvhostlink-read",
-    "z": "tab-kv-basic",
-    "name": "Read DM100",
-    "connection": "cfg-kv-basic",
-    "addresses": "DM100",
-    "addressesType": "str",
-    "outputMode": "value",
-    "errorHandling": "output2",
-    "metadataMode": "minimal",
-    "x": 400,
-    "y": 120,
-    "wires": [
-      [
-        "debug-kv-basic-read"
-      ],
-      [
-        "debug-kv-basic-error"
-      ]
-    ]
-  },
-  {
-    "id": "write-kv-basic",
-    "type": "kvhostlink-write",
-    "z": "tab-kv-basic",
-    "name": "Write DM100",
-    "connection": "cfg-kv-basic",
-    "updates": "payload",
-    "updatesType": "msg",
-    "errorHandling": "output2",
-    "metadataMode": "minimal",
-    "x": 390,
-    "y": 180,
-    "wires": [
-      [
-        "read-kv-basic"
-      ],
-      [
-        "debug-kv-basic-error"
-      ]
-    ]
-  },
-  {
-    "id": "debug-kv-basic-read",
-    "type": "debug",
-    "z": "tab-kv-basic",
-    "name": "Scalar result",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "x": 650,
-    "y": 120,
-    "wires": []
-  },
-  {
-    "id": "debug-kv-basic-error",
-    "type": "debug",
-    "z": "tab-kv-basic",
-    "name": "Basic flow error",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "true",
-    "targetType": "full",
-    "x": 650,
-    "y": 200,
-    "wires": []
-  },
-  {
-    "id": "cfg-kv-basic",
-    "type": "kvhostlink-connection",
-    "name": "KV PLC TCP",
-    "host": "192.168.250.100",
-    "port": "8501",
-    "transport": "tcp",
-    "timeout": "3000",
-    "appendLfOnSend": false
-  }
+    {
+        "id":  "tab-kv-basic",
+        "type":  "tab",
+        "label":  "KV Host Link Basic Read Write",
+        "disabled":  false,
+        "info":  "Starter flow for scalar KEYENCE KV Host Link read and write. Use canonical uppercase addresses in the examples. The flow nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior."
+    },
+    {
+        "id":  "comment-kv-basic",
+        "type":  "comment",
+        "z":  "tab-kv-basic",
+        "name":  "Start here: scalar read/write smoke test",
+        "info":  "",
+        "x":  270,
+        "y":  40,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "inject-kv-basic-read",
+        "type":  "inject",
+        "z":  "tab-kv-basic",
+        "name":  "Read DM100",
+        "props":  [
+                      {
+                          "p":  "payload"
+                      }
+                  ],
+        "repeat":  "",
+        "crontab":  "",
+        "once":  false,
+        "onceDelay":  0.1,
+        "topic":  "",
+        "payload":  "",
+        "payloadType":  "date",
+        "x":  120,
+        "y":  120,
+        "wires":  [
+                      [
+                          "read-kv-basic"
+                      ]
+                  ]
+    },
+    {
+        "id":  "inject-kv-basic-write",
+        "type":  "inject",
+        "z":  "tab-kv-basic",
+        "name":  "Write DM100=123",
+        "props":  [
+                      {
+                          "p":  "payload"
+                      }
+                  ],
+        "repeat":  "",
+        "crontab":  "",
+        "once":  false,
+        "onceDelay":  0.1,
+        "topic":  "",
+        "payload":  "{\"DM100\":123}",
+        "payloadType":  "json",
+        "x":  130,
+        "y":  180,
+        "wires":  [
+                      [
+                          "write-kv-basic"
+                      ]
+                  ]
+    },
+    {
+        "id":  "read-kv-basic",
+        "type":  "kvhostlink-read",
+        "z":  "tab-kv-basic",
+        "name":  "Read DM100",
+        "connection":  "cfg-kv-basic",
+        "addresses":  "DM100",
+        "addressesType":  "str",
+        "outputMode":  "value",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "x":  400,
+        "y":  120,
+        "wires":  [
+                      [
+                          "debug-kv-basic-read"
+                      ],
+                      [
+                          "debug-kv-basic-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "write-kv-basic",
+        "type":  "kvhostlink-write",
+        "z":  "tab-kv-basic",
+        "name":  "Write DM100",
+        "connection":  "cfg-kv-basic",
+        "updates":  "payload",
+        "updatesType":  "msg",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "x":  390,
+        "y":  180,
+        "wires":  [
+                      [
+                          "read-kv-basic"
+                      ],
+                      [
+                          "debug-kv-basic-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "debug-kv-basic-read",
+        "type":  "debug",
+        "z":  "tab-kv-basic",
+        "name":  "Scalar result",
+        "active":  true,
+        "tosidebar":  true,
+        "console":  false,
+        "tostatus":  false,
+        "complete":  "payload",
+        "targetType":  "msg",
+        "x":  650,
+        "y":  120,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "debug-kv-basic-error",
+        "type":  "debug",
+        "z":  "tab-kv-basic",
+        "name":  "Basic flow error",
+        "active":  true,
+        "tosidebar":  true,
+        "console":  false,
+        "tostatus":  false,
+        "complete":  "true",
+        "targetType":  "full",
+        "x":  650,
+        "y":  200,
+        "wires":  [
+
+                  ]
+    },
+    {
+        "id":  "cfg-kv-basic",
+        "type":  "kvhostlink-connection",
+        "name":  "KV PLC TCP",
+        "host":  "192.168.250.100",
+        "port":  "8501",
+        "transport":  "tcp",
+        "timeout":  "3000",
+        "appendLfOnSend":  false
+    }
 ]

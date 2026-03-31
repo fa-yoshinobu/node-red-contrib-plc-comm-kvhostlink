@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  formatParsedAddress,
+  normalizeAddress,
   normalizeAddressList,
   parseAddress,
   poll,
@@ -19,6 +21,7 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     bitIndex: null,
     count: 1,
     hasCount: false,
+    explicitDtype: false,
   });
   assert.deepEqual(parseAddress("DM100:F"), {
     base: "DM100",
@@ -26,6 +29,7 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     bitIndex: null,
     count: 1,
     hasCount: false,
+    explicitDtype: true,
   });
   assert.deepEqual(parseAddress("DM50.3"), {
     base: "DM50",
@@ -33,6 +37,7 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     bitIndex: 3,
     count: 1,
     hasCount: false,
+    explicitDtype: false,
   });
   assert.deepEqual(parseAddress("DM200:D,4"), {
     base: "DM200",
@@ -40,7 +45,15 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     bitIndex: null,
     count: 4,
     hasCount: true,
+    explicitDtype: true,
   });
+});
+
+test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
+  assert.equal(normalizeAddress(" dm200:d,4 "), "DM200:D,4");
+  assert.equal(normalizeAddress("100"), "R100");
+  assert.equal(normalizeAddress("dm50.3"), "DM50.3");
+  assert.equal(formatParsedAddress(parseAddress("R20,4")), "R20,4");
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {

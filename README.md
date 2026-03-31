@@ -1,4 +1,4 @@
-﻿# Node-RED KV Host Link Nodes for KEYENCE PLCs
+# Node-RED KV Host Link Nodes for KEYENCE PLCs
 
 [![CI](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml/badge.svg)](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/%40fa_yoshinobu%2Fnode-red-contrib-plc-comm-kvhostlink?logo=npm&color=CB3837)](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink)
@@ -66,6 +66,7 @@ npm install /path/to/node-red-contrib-plc-comm-kvhostlink
 - matrix-style debug flow with JSONL result logging
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
+- helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
 - local Node-RED runtime smoke test confirmed the basic flow loads and starts successfully
 
 Supported high-level address forms include:

@@ -1,4 +1,4 @@
-﻿# User Guide
+# User Guide
 
 ## Start here
 
@@ -51,6 +51,8 @@ Connection control:
 - or `msg.topic = "connect" | "disconnect" | "reinitialize"`
 
 The read and write nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior.
+
+The helper exports also include `normalizeAddress()`, `formatParsedAddress()`, and `normalizeAddressList()` when runtime code wants canonical uppercase address text outside the editor UI.
 
 ## Example flows
 
