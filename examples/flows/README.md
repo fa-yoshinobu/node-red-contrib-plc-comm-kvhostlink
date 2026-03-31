@@ -1,4 +1,4 @@
-﻿# Example Flows
+# Example Flows
 
 ## Start here
 
@@ -16,4 +16,5 @@
 
 - Edit the catalog in `Prepare next device sample (edit catalog here)` before deploy if your PLC uses different ranges.
 - The flows use only the high-level `kvhostlink-read` and `kvhostlink-write` nodes.
+- The beginner flows already show the metadata selector and the shared connection control pattern.
 - Use `Reset sequence + history` before a new matrix verification pass.

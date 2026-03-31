@@ -21,6 +21,37 @@
 - `T10:D`
 - `C10:D`
 
+## Connection settings
+
+Configure these explicitly on the connection node:
+
+- host
+- port
+- transport: `tcp` or `udp`
+- timeout in milliseconds
+- `Append LF on send`
+
+Validated PLC model:
+
+- `KV-7500`
+
+## Runtime behavior
+
+Metadata modes:
+
+- `full`: emit configured addresses or updates plus the effective connection profile in `msg.kvhostlink`
+- `minimal`: emit only `itemCount` and `metadataMode` in `msg.kvhostlink`
+- `off`: leave `msg.kvhostlink` unchanged
+
+Connection control:
+
+- `msg.connect = true`
+- `msg.disconnect = true`
+- `msg.reinitialize = true`
+- or `msg.topic = "connect" | "disconnect" | "reinitialize"`
+
+The read and write nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior.
+
 ## Example flows
 
 - [Example Flows](../../examples/flows/README.md)
@@ -30,10 +61,6 @@
 - [kvhostlink-device-matrix.json](../../examples/flows/kvhostlink-device-matrix.json)
 
 The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
-
-## Validated PLC model
-
-- `KV-7500`
 
 ## Known limitations
 

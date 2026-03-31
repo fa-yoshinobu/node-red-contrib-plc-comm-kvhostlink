@@ -1,4 +1,4 @@
-﻿<script type="text/javascript">
+<script type="text/javascript">
   const KVHOSTLINK_ADDRESS_TOKEN_RE = /[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?/iy;
 
   function kvGetCurrentType(typeSelector, fallback) {
@@ -182,4 +182,5 @@
   <p>Metadata can emit full <code>msg.kvhostlink</code>, a minimal object with item count only, or leave <code>msg.kvhostlink</code> unchanged.</p>
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, <code>msg.addresses</code> or a string/array in <code>msg.payload</code> still take priority.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
+  <p>The node keeps the caller-visible logical request shape. It does not silently retry one logical read as a different fallback split request.</p>
 </script>

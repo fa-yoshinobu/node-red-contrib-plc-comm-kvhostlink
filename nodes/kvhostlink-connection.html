@@ -1,4 +1,4 @@
-﻿<script type="text/javascript">
+<script type="text/javascript">
   function kvValidateIntegerInRange(value, min, max) {
     const text = String(value == null ? "" : value).trim();
     if (!/^\d+$/.test(text)) {
@@ -69,5 +69,6 @@
 <script type="text/html" data-help-name="kvhostlink-connection">
   <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
+  <p>Set <code>Append LF</code> only when your PLC bridge or converter expects <code>CRLF</code> instead of the default <code>CR</code>-terminated command line.</p>
   <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>
 </script>

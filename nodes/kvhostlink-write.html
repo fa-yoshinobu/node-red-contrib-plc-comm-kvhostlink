@@ -1,4 +1,4 @@
-﻿<script type="text/javascript">
+<script type="text/javascript">
   const KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE = /^[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?$/i;
 
   function kvGetWriteCurrentType(typeSelector, fallback) {
@@ -175,4 +175,5 @@
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects or <code>address=value</code> lines.</p>
   <p>You can also send a single write with <code>msg.address</code>, optional <code>msg.dtype</code>, and the value in <code>msg.value</code> or <code>msg.payload</code>. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
+  <p>The node keeps the caller-visible logical write shape. It does not silently retry one logical update as a different fallback split request.</p>
 </script>

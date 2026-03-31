@@ -16,7 +16,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Quick start
 
 1. Install the package into your Node-RED user directory and restart Node-RED.
-2. Add one `kvhostlink-connection` config node and set `host`, `port`, and `transport`.
+2. Add one `kvhostlink-connection` config node and set `host`, `port`, `transport`, `timeout`, and `Append LF` as needed.
 3. Import [`kvhostlink-basic-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json) for the first smoke test.
 4. When scalar read/write works, move to [`kvhostlink-typed-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json) and [`kvhostlink-array-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json).
 5. Use [`kvhostlink-device-matrix.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json) only after the basics are stable.
@@ -57,9 +57,12 @@ npm install /path/to/node-red-contrib-plc-comm-kvhostlink
 
 - TCP and UDP transport
 - Reusable `kvhostlink-connection` config node
+- explicit connection options for `host`, `port`, `transport`, `timeout`, and `append LF on send`
 - `kvhostlink-read` powered by the high-level helper API
 - `kvhostlink-write` powered by the high-level helper API
 - high-level scalar, signed, dword, long, float, bit-in-word, and `,count` forms
+- metadata emission modes for `msg.kvhostlink`: `full` / `minimal` / `off`
+- connection control via `connect` / `disconnect` / `reinitialize` messages
 - matrix-style debug flow with JSONL result logging
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
@@ -111,6 +114,24 @@ Supported high-level timer and counter scalar forms:
   `,count` read/write examples for words and bits.
 - [kvhostlink-device-matrix.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json)
   High-level matrix-style verification flow. Completed results are appended to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
+
+## Connection and runtime behavior
+
+Connection settings on `kvhostlink-connection`:
+
+- host
+- port
+- transport: `tcp` or `udp`
+- timeout in milliseconds
+- `Append LF on send`
+
+Read and write nodes support:
+
+- full or minimal `msg.kvhostlink` metadata, or leaving it unchanged
+- `msg.connect`, `msg.disconnect`, and `msg.reinitialize`
+- `msg.topic = "connect" | "disconnect" | "reinitialize"`
+
+The read and write nodes keep the caller-visible logical request shape and do not silently retry one logical request as a different fallback split operation.
 
 ## Known limitations
 
