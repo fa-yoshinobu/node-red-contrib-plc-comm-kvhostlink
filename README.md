@@ -44,6 +44,14 @@ cd ~/.node-red
 npm install /path/to/node-red-contrib-plc-comm-kvhostlink
 ```
 
+Optional local editor smoke test from the repository root:
+
+```bash
+npm run smoke:editor
+```
+
+This command installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, verifies the flow starts, and then shuts the runtime down again.
+
 ## Documentation
 
 - [User Guide](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/docsrc/user/USER_GUIDE.md)
@@ -67,6 +75,7 @@ npm install /path/to/node-red-contrib-plc-comm-kvhostlink
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
 - helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
+- optional local runtime smoke validation via `npm run smoke:editor`
 - local Node-RED runtime smoke test confirmed the basic flow loads and starts successfully
 
 Supported high-level address forms include:

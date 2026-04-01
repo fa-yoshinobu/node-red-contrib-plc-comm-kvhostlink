@@ -12,6 +12,14 @@
   High-level one-by-one debug flow for KEYENCE KV Host Link device families.
   It records completed results to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
 
+## Local smoke test from the repository root
+
+```bash
+npm run smoke:editor
+```
+
+This imports `kvhostlink-basic-read-write.json` into an isolated temporary userDir and verifies that the temporary Node-RED runtime reaches `Started flows`.
+
 ## Notes
 
 - Edit the catalog in `Prepare next device sample (edit catalog here)` before deploy if your PLC uses different ranges.

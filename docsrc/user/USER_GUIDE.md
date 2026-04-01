@@ -69,7 +69,11 @@ The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<sess
 - `AT` is still tracked as pending support.
 - `kvhostlink-device-matrix.json` is intended for validation and debugging, not as the first flow for a new user.
 
-## Runtime smoke test
+## Runtime smoke test from the repository root
 
-- A local Node-RED runtime smoke test loaded kvhostlink-basic-read-write.json from an isolated userDir and reached Started flows.
+```bash
+npm run smoke:editor
+```
 
+- The smoke script installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, and verifies that the flow reaches `Started flows`.
+- A local Node-RED runtime smoke test loaded `kvhostlink-basic-read-write.json` from an isolated userDir and reached `Started flows`.
