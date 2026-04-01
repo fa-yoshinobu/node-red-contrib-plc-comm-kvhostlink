@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-04-01
+
+- add an optional `npm run smoke:editor` script that installs the local package into an isolated userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, and verifies the flow starts cleanly
+- refresh README, user guide, and example-flow docs with the editor-smoke command and the canonical address helper exports
+
 - add an optional `npm run smoke:editor` script that installs the local package into an isolated userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, and verifies the flow starts cleanly
 - refresh README, user guide, and example-flow docs with the editor-smoke command and the canonical address helper exports
 
