@@ -9,6 +9,7 @@ const {
   normalizeAddressList,
   parseAddress,
   poll,
+  readComments,
   readNamed,
   readTyped,
   writeNamed,
@@ -47,12 +48,21 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     hasCount: true,
     explicitDtype: true,
   });
+  assert.deepEqual(parseAddress("DM250:COMMENT"), {
+    base: "DM250",
+    dtype: "COMMENT",
+    bitIndex: null,
+    count: 1,
+    hasCount: false,
+    explicitDtype: true,
+  });
 });
 
 test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
   assert.equal(normalizeAddress(" dm200:d,4 "), "DM200:D,4");
   assert.equal(normalizeAddress("100"), "R100");
   assert.equal(normalizeAddress("dm50.3"), "DM50.3");
+  assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
   assert.equal(formatParsedAddress(parseAddress("R20,4")), "R20,4");
 });
 
@@ -71,6 +81,18 @@ test("readTyped reads float through two words", async () => {
   };
 
   assert.equal(await readTyped(fakeClient, "DM100", "F"), 12.5);
+});
+
+test("readComments delegates to the low-level RDC command", async () => {
+  const fakeClient = {
+    async readComments(device, options = {}) {
+      assert.equal(device, "DM250");
+      assert.equal(options.stripPadding, true);
+      return "MAIN COMMENT";
+    },
+  };
+
+  assert.equal(await readComments(fakeClient, "DM250", { stripPadding: true }), "MAIN COMMENT");
 });
 
 test("readTyped uses preset value from timer and counter composite responses", async () => {
@@ -155,9 +177,15 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       }
       throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
     },
+    async readComments(device) {
+      if (device === "DM250") {
+        return "MAIN COMMENT";
+      }
+      throw new Error(`unexpected readComments ${device}`);
+    },
   };
 
-  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R10", "DM400,3", "R20,4"]);
+  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R10", "DM250:COMMENT", "DM400,3", "R20,4"]);
   assert.deepEqual(snapshot, {
     DM100: 123,
     "DM101:S": -5,
@@ -165,6 +193,7 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
     "DM300:F": 3.5,
     "DM50.3": true,
     R10: true,
+    "DM250:COMMENT": "MAIN COMMENT",
     "DM400,3": [1, 2, 3],
     "R20,4": [true, false, true, false],
   });

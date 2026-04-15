@@ -69,6 +69,7 @@ This command installs the local package into an isolated temporary userDir, star
 - `kvhostlink-read` powered by the high-level helper API
 - `kvhostlink-write` powered by the high-level helper API
 - high-level scalar, signed, dword, long, float, bit-in-word, and `,count` forms
+- comment read helper and `:COMMENT` snapshot form
 - metadata emission modes for `msg.kvhostlink`: `full` / `minimal` / `off`
 - connection control via `connect` / `disconnect` / `reinitialize` messages
 - matrix-style debug flow with JSONL result logging
@@ -85,6 +86,7 @@ Supported high-level address forms include:
 - `DM120:D`
 - `DM130:L`
 - `DM140:F`
+- `DM145:COMMENT`
 - `DM150.3`
 - `DM160,4`
 - `R200,4`
@@ -143,10 +145,12 @@ Read and write nodes support:
 
 The read and write nodes keep the caller-visible logical request shape and do not silently retry one logical request as a different fallback split operation.
 
+Comment reads use the Host Link `RDC` command and return strings in the same payload shapes as other read values.
+
+XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`, `M20:COMMENT`, and `X100:COMMENT` are valid.
+
 ## Known limitations
 
 - `AT` remains pending support and is tracked in [TODO.md](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md).
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
-
-
 

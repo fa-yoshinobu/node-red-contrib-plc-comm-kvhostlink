@@ -15,6 +15,7 @@
 - `DM120:D`
 - `DM130:L`
 - `DM140:F`
+- `DM145:COMMENT`
 - `DM150.3`
 - `DM160,4`
 - `R200,4`
@@ -51,6 +52,10 @@ Connection control:
 - or `msg.topic = "connect" | "disconnect" | "reinitialize"`
 
 The read and write nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior.
+
+Comment reads such as `DM145:COMMENT` use the Host Link `RDC` command and return strings in `msg.payload`.
+
+XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`, `M20:COMMENT`, and `X100:COMMENT` are valid.
 
 The helper exports also include `normalizeAddress()`, `formatParsedAddress()`, and `normalizeAddressList()` when runtime code wants canonical uppercase address text outside the editor UI.
 

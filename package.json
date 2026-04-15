@@ -45,6 +45,9 @@
     "pack:dry-run": "npm pack --dry-run",
     "smoke:editor": "node test/run-editor-smoke.js"
   },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  },
   "node-red": {
     "version": ">=3.0.0",
     "nodes": {

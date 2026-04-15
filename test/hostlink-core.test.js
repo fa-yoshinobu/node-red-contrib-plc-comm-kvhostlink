@@ -44,3 +44,17 @@ test("client serializes queued requests", async () => {
   await Promise.all([client.sendRaw("ER"), client.sendRaw("ER"), client.sendRaw("ER")]);
   assert.equal(maxActive, 1);
 });
+
+test("readComments accepts XYM alias device types", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("MAIN COMMENT                    \r", "ascii");
+  };
+
+  assert.equal(await client.readComments("D10"), "MAIN COMMENT");
+  assert.equal(await client.readComments("M20"), "MAIN COMMENT");
+  assert.deepEqual(commands, ["RDC D10", "RDC M20"]);
+});
