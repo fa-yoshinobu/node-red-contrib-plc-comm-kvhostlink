@@ -1,6 +1,6 @@
 ﻿{
   "name": "@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Node-RED nodes for KEYENCE KV Host Link communication over TCP/UDP.",
   "author": "fa-yoshinobu",
   "license": "MIT",

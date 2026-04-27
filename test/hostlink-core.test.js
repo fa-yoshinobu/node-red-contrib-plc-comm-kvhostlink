@@ -20,11 +20,17 @@ test("parseDevice handles decimal and hex devices", () => {
   assert.deepEqual(parseDevice("DM100"), { deviceType: "DM", number: 100, suffix: "" });
   assert.deepEqual(parseDevice("B1F"), { deviceType: "B", number: 31, suffix: "" });
   assert.equal(deviceToString({ deviceType: "B", number: 31, suffix: "" }), "B1F");
+  assert.deepEqual(parseDevice("X390"), { deviceType: "X", number: 39 * 16, suffix: "" });
+  assert.deepEqual(parseDevice("X400"), { deviceType: "X", number: 40 * 16, suffix: "" });
+  assert.equal(deviceToString({ deviceType: "X", number: 39 * 16 + 15, suffix: "" }), "X39F");
+  assert.equal(deviceToString({ deviceType: "X", number: 40 * 16, suffix: "" }), "X400");
   assert.equal(parseDevice("M63999").number, 63999);
   assert.equal(deviceToString(parseDevice("R1")), "R001");
   assert.equal(deviceToString(parseDevice("CR0")), "CR000");
   assert.throws(() => parseDevice("M64000"));
   assert.throws(() => parseDevice("R016"));
+  assert.throws(() => parseDevice("X3F0"));
+  assert.throws(() => parseDevice("Y19A0"));
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
@@ -66,6 +72,21 @@ test("readComments accepts XYM alias device types", async () => {
   assert.equal(await client.readComments("D10"), "MAIN COMMENT");
   assert.equal(await client.readComments("M20"), "MAIN COMMENT");
   assert.deepEqual(commands, ["RDC D10", "RDC M20"]);
+});
+
+test("monitor registration accepts XYM bit aliases verified on KV-7500", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("OK\r", "ascii");
+  };
+
+  await client.registerMonitorBits("X100", "X101", "M100", "M101");
+  await client.registerMonitorWords("X100", "Y100");
+
+  assert.deepEqual(commands, ["MBS X100 X101 M100 M101", "MWS X100 Y100"]);
 });
 
 test("device range catalog resolves model families and XYM aliases", () => {

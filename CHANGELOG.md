@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.2.4 - 2026-04-27
+
+- add X/Y monitor registration support verified on KV-7500
+- normalize X/Y bit addresses as decimal bank plus hexadecimal bit notation, rejecting invalid forms such as `X3F0` before sending
+- add M/L monitor bit registration support while keeping M/L out of monitor word registration
+
 ## 0.2.3 - 2026-04-27
 
 - align Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range
