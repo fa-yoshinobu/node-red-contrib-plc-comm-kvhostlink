@@ -24,7 +24,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Release information
 
 - package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.2.0`
+- package version: `0.2.3`
 - npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
 - Node-RED requirement: `>=3.0.0`
 - Node.js requirement: `>=18`
@@ -76,6 +76,7 @@ This command installs the local package into an isolated temporary userDir, star
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
 - helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
+- helper exports include `deviceRangeCatalogForModel()` and `client.readDeviceRangeCatalog()` for model-specific published ranges
 - optional local runtime smoke validation via `npm run smoke:editor`
 - local Node-RED runtime smoke test confirmed the basic flow loads and starts successfully
 

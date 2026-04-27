@@ -63,7 +63,7 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
   assert.equal(normalizeAddress("100"), "R100");
   assert.equal(normalizeAddress("dm50.3"), "DM50.3");
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
-  assert.equal(formatParsedAddress(parseAddress("R20,4")), "R20,4");
+  assert.equal(formatParsedAddress(parseAddress("R10,4")), "R010,4");
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {
@@ -155,7 +155,7 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       if (device === "DM200" && options.dataFormat === ".D") {
         return 0x12345678;
       }
-      if (device === "R10") {
+      if (device === "R010") {
         return 1;
       }
       if (device === "DM50" && options.dataFormat === ".U") {
@@ -172,7 +172,7 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       if (device === "DM400" && count === 3 && options.dataFormat === ".U") {
         return [1, 2, 3];
       }
-      if (device === "R20" && count === 4) {
+      if (device === "R010" && count === 4) {
         return [1, 0, 1, 0];
       }
       throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
@@ -185,17 +185,17 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R10", "DM250:COMMENT", "DM400,3", "R20,4"]);
+  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R010", "DM250:COMMENT", "DM400,3", "R010,4"]);
   assert.deepEqual(snapshot, {
     DM100: 123,
     "DM101:S": -5,
     "DM200:D": 0x12345678,
     "DM300:F": 3.5,
     "DM50.3": true,
-    R10: true,
+    R010: true,
     "DM250:COMMENT": "MAIN COMMENT",
     "DM400,3": [1, 2, 3],
-    "R20,4": [true, false, true, false],
+    "R010,4": [true, false, true, false],
   });
 });
 
@@ -246,9 +246,9 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     "DM202:F": 3.5,
     "DM50.3": true,
     "DM300,3": [1, 2, 3],
-    R20: true,
-    R21: false,
-    "R30,4": [true, false, true, false],
+    R010: true,
+    R011: false,
+    "R100,4": [true, false, true, false],
     "T10:D": 111,
     "T11:D": 222,
     "C10:D": 333,
@@ -261,8 +261,8 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     { kind: "writeConsecutive", device: "DM200", values: [0, 16416, 0, 16480], dataFormat: ".U" },
     { kind: "write", device: "DM50", value: 8, dataFormat: ".U" },
     { kind: "writeConsecutive", device: "DM300", values: [1, 2, 3], dataFormat: ".U" },
-    { kind: "writeConsecutive", device: "R20", values: [1, 0], dataFormat: "" },
-    { kind: "writeConsecutive", device: "R30", values: [1, 0, 1, 0], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R010", values: [1, 0], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R100", values: [1, 0, 1, 0], dataFormat: "" },
     { kind: "writeSetValueConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
     { kind: "writeSetValueConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
   ]);
