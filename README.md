@@ -24,7 +24,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Release information
 
 - package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.2.2`
+- package version: `0.2.3`
 - npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
 - Node-RED requirement: `>=3.0.0`
 - Node.js requirement: `>=18`

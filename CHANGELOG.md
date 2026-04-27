@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.2.3 - 2026-04-27
+
+- align Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range
+- add a published KEYENCE KV device range catalog and `readDeviceRangeCatalog()` helper
+- normalize `R`, `MR`, `LR`, and `CR` bit-bank addresses and reject invalid lower-two-digit bit numbers
+
 ## 0.2.2 - 2026-04-14
 
 - add a committed `package-lock.json` so installs and release packaging use reproducible npm dependency resolution
