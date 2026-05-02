@@ -2,9 +2,18 @@
 
 ## Unreleased
 
+## 0.2.8 - 2026-05-02
+
+- bump the release revision for npm and Node-RED Flow Library publishing; the Flow Library currently shows `0.2.0` as the public baseline
+- refresh README, user-guide, and example-flow docs with compatibility notes from the published Flow Library version
+- document the public compatibility change that Host Link command framing is fixed to CR termination
+- document the expanded current surface since Flow Library `0.2.0`: timeout setting, metadata modes, connection control messages, comment reads, and canonical address helper exports
+- update the `kvhostlink-device-matrix.json` documentation for one-click run-all read/write buttons, auto-run status lamp feedback, timeout tracking, JSONL logging, and non-overlapping buttons
+- document the 2026-05-02 KV-5000 matrix result: 35 catalog samples, 157 completed JSONL records, and all records `OK`
+
 ## 0.2.7 - 2026-05-02
 
-- remove the public device range catalog API from the Node-RED package
+- remove the interim device-range catalog helper from the Node-RED package
 - stop rejecting device addresses by built-in common range limits; ordinary read/write validation now checks address format and Host Link command constraints, leaving actual range errors to the PLC response
 
 ## 0.2.6 - 2026-05-02
@@ -24,7 +33,7 @@
 ## 0.2.3 - 2026-04-27
 
 - align Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range
-- add a published KEYENCE KV device range catalog and `readDeviceRangeCatalog()` helper
+- add an interim KEYENCE KV device-range catalog helper
 - normalize `R`, `MR`, `LR`, and `CR` bit-bank addresses and reject invalid lower-two-digit bit numbers
 
 ## 0.2.2 - 2026-04-14

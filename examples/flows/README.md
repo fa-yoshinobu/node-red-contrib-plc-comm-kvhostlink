@@ -30,4 +30,4 @@ This imports `kvhostlink-basic-read-write.json` into an isolated temporary userD
 - Use `Run all reads` or `Run all writes` to run the catalog automatically with one outstanding request at a time. The `Auto run status lamp` node shows active, pending, idle, and error state in the Node-RED editor.
 - `T` and `C` high-level samples require a corresponding timer/counter circuit in the PLC program. A PLC error or timeout is expected when that circuit is absent; use `TC` / `TS` / `CC` / `CS` samples for read-only current/contact family checks.
 - The write sequence skips entries marked `writable: false`, including the timer/counter samples that are not safe generic write targets.
-- A KV-5000 write/readback pass confirmed all writable matrix samples passed.
+- Latest retained KV-5000 matrix pass on 2026-05-02 completed 157 JSONL result records across 35 catalog samples with all records `OK`.

@@ -33,6 +33,16 @@ Configure these explicitly on the connection node:
 
 Commands are sent with Host Link CR termination.
 
+## Changes since Flow Library 0.2.0
+
+The Node-RED Flow Library currently shows `0.2.0` as the published baseline for this scoped package.
+
+- Host Link command framing is fixed to CR termination.
+- The connection node now exposes an explicit timeout setting.
+- Read/write nodes expose metadata modes, connection control messages, comment reads, and canonical address helper exports.
+- The matrix flow now includes run-all read/write buttons, timeout tracking, an auto-run status lamp, non-overlapping buttons, and JSONL logging.
+- The matrix write sequence skips entries marked `writable: false`; timer/counter `T` and `C` samples are circuit-dependent and not safe generic write targets.
+
 ## Device input validation
 
 Read/write input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
@@ -76,6 +86,14 @@ The helper exports also include `normalizeAddress()`, `formatParsedAddress()`, a
 
 The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
 It includes one-by-one buttons, run-all read/write buttons, timeout tracking, and an auto-run status lamp.
+
+Latest retained KV Host Link matrix result:
+
+- date: `2026-05-02`
+- target class: `KV-5000`
+- catalog samples: `35`
+- completed JSONL records: `157`
+- result: all records `OK`
 
 ## Known limitations
 

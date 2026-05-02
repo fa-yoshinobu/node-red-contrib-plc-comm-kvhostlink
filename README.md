@@ -24,7 +24,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Release information
 
 - package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.2.7`
+- package version: `0.2.8`
 - npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
 - Node-RED requirement: `>=3.0.0`
 - Node.js requirement: `>=18`
@@ -51,6 +51,16 @@ npm run smoke:editor
 ```
 
 This command installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, verifies the flow starts, and then shuts the runtime down again.
+
+### Changes Since Flow Library 0.2.0
+
+The Node-RED Flow Library currently shows `0.2.0` as the published baseline for this scoped package. Check these changes before updating an existing flow:
+
+- Host Link command framing is fixed to CR termination. If an old flow had an `Append LF` connection option, remove that assumption.
+- The connection node now exposes an explicit timeout setting.
+- Read/write nodes now expose metadata modes, connection control messages, comment reads, and canonical address helper exports.
+- `kvhostlink-device-matrix.json` now includes one-click run-all read/write buttons, an auto-run status lamp, timeout tracking, non-overlapping button layout, and JSONL logging.
+- The matrix write sequence skips entries marked `writable: false`; timer/counter `T` and `C` samples are circuit-dependent and not safe generic write targets.
 
 ## Documentation
 
@@ -156,4 +166,15 @@ XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`,
 
 - `AT` remains pending support and is tracked in [TODO.md](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md).
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
+
+## Latest Matrix Verification
+
+Latest retained KV Host Link Node-RED matrix result:
+
+- date: `2026-05-02`
+- target class: `KV-5000`
+- catalog samples: `35`
+- completed JSONL records: `157`
+- result: all records `OK`
+- log shape: each record includes `protocol`, `requestId`, `sessionId`, `logPath`, `operation`, `deviceCode`, `sampleLabel`, `address`, `status`, and timing fields
 
