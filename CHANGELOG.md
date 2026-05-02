@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.2.5 - 2026-05-02
+
+- bump package revision and update `iconv-lite` to `^0.7.2`
+
 ## 0.2.4 - 2026-04-27
 
 - add X/Y monitor registration support verified on KV-7500

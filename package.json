@@ -1,6 +1,6 @@
 ﻿{
   "name": "@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Node-RED nodes for KEYENCE KV Host Link communication over TCP/UDP.",
   "author": "fa-yoshinobu",
   "license": "MIT",
@@ -46,7 +46,7 @@
     "smoke:editor": "node test/run-editor-smoke.js"
   },
   "dependencies": {
-    "iconv-lite": "^0.6.3"
+    "iconv-lite": "^0.7.2"
   },
   "node-red": {
     "version": ">=3.0.0",
