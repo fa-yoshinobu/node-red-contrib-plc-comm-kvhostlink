@@ -27,8 +27,7 @@
         validate: function (value) {
           return kvValidateIntegerInRange(value, 1, 2147483647);
         }
-      },
-      appendLfOnSend: { value: false }
+      }
     },
     label: function () {
       return this.name || `${this.host || "kv"}:${this.port || 8501}`;
@@ -60,15 +59,11 @@
     <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout ms</label>
     <input type="text" id="node-config-input-timeout" placeholder="3000" />
   </div>
-  <div class="form-row">
-    <label for="node-config-input-appendLfOnSend"><i class="fa fa-terminal"></i> Append LF</label>
-    <input type="checkbox" id="node-config-input-appendLfOnSend" style="width:auto;" />
-  </div>
 </script>
 
 <script type="text/html" data-help-name="kvhostlink-connection">
   <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
-  <p>Set <code>Append LF</code> only when your PLC bridge or converter expects <code>CRLF</code> instead of the default <code>CR</code>-terminated command line.</p>
+  <p>Commands are sent as Host Link command lines terminated with <code>CR</code>.</p>
   <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>
 </script>

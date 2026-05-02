@@ -148,11 +148,10 @@
     {
         "id":  "cfg-kv-basic",
         "type":  "kvhostlink-connection",
-        "name":  "KV PLC TCP",
+        "name":  "KV Host Link TCP",
         "host":  "192.168.250.100",
         "port":  "8501",
         "transport":  "tcp",
-        "timeout":  "3000",
-        "appendLfOnSend":  false
+        "timeout":  "3000"
     }
 ]

@@ -11,14 +11,12 @@ module.exports = function registerKvHostLinkConnection(RED) {
     this.port = Number(config.port || 8501);
     this.transport = config.transport || "tcp";
     this.timeout = Number(config.timeout || 3000);
-    this.appendLfOnSend = Boolean(config.appendLfOnSend);
 
     this.client = new HostLinkClient({
       host: this.host,
       port: this.port,
       transport: this.transport,
       timeout: this.timeout,
-      appendLfOnSend: this.appendLfOnSend,
     });
 
     this._setState = (fill, shape, text) => this.status({ fill, shape, text });
@@ -28,7 +26,6 @@ module.exports = function registerKvHostLinkConnection(RED) {
       port: this.port,
       transport: this.transport,
       timeout: this.timeout,
-      appendLfOnSend: this.appendLfOnSend,
     });
     this.connect = async () => {
       this._setState("yellow", "ring", "connecting");

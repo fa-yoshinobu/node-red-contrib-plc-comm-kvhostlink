@@ -1,5 +1,17 @@
 <script type="text/javascript">
   const KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE = /^[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?$/i;
+  const KVHOSTLINK_WRITE_DEVICE_BASES = Object.freeze({
+    R: 10, B: 16, MR: 10, LR: 10, CR: 10, VB: 16,
+    DM: 10, EM: 10, FM: 10, ZF: 10, W: 16, TM: 10, Z: 10,
+    T: 10, TC: 10, TS: 10, C: 10, CC: 10, CS: 10, AT: 10,
+    CM: 10, VM: 10, X: 10, Y: 10, M: 10, L: 10, D: 10, E: 10, F: 10
+  });
+  const KVHOSTLINK_WRITE_DEVICE_CODES = Object.keys(KVHOSTLINK_WRITE_DEVICE_BASES).sort(function (left, right) {
+    return right.length - left.length || left.localeCompare(right);
+  });
+  const KVHOSTLINK_WRITE_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H"]);
+  const KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
+  const KVHOSTLINK_WRITE_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
   function kvGetWriteCurrentType(typeSelector, fallback) {
     const field = $(typeSelector);
@@ -14,7 +26,68 @@
   }
 
   function kvValidateWriteAddress(address) {
-    return KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE.test(String(address || "").trim());
+    const token = String(address || "").trim();
+    return KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE.test(token) && kvValidateWriteAddressToken(token);
+  }
+
+  function kvValidateWriteAddressToken(value) {
+    let text = String(value == null ? "" : value).trim().toUpperCase();
+    if (!text) {
+      return false;
+    }
+
+    const countMatch = /^(.*?),\s*(\d+)$/.exec(text);
+    if (countMatch) {
+      text = countMatch[1].trim();
+      if (Number.parseInt(countMatch[2], 10) <= 0) {
+        return false;
+      }
+    }
+
+    const suffixMatch = /^(.*?):([A-Z]+)$/.exec(text);
+    if (suffixMatch) {
+      text = suffixMatch[1].trim();
+      if (!KVHOSTLINK_WRITE_DTYPE_SUFFIXES.has(suffixMatch[2].toUpperCase())) {
+        return false;
+      }
+    }
+
+    const bitMatch = /^(.*?)\.([0-9A-F])$/i.exec(text);
+    if (bitMatch) {
+      if (countMatch || suffixMatch) {
+        return false;
+      }
+      text = bitMatch[1].trim();
+    }
+
+    return kvValidateWriteDeviceToken(text);
+  }
+
+  function kvValidateWriteDeviceToken(text) {
+    for (const code of KVHOSTLINK_WRITE_DEVICE_CODES) {
+      if (!text.startsWith(code)) {
+        continue;
+      }
+      const numberText = text.slice(code.length);
+      if (!numberText) {
+        return false;
+      }
+      if (KVHOSTLINK_WRITE_XY_DEVICE_TYPES.has(code)) {
+        const bankText = numberText.length === 1 ? "0" : numberText.slice(0, -1);
+        return /^[0-9]+$/.test(bankText) && /^[0-9A-F]$/i.test(numberText.slice(-1));
+      }
+      if (KVHOSTLINK_WRITE_DEVICE_BASES[code] === 16) {
+        return /^[0-9A-F]+$/i.test(numberText);
+      }
+      if (!/^\d+$/.test(numberText)) {
+        return false;
+      }
+      if (KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES.has(code)) {
+        return Number.parseInt(numberText, 10) % 100 <= 15;
+      }
+      return true;
+    }
+    return false;
   }
 
   function kvValidateWriteLiteral(value) {

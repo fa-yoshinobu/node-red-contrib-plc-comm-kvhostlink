@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.2.7 - 2026-05-02
+
+- remove the public device range catalog API from the Node-RED package
+- stop rejecting device addresses by built-in common range limits; ordinary read/write validation now checks address format and Host Link command constraints, leaving actual range errors to the PLC response
+
+## 0.2.6 - 2026-05-02
+
+- remove the `Append LF` connection option and always send Host Link commands with CR termination
+
 ## 0.2.5 - 2026-05-02
 
 - bump package revision and update `iconv-lite` to `^0.7.2`

@@ -30,11 +30,18 @@ Configure these explicitly on the connection node:
 - port
 - transport: `tcp` or `udp`
 - timeout in milliseconds
-- `Append LF on send`
 
-Validated PLC model:
+Commands are sent with Host Link CR termination.
 
-- `KV-7500`
+## Device input validation
+
+Read/write input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
+It does not check PLC model-specific device ranges.
+If an address is outside the connected PLC's actual range, the PLC response is returned as the runtime error.
+
+`Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
+If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
+Use `TC` / `TS` / `CC` / `CS` when checking the timer/counter current/contact device families directly.
 
 ## Runtime behavior
 
@@ -68,6 +75,7 @@ The helper exports also include `normalizeAddress()`, `formatParsedAddress()`, a
 - [kvhostlink-device-matrix.json](../../examples/flows/kvhostlink-device-matrix.json)
 
 The matrix flow writes completed results to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
+It includes one-by-one buttons, run-all read/write buttons, timeout tracking, and an auto-run status lamp.
 
 ## Known limitations
 
@@ -81,4 +89,3 @@ npm run smoke:editor
 ```
 
 - The smoke script installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, and verifies that the flow reaches `Started flows`.
-- A local Node-RED runtime smoke test loaded `kvhostlink-basic-read-write.json` from an isolated userDir and reached `Started flows`.

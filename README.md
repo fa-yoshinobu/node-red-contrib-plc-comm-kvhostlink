@@ -16,7 +16,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Quick start
 
 1. Install the package into your Node-RED user directory and restart Node-RED.
-2. Add one `kvhostlink-connection` config node and set `host`, `port`, `transport`, `timeout`, and `Append LF` as needed.
+2. Add one `kvhostlink-connection` config node and set `host`, `port`, `transport`, and `timeout`.
 3. Import [`kvhostlink-basic-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json) for the first smoke test.
 4. When scalar read/write works, move to [`kvhostlink-typed-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json) and [`kvhostlink-array-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json).
 5. Use [`kvhostlink-device-matrix.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json) only after the basics are stable.
@@ -24,7 +24,7 @@ Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper 
 ## Release information
 
 - package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.2.5`
+- package version: `0.2.7`
 - npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
 - Node-RED requirement: `>=3.0.0`
 - Node.js requirement: `>=18`
@@ -65,20 +65,18 @@ This command installs the local package into an isolated temporary userDir, star
 
 - TCP and UDP transport
 - Reusable `kvhostlink-connection` config node
-- explicit connection options for `host`, `port`, `transport`, `timeout`, and `append LF on send`
+- explicit connection options for `host`, `port`, `transport`, and `timeout`
 - `kvhostlink-read` powered by the high-level helper API
 - `kvhostlink-write` powered by the high-level helper API
 - high-level scalar, signed, dword, long, float, bit-in-word, and `,count` forms
 - comment read helper and `:COMMENT` snapshot form
 - metadata emission modes for `msg.kvhostlink`: `full` / `minimal` / `off`
 - connection control via `connect` / `disconnect` / `reinitialize` messages
-- matrix-style debug flow with JSONL result logging
+- matrix-style debug flow with one-click run-all read/write, status lamp feedback, timeout tracking, and JSONL result logging
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
 - helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
-- helper exports include `deviceRangeCatalogForModel()` and `client.readDeviceRangeCatalog()` for model-specific published ranges
 - optional local runtime smoke validation via `npm run smoke:editor`
-- local Node-RED runtime smoke test confirmed the basic flow loads and starts successfully
 
 Supported high-level address forms include:
 
@@ -94,11 +92,11 @@ Supported high-level address forms include:
 - `T10:D`
 - `C10:D`
 
-Validated PLC model:
-
-- `KV-7500`
-
 ## Supported devices
+
+Input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
+It does not check PLC model-specific device ranges.
+If an address is outside the connected PLC's actual range, the PLC response is returned as the runtime error.
 
 Supported bit devices:
 
@@ -117,6 +115,10 @@ Supported high-level timer and counter scalar forms:
 - `Tn:D`
 - `Cn:D`
 
+`Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
+If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
+Use `TC` / `TS` / `CC` / `CS` when checking the timer/counter current/contact device families directly.
+
 ## Example flows
 
 - [kvhostlink-basic-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json)
@@ -126,7 +128,7 @@ Supported high-level timer and counter scalar forms:
 - [kvhostlink-array-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json)
   `,count` read/write examples for words and bits.
 - [kvhostlink-device-matrix.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json)
-  High-level matrix-style verification flow. Completed results are appended to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
+  High-level matrix-style verification flow with one-by-one controls, run-all read/write buttons, status lamp feedback, and JSONL logging. Completed results are appended to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
 
 ## Connection and runtime behavior
 
@@ -136,7 +138,7 @@ Connection settings on `kvhostlink-connection`:
 - port
 - transport: `tcp` or `udp`
 - timeout in milliseconds
-- `Append LF on send`
+- command framing is fixed to Host Link CR termination
 
 Read and write nodes support:
 
