@@ -5,12 +5,8 @@ const assert = require("node:assert/strict");
 
 const {
   HostLinkClient,
-  KvDeviceRangeCategory,
-  KvDeviceRangeNotation,
-  availableDeviceRangeModels,
   buildFrame,
   decodeResponse,
-  deviceRangeCatalogForModel,
   deviceToString,
   splitDataTokens,
   parseDevice,
@@ -25,9 +21,11 @@ test("parseDevice handles decimal and hex devices", () => {
   assert.equal(deviceToString({ deviceType: "X", number: 39 * 16 + 15, suffix: "" }), "X39F");
   assert.equal(deviceToString({ deviceType: "X", number: 40 * 16, suffix: "" }), "X400");
   assert.equal(parseDevice("M63999").number, 63999);
+  assert.equal(parseDevice("M64000").number, 64000);
+  assert.equal(parseDevice("Z0").number, 0);
   assert.equal(deviceToString(parseDevice("R1")), "R001");
   assert.equal(deviceToString(parseDevice("CR0")), "CR000");
-  assert.throws(() => parseDevice("M64000"));
+  assert.throws(() => parseDevice("DM12A"));
   assert.throws(() => parseDevice("R016"));
   assert.throws(() => parseDevice("X3F0"));
   assert.throws(() => parseDevice("Y19A0"));
@@ -89,30 +87,7 @@ test("monitor registration accepts XYM bit aliases verified on KV-7500", async (
   assert.deepEqual(commands, ["MBS X100 X101 M100 M101", "MWS X100 Y100"]);
 });
 
-test("device range catalog resolves model families and XYM aliases", () => {
-  assert.ok(availableDeviceRangeModels().includes("KV-7000(XYM)"));
-
-  const catalog = deviceRangeCatalogForModel("KV-8000A");
-  assert.equal(catalog.model, "KV-8000");
-  assert.equal(catalog.modelCode, "");
-  assert.equal(catalog.hasModelCode, false);
-  assert.equal(catalog.entry("DM").addressRange, "DM00000-DM65534");
-  assert.equal(catalog.entry("TM").category, KvDeviceRangeCategory.WORD);
-
-  const xym = deviceRangeCatalogForModel("KV-3000/5000(XYM)");
-  const entry = xym.entry("R");
-  assert.equal(entry.category, KvDeviceRangeCategory.BIT);
-  assert.equal(entry.notation, KvDeviceRangeNotation.HEXADECIMAL);
-  assert.equal(entry.upperBound, 0x999f);
-  assert.equal(entry.pointCount, 0x99a0);
-  assert.equal(entry.addressRange, "X0-999F,Y0-999F");
-  assert.deepEqual(entry.segments.map((segment) => segment.device), ["X", "Y"]);
-  assert.equal(xym.entry("X").deviceType, "R");
-  assert.equal(xym.entry("D").deviceType, "DM");
-  assert.equal(xym.entry("CR").addressRange, "CR0000-CR3915");
-});
-
-test("readDeviceRangeCatalog uses queryModel response", async () => {
+test("queryModel returns the raw model code and known model label", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];
 
@@ -121,8 +96,7 @@ test("readDeviceRangeCatalog uses queryModel response", async () => {
     return Buffer.from("63\r", "ascii");
   };
 
-  const catalog = await client.readDeviceRangeCatalog();
-  assert.equal(catalog.model, "KV-X500");
-  assert.equal(catalog.modelCode, "63");
+  const model = await client.queryModel();
+  assert.deepEqual(model, { code: "63", model: "KV-X550" });
   assert.deepEqual(commands, ["?K"]);
 });

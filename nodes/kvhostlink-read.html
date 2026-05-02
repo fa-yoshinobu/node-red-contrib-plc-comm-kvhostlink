@@ -1,5 +1,17 @@
 <script type="text/javascript">
   const KVHOSTLINK_ADDRESS_TOKEN_RE = /[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?/iy;
+  const KVHOSTLINK_DEVICE_BASES = Object.freeze({
+    R: 10, B: 16, MR: 10, LR: 10, CR: 10, VB: 16,
+    DM: 10, EM: 10, FM: 10, ZF: 10, W: 16, TM: 10, Z: 10,
+    T: 10, TC: 10, TS: 10, C: 10, CC: 10, CS: 10, AT: 10,
+    CM: 10, VM: 10, X: 10, Y: 10, M: 10, L: 10, D: 10, E: 10, F: 10
+  });
+  const KVHOSTLINK_DEVICE_CODES = Object.keys(KVHOSTLINK_DEVICE_BASES).sort(function (left, right) {
+    return right.length - left.length || left.localeCompare(right);
+  });
+  const KVHOSTLINK_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H", "COMMENT"]);
+  const KVHOSTLINK_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
+  const KVHOSTLINK_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
   function kvGetCurrentType(typeSelector, fallback) {
     const field = $(typeSelector);
@@ -43,7 +55,75 @@
     if (!text) {
       return true;
     }
-    return Array.isArray(kvTokenizeAddressList(text));
+    const tokens = kvTokenizeAddressList(text);
+    return Array.isArray(tokens) && tokens.every(function (token) {
+      return kvValidateAddressToken(token, { allowComment: true });
+    });
+  }
+
+  function kvValidateAddressToken(value, options) {
+    const settings = options || {};
+    let text = String(value == null ? "" : value).trim().toUpperCase();
+    if (!text) {
+      return false;
+    }
+
+    const countMatch = /^(.*?),\s*(\d+)$/.exec(text);
+    if (countMatch) {
+      text = countMatch[1].trim();
+      if (Number.parseInt(countMatch[2], 10) <= 0) {
+        return false;
+      }
+    }
+
+    const suffixMatch = /^(.*?):([A-Z]+)$/.exec(text);
+    if (suffixMatch) {
+      text = suffixMatch[1].trim();
+      const suffix = suffixMatch[2].toUpperCase();
+      if (!KVHOSTLINK_DTYPE_SUFFIXES.has(suffix)) {
+        return false;
+      }
+      if (suffix === "COMMENT" && (countMatch || settings.allowComment === false)) {
+        return false;
+      }
+    }
+
+    const bitMatch = /^(.*?)\.([0-9A-F])$/i.exec(text);
+    if (bitMatch) {
+      if (countMatch || suffixMatch) {
+        return false;
+      }
+      text = bitMatch[1].trim();
+    }
+
+    return kvValidateDeviceToken(text);
+  }
+
+  function kvValidateDeviceToken(text) {
+    for (const code of KVHOSTLINK_DEVICE_CODES) {
+      if (!text.startsWith(code)) {
+        continue;
+      }
+      const numberText = text.slice(code.length);
+      if (!numberText) {
+        return false;
+      }
+      if (KVHOSTLINK_XY_DEVICE_TYPES.has(code)) {
+        const bankText = numberText.length === 1 ? "0" : numberText.slice(0, -1);
+        return /^[0-9]+$/.test(bankText) && /^[0-9A-F]$/i.test(numberText.slice(-1));
+      }
+      if (KVHOSTLINK_DEVICE_BASES[code] === 16) {
+        return /^[0-9A-F]+$/i.test(numberText);
+      }
+      if (!/^\d+$/.test(numberText)) {
+        return false;
+      }
+      if (KVHOSTLINK_BIT_BANK_DEVICE_TYPES.has(code)) {
+        return Number.parseInt(numberText, 10) % 100 <= 15;
+      }
+      return true;
+    }
+    return false;
   }
 
   function kvValidateSourceField(value, typeSelector, literalValidator, fallbackType) {

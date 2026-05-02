@@ -22,8 +22,12 @@ This imports `kvhostlink-basic-read-write.json` into an isolated temporary userD
 
 ## Notes
 
-- Edit the catalog in `Prepare next device sample (edit catalog here)` before deploy if your PLC uses different ranges.
+- Edit the catalog in `Prepare next device sample (edit catalog here)` before deploy if your PLC uses different test addresses.
 - The flows use only the high-level `kvhostlink-read` and `kvhostlink-write` nodes.
 - The flow nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior.
 - The beginner flows already show the metadata selector and the shared connection control pattern.
 - Use `Reset sequence + history` before a new matrix verification pass.
+- Use `Run all reads` or `Run all writes` to run the catalog automatically with one outstanding request at a time. The `Auto run status lamp` node shows active, pending, idle, and error state in the Node-RED editor.
+- `T` and `C` high-level samples require a corresponding timer/counter circuit in the PLC program. A PLC error or timeout is expected when that circuit is absent; use `TC` / `TS` / `CC` / `CS` samples for read-only current/contact family checks.
+- The write sequence skips entries marked `writable: false`, including the timer/counter samples that are not safe generic write targets.
+- A KV-5000 write/readback pass confirmed all writable matrix samples passed.

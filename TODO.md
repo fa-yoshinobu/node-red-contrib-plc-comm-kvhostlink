@@ -12,5 +12,5 @@
 
 - [x] **Keep control-message behavior aligned**: `connect`, `disconnect`, and `reinitialize` control handling is exposed consistently through the shared connection node and the read/write nodes.
 - [x] **Stabilize metadata schema**: The user-facing metadata modes now stay aligned around connection profile and item-count summaries.
-- [x] **Keep protocol-specific options explicit**: Transport, timeout, and `appendLfOnSend` stay explicit connection settings instead of hidden defaults.
+- [x] **Keep protocol-specific options explicit**: Transport and timeout stay explicit connection settings. Host Link command framing is fixed to CR termination.
 - [x] **Preserve semantic atomicity by default**: Read and write nodes keep the caller-visible logical request shape. Protocol-defined segmentation, when it exists below the node surface, must stay documented and must not be hidden behind fallback semantic changes.
