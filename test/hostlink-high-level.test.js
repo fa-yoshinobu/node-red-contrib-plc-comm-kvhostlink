@@ -143,6 +143,60 @@ test("readNamed batches optimizable contiguous word requests", async () => {
   assert.deepEqual(calls, [{ device: "DM100", count: 7, dataFormat: ".U" }]);
 });
 
+test("readNamed batches direct bit requests", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, options = {}) {
+      calls.push({ device, count, dataFormat: options.dataFormat || "" });
+      if (device === "X100" && count === 2) {
+        return [1, 0];
+      }
+      if (device === "R000" && count === 4) {
+        return [1, 0, 1, 0];
+      }
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+    },
+  };
+
+  const snapshot = await readNamed(fakeClient, ["X100", "X101", "R0", "R1", "R2", "R3"]);
+
+  assert.deepEqual(snapshot, {
+    X100: true,
+    X101: false,
+    R0: true,
+    R1: false,
+    R2: true,
+    R3: false,
+  });
+  assert.deepEqual(calls, [
+    { device: "X100", count: 2, dataFormat: "" },
+    { device: "R000", count: 4, dataFormat: "" },
+  ]);
+});
+
+test("readNamed batches bit-bank direct bits across display bank boundary", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, options = {}) {
+      calls.push({ device, count, dataFormat: options.dataFormat || "" });
+      if (device === "CR3614" && count === 4) {
+        return [0, 1, 0, 1];
+      }
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+    },
+  };
+
+  const snapshot = await readNamed(fakeClient, ["CR3614", "CR3615", "CR3700", "CR3701"]);
+
+  assert.deepEqual(snapshot, {
+    CR3614: false,
+    CR3615: true,
+    CR3700: false,
+    CR3701: true,
+  });
+  assert.deepEqual(calls, [{ device: "CR3614", count: 4, dataFormat: "" }]);
+});
+
 test("readNamed falls back for mixed scalar, dword, float, bit, and array reads", async () => {
   const fakeClient = {
     async read(device, options = {}) {
