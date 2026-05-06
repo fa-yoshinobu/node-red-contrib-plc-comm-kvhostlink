@@ -20,6 +20,7 @@ test("parseDevice handles decimal and hex devices", () => {
   assert.deepEqual(parseDevice("X400"), { deviceType: "X", number: 40 * 16, suffix: "" });
   assert.equal(deviceToString({ deviceType: "X", number: 39 * 16 + 15, suffix: "" }), "X39F");
   assert.equal(deviceToString({ deviceType: "X", number: 40 * 16, suffix: "" }), "X400");
+  assert.equal(parseDevice("Y1999F").number, 1999 * 16 + 15);
   assert.equal(parseDevice("M63999").number, 63999);
   assert.equal(parseDevice("M64000").number, 64000);
   assert.equal(parseDevice("Z0").number, 0);

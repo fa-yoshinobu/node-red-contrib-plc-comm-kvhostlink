@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- batch `readNamed()` direct-bit requests for Host Link bit devices, including `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`
+
 ## 0.2.8 - 2026-05-02
 
 - bump the release revision for npm and Node-RED Flow Library publishing; the Flow Library currently shows `0.2.0` as the public baseline
