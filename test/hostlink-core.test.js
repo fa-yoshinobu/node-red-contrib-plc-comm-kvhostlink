@@ -88,6 +88,26 @@ test("monitor registration accepts XYM bit aliases verified on KV-7500", async (
   assert.deepEqual(commands, ["MBS X100 X101 M100 M101", "MWS X100 Y100"]);
 });
 
+test("client rejects device spans crossing range before send", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\r", "ascii");
+  };
+
+  await assert.rejects(() => client.read("DM65534", { dataFormat: ".D" }), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("DM65535", 2), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("Y1999F", 2), /Device span out of range/);
+
+  assert.deepEqual(commands, []);
+
+  assert.equal((await client.readConsecutive("CR7900", 16)).length, 16);
+  await assert.rejects(() => client.readConsecutive("CR7900", 17), /Device span out of range/);
+  assert.deepEqual(commands, ["RDS CR7900 16"]);
+});
+
 test("queryModel returns the raw model code and known model label", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];

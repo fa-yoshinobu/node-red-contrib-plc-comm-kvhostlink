@@ -105,8 +105,9 @@ Supported high-level address forms include:
 ## Supported devices
 
 Input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
-It does not check PLC model-specific device ranges.
-If an address is outside the connected PLC's actual range, the PLC response is returned as the runtime error.
+It also rejects spans that cross the common Host Link device-family bounds before a request is sent, including 32-bit reads that would run past the end of a word device area.
+It does not check PLC model-specific device ranges because the Node-RED connection profile does not select a PLC model.
+If an address is valid for the common Host Link family but outside the connected PLC's actual range, the PLC response is returned as the runtime error.
 
 Supported bit devices:
 
