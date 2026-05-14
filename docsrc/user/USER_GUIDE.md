@@ -22,6 +22,12 @@
 - `T10:D`
 - `C10:D`
 
+`T10:D` and `C10:D` read the preset value through the normal read node and
+`readNamed` helper semantics. In custom JavaScript code, use the exported
+`readTimerCounter(client, "T10")`, `readTimer(client, "T10")`, or
+`readCounter(client, "C10")` helper when you need all three Host Link fields:
+`status`, `current`, and `preset`.
+
 ## Connection settings
 
 Configure these explicitly on the connection node:
@@ -53,6 +59,8 @@ If an address is valid for the common Host Link family but outside the connected
 `Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
 If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
 Use `TC` / `TS` / `CC` / `CS` when checking the timer/counter current/contact device families directly.
+Use `readTimerCounter` when you want the single Host Link `T` / `C` composite
+response instead of reading those separate device families.
 
 ## Runtime behavior
 
@@ -75,7 +83,10 @@ Comment reads such as `DM145:COMMENT` use the Host Link `RDC` command and return
 
 XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`, `M20:COMMENT`, and `X100:COMMENT` are valid.
 
-The helper exports also include `normalizeAddress()`, `formatParsedAddress()`, and `normalizeAddressList()` when runtime code wants canonical uppercase address text outside the editor UI.
+The helper exports also include `normalizeAddress()`, `formatParsedAddress()`,
+`normalizeAddressList()`, `readTimerCounter()`, `readTimer()`, and
+`readCounter()` when runtime code needs helper-layer behavior outside the
+editor UI.
 
 ## Example flows
 
