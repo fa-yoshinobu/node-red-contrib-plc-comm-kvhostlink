@@ -177,6 +177,27 @@ test("switchBank sends BE and validates the bank number", async () => {
   assert.deepEqual(commands, ["BE 1"]);
 });
 
+test("setTime sends WRT with Sunday-based weekday", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("OK\r", "ascii");
+  };
+
+  await client.setTime(new Date(2026, 2, 15, 1, 2, 3));
+  await client.setTime(new Date(2026, 2, 16, 1, 2, 3));
+  await client.setTime(new Date(2026, 2, 21, 1, 2, 3));
+  await assert.rejects(() => client.setTime([26, 3, 15, 1, 2, 3, 7]), /week out of range/);
+
+  assert.deepEqual(commands, [
+    "WRT 26 03 15 01 02 03 0",
+    "WRT 26 03 16 01 02 03 1",
+    "WRT 26 03 21 01 02 03 6",
+  ]);
+});
+
 test("queryModel returns the raw model code and known model label", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];
