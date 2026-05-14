@@ -52,9 +52,10 @@ npm run smoke:editor
 
 This command installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, verifies the flow starts, and then shuts the runtime down again.
 
-### Changes Since Flow Library 0.2.0
+### Changes Since Older Flow Library Entries
 
-The Node-RED Flow Library currently shows `0.2.0` as the published baseline for this scoped package. Check these changes before updating an existing flow:
+If your Node-RED Flow Library entry or an existing project is still on `0.2.0`,
+check these changes before updating a flow:
 
 - Host Link command framing is fixed to CR termination. If an old flow had an `Append LF` connection option, remove that assumption.
 - The connection node now exposes an explicit timeout setting.
@@ -85,7 +86,9 @@ The Node-RED Flow Library currently shows `0.2.0` as the published baseline for 
 - matrix-style debug flow with one-click run-all read/write, status lamp feedback, timeout tracking, and JSONL result logging
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
-- helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
+- helper exports also include `normalizeAddress`, `formatParsedAddress`,
+  `normalizeAddressList`, `readTimerCounter`, `readTimer`, and `readCounter`
+  for canonical address handling and timer/counter composite reads
 - the low-level `HostLinkClient` export includes expansion unit buffer helpers:
   `readExpansionUnitBuffer()` and `writeExpansionUnitBuffer()`
 - the low-level `HostLinkClient` export includes `switchBank()` for PLC models
@@ -137,8 +140,9 @@ Supported high-level timer and counter scalar forms:
 - `Cn:D`
 
 The high-level helper `readNamed(["T10"])` keeps returning the preset value for
-compatibility. Use the exported JS helper `readTimerCounter(client, "T10")` when
-the Host Link composite fields are needed: `status`, `current`, and `preset`.
+compatibility. Use the exported JS helpers `readTimerCounter(client, "T10")`,
+`readTimer(client, "T10")`, or `readCounter(client, "C10")` when the Host Link
+composite fields are needed: `status`, `current`, and `preset`.
 
 `Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
 If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.

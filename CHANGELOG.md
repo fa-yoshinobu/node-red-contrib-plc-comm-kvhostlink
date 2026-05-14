@@ -18,7 +18,7 @@
 
 ## 0.2.8 - 2026-05-02
 
-- bump the release revision for npm and Node-RED Flow Library publishing; the Flow Library currently shows `0.2.0` as the public baseline
+- bump the release revision for npm and Node-RED Flow Library publishing; older Flow Library entries may still show `0.2.0`
 - refresh README, user-guide, and example-flow docs with compatibility notes from the published Flow Library version
 - document the public compatibility change that Host Link command framing is fixed to CR termination
 - document the expanded current surface since Flow Library `0.2.0`: timeout setting, metadata modes, connection control messages, comment reads, and canonical address helper exports

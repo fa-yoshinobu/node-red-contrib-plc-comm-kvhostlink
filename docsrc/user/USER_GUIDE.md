@@ -39,9 +39,10 @@ Configure these explicitly on the connection node:
 
 Commands are sent with Host Link CR termination.
 
-## Changes since Flow Library 0.2.0
+## Changes since older Flow Library entries
 
-The Node-RED Flow Library currently shows `0.2.0` as the published baseline for this scoped package.
+If your Node-RED Flow Library entry or an existing project is still on `0.2.0`,
+check these changes before updating a flow.
 
 - Host Link command framing is fixed to CR termination.
 - The connection node now exposes an explicit timeout setting.
@@ -109,7 +110,9 @@ Latest retained KV Host Link matrix result:
 
 ## Known limitations
 
-- `AT` is still tracked as pending support.
+- `AT` is not present on KV-X500. On KV-7500, `AT0.D`, `AT7.D`, default
+  high-level `AT0`, and `RDS AT0.D 8` were verified. `AT` is not listed in the
+  WR/WRS device table, so write helpers reject AT before sending.
 - `kvhostlink-device-matrix.json` is intended for validation and debugging, not as the first flow for a new user.
 
 ## Runtime smoke test from the repository root
