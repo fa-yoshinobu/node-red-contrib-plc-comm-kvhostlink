@@ -108,6 +108,22 @@ test("client rejects device spans crossing range before send", async () => {
   assert.deepEqual(commands, ["RDS CR7900 16"]);
 });
 
+test("AT defaults to 32-bit values but spans by AT device point", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000\r", "ascii");
+  };
+
+  await client.read("AT7");
+  await client.readConsecutive("AT0", 8);
+  await assert.rejects(() => client.readConsecutive("AT1", 8), /Device span out of range/);
+
+  assert.deepEqual(commands, ["RD AT7.D", "RDS AT0.D 8"]);
+});
+
 test("expansion unit buffer uses address-suffix command form", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];

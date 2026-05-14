@@ -123,6 +123,8 @@ Supported word devices:
 
 - `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`
 - `TC`, `TS`, `CC`, `CS`
+- `AT` digital trimmer values, treated as 32-bit (`.D`) device points on
+  supported PLC families
 - `CM`, `VM`
 - `D`, `E`, `F`
 
@@ -174,7 +176,8 @@ XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`,
 
 ## Known limitations
 
-- `AT` remains pending support and is tracked in [TODO.md](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md).
+- `AT` is not present on KV-X500. On KV-7500, `AT0.D` / `AT7.D` read and
+  default `AT0` high-level read were verified; `AT` write returned PLC `E1`.
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
 
 ## Latest Matrix Verification

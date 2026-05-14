@@ -56,6 +56,14 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     hasCount: false,
     explicitDtype: true,
   });
+  assert.deepEqual(parseAddress("AT0,8"), {
+    base: "AT0",
+    dtype: "D",
+    bitIndex: null,
+    count: 8,
+    hasCount: true,
+    explicitDtype: false,
+  });
 });
 
 test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
@@ -251,6 +259,24 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
     "DM400,3": [1, 2, 3],
     "R010,4": [true, false, true, false],
   });
+});
+
+test("readNamed reads AT dword arrays as AT device points", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, options = {}) {
+      calls.push({ device, count, dataFormat: options.dataFormat || "" });
+      if (device === "AT0" && count === 2 && options.dataFormat === ".D") {
+        return [3533, 5543];
+      }
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+    },
+  };
+
+  assert.deepEqual(await readNamed(fakeClient, ["AT0,2"]), {
+    "AT0,2": [3533, 5543],
+  });
+  assert.deepEqual(calls, [{ device: "AT0", count: 2, dataFormat: ".D" }]);
 });
 
 test("poll reuses compiled read plan", async () => {
