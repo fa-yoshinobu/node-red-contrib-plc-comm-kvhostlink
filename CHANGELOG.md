@@ -4,6 +4,8 @@
 
 - add low-level `HostLinkClient` helpers for expansion unit buffer `URD` / `UWR`
   access and frame them with the verified `address.suffix` command form
+- add low-level `HostLinkClient.switchBank()` for the `BE` bank-switch command
+  used by PLC models that support data banks; KV-X500 is treated as non-target
 
 ## 0.2.9 - 2026-05-14
 

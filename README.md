@@ -88,6 +88,9 @@ The Node-RED Flow Library currently shows `0.2.0` as the published baseline for 
 - helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
 - the low-level `HostLinkClient` export includes expansion unit buffer helpers:
   `readExpansionUnitBuffer()` and `writeExpansionUnitBuffer()`
+- the low-level `HostLinkClient` export includes `switchBank()` for PLC models
+  that support the Host Link `BE` bank-switch command; KV-X500 targets do not
+  use this command
 - optional local runtime smoke validation via `npm run smoke:editor`
 
 Supported high-level address forms include:

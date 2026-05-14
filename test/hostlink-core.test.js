@@ -131,6 +131,21 @@ test("expansion unit buffer uses address-suffix command form", async () => {
   assert.deepEqual(commands, ["URD 01 100.U 2", "UWR 02 200.S 2 7 8"]);
 });
 
+test("switchBank sends BE and validates the bank number", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("OK\r", "ascii");
+  };
+
+  await client.switchBank(1);
+  await assert.rejects(() => client.switchBank(16), /bankNo out of range/);
+
+  assert.deepEqual(commands, ["BE 1"]);
+});
+
 test("queryModel returns the raw model code and known model label", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];
