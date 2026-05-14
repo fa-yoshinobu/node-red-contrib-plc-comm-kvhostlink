@@ -124,6 +124,21 @@ test("AT defaults to 32-bit values but spans by AT device point", async () => {
   assert.deepEqual(commands, ["RD AT7.D", "RDS AT0.D 8"]);
 });
 
+test("AT writes are rejected before sending WR or WRS", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    commands.push(payload.toString("ascii").trim());
+    return Buffer.from("OK\r", "ascii");
+  };
+
+  await assert.rejects(() => client.write("AT0", 3533), /does not support device type 'AT'/);
+  await assert.rejects(() => client.writeConsecutive("AT0", [3533, 5543]), /does not support device type 'AT'/);
+
+  assert.deepEqual(commands, []);
+});
+
 test("expansion unit buffer uses address-suffix command form", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];

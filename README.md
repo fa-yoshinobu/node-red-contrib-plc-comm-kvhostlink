@@ -128,6 +128,9 @@ Supported word devices:
 - `CM`, `VM`
 - `D`, `E`, `F`
 
+`AT` is not listed in the WR/WRS device table, so write helpers reject AT before
+sending.
+
 Supported high-level timer and counter scalar forms:
 
 - `Tn:D`
@@ -177,7 +180,9 @@ XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`,
 ## Known limitations
 
 - `AT` is not present on KV-X500. On KV-7500, `AT0.D` / `AT7.D` read and
-  default `AT0` high-level read were verified; `AT` write returned PLC `E1`.
+  default `AT0` high-level read were verified. `AT` is not listed in the
+  WR/WRS device table, so write helpers reject AT before sending; a raw WR
+  probe returned PLC `E1`.
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
 
 ## Latest Matrix Verification
