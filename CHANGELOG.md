@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 0.2.9 - 2026-05-14
+
 - batch `readNamed()` direct-bit requests for Host Link bit devices, including `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`
 - reject common Host Link device span overflows before sending, while still leaving PLC model-specific range validation to the connected PLC response
+- bump the package revision for the Host Link span-validation fix
 
 ## 0.2.8 - 2026-05-02
 
