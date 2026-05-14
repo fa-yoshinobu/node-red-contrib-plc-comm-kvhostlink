@@ -6,6 +6,9 @@
   access and frame them with the verified `address.suffix` command form
 - add low-level `HostLinkClient.switchBank()` for the `BE` bank-switch command
   used by PLC models that support data banks; KV-X500 is treated as non-target
+- clarify that `WS` / `WSS` timer/counter preset writes are KV-8000/7000-series
+  commands; other CPU units do not support them and return abnormal response
+  `E1` when executed
 
 ## 0.2.9 - 2026-05-14
 

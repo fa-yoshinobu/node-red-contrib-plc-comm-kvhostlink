@@ -133,6 +133,10 @@ Supported high-level timer and counter scalar forms:
 
 `Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
 If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
+Timer/counter preset writes use Host Link `WS` / `WSS` only on
+KV-8000/7000-series CPU units. Manuals state that other CPU units do not
+support those commands and return abnormal response `E1` when they are
+executed.
 Use `TC` / `TS` / `CC` / `CS` when checking the timer/counter current/contact device families directly.
 
 ## Example flows
