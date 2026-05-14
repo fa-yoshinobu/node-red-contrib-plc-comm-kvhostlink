@@ -2,11 +2,16 @@
 
 ## Device Follow-up
 
-- Investigate `AT` access on real PLCs.
-  Current status: keep this as pending support in the debug matrix until the expected Host Link behavior is verified.
+- Investigate `AT` access on a non-KV-X PLC model that has digital trimmers.
+  Current status: keep this as pending support in the debug matrix until the
+  expected Host Link behavior is verified on a target that actually supports
+  `AT`.
   Notes:
-  - `AT1` timed out in the Node-RED matrix flow.
-  - `TRM0-7` is not a drop-in replacement. A raw read probe against `192.168.250.100:8501` returned `E1` for `RD TRM0-TRM7` and `RDS TRM0 8`.
+  - KV-X500 does not have `AT` digital trimmer access, and the KV-X upper-link
+    command table does not list `AT`.
+  - `AT1` timed out in the older Node-RED matrix flow.
+  - `TRM0-7` is not a drop-in replacement. A raw read probe against
+    `192.168.250.100:8501` returned `E1` for `RD TRM0-TRM7` and `RDS TRM0 8`.
 
 ## Cross-Stack Alignment
 
