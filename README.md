@@ -86,6 +86,8 @@ The Node-RED Flow Library currently shows `0.2.0` as the published baseline for 
 - beginner-oriented sample flows for scalar, typed, and array patterns
 - local tests for protocol parsing and high-level helper behavior
 - helper exports also include `normalizeAddress`, `formatParsedAddress`, and `normalizeAddressList` for canonical address handling
+- the low-level `HostLinkClient` export includes expansion unit buffer helpers:
+  `readExpansionUnitBuffer()` and `writeExpansionUnitBuffer()`
 - optional local runtime smoke validation via `npm run smoke:editor`
 
 Supported high-level address forms include:

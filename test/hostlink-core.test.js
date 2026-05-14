@@ -108,6 +108,29 @@ test("client rejects device spans crossing range before send", async () => {
   assert.deepEqual(commands, ["RDS CR7900 16"]);
 });
 
+test("expansion unit buffer uses address-suffix command form", async () => {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const commands = [];
+
+  client._exchange = async (payload) => {
+    const command = payload.toString("ascii").trim();
+    commands.push(command);
+    if (command.startsWith("URD ")) {
+      return Buffer.from("123 456\r", "ascii");
+    }
+    return Buffer.from("OK\r", "ascii");
+  };
+
+  assert.deepEqual(await client.readExpansionUnitBuffer(1, 100, 2), [123, 456]);
+  await client.writeExpansionUnitBuffer(2, 200, [7, 8], { dataFormat: ".S" });
+  await assert.rejects(
+    () => client.readExpansionUnitBuffer(1, 59999, 1, { dataFormat: ".D" }),
+    /Expansion buffer span out of range/
+  );
+
+  assert.deepEqual(commands, ["URD 01 100.U 2", "UWR 02 200.S 2 7 8"]);
+});
+
 test("queryModel returns the raw model code and known model label", async () => {
   const client = new HostLinkClient({ host: "127.0.0.1" });
   const commands = [];

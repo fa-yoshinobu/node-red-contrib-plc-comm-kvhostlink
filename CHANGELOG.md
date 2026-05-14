@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- add low-level `HostLinkClient` helpers for expansion unit buffer `URD` / `UWR`
+  access and frame them with the verified `address.suffix` command form
+
 ## 0.2.9 - 2026-05-14
 
 - batch `readNamed()` direct-bit requests for Host Link bit devices, including `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`
