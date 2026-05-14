@@ -120,6 +120,25 @@ test("readTyped uses preset value from timer and counter composite responses", a
   assert.equal(await readTyped(fakeClient, "C10", "D"), 12345);
 });
 
+test("readNamed uses preset value from timer and counter composite responses", async () => {
+  const fakeClient = {
+    async read(device) {
+      if (device === "T10") {
+        return [0, 10, 20];
+      }
+      if (device === "C10") {
+        return [0, 0, 30];
+      }
+      throw new Error(`unexpected read ${device}`);
+    },
+  };
+
+  assert.deepEqual(await readNamed(fakeClient, ["T10", "C10"]), {
+    T10: 20,
+    C10: 30,
+  });
+});
+
 test("readNamed batches optimizable contiguous word requests", async () => {
   const calls = [];
   const fakeClient = {
