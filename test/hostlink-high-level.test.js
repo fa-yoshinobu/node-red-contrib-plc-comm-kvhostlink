@@ -11,6 +11,7 @@ const {
   poll,
   readComments,
   readNamed,
+  readTimerCounter,
   readTyped,
   writeNamed,
 } = require("../lib/hostlink");
@@ -136,6 +137,22 @@ test("readNamed uses preset value from timer and counter composite responses", a
   assert.deepEqual(await readNamed(fakeClient, ["T10", "C10"]), {
     T10: 20,
     C10: 30,
+  });
+});
+
+test("readTimerCounter returns status current and preset", async () => {
+  const fakeClient = {
+    async read(device, options = {}) {
+      assert.equal(device, "T10");
+      assert.equal(options.dataFormat, ".D");
+      return [1, 10, 20];
+    },
+  };
+
+  assert.deepEqual(await readTimerCounter(fakeClient, "T10"), {
+    status: 1,
+    current: 10,
+    preset: 20,
   });
 });
 

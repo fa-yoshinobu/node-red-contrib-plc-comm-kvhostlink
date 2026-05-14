@@ -136,6 +136,10 @@ Supported high-level timer and counter scalar forms:
 - `Tn:D`
 - `Cn:D`
 
+The high-level helper `readNamed(["T10"])` keeps returning the preset value for
+compatibility. Use the exported JS helper `readTimerCounter(client, "T10")` when
+the Host Link composite fields are needed: `status`, `current`, and `preset`.
+
 `Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
 If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
 Timer/counter preset writes use Host Link `WS` / `WSS` only on
