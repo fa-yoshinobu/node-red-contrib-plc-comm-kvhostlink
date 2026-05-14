@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.2.10 - 2026-05-14
+
+- add high-level `readTimerCounter()`, `readTimer()`, and `readCounter()`
+  helpers for full `T` / `C` composite values
 - add low-level `HostLinkClient` helpers for expansion unit buffer `URD` / `UWR`
   access and frame them with the verified `address.suffix` command form
 - add low-level `HostLinkClient.switchBank()` for the `BE` bank-switch command
