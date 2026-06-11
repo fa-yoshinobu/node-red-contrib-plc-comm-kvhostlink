@@ -12,6 +12,19 @@ const {
   parseDevice,
 } = require("../lib/hostlink");
 
+function createFrameRecorder(responseForCommand = () => "OK\r") {
+  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const frames = [];
+
+  client._exchange = async (payload) => {
+    const frame = payload.toString("ascii");
+    frames.push(frame);
+    return Buffer.from(responseForCommand(frame.replace(/\r$/, "")), "ascii");
+  };
+
+  return { client, frames };
+}
+
 test("parseDevice handles decimal and hex devices", () => {
   assert.deepEqual(parseDevice("DM100"), { deviceType: "DM", number: 100, suffix: "" });
   assert.deepEqual(parseDevice("B1F"), { deviceType: "B", number: 31, suffix: "" });
@@ -57,6 +70,71 @@ test("client serializes queued requests", async () => {
 
   await Promise.all([client.sendRaw("ER"), client.sendRaw("ER"), client.sendRaw("ER")]);
   assert.equal(maxActive, 1);
+});
+
+test("low-level command helpers preserve exact CR-terminated frames", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command === "?E") return "0\r";
+    if (command === "?M") return "1\r";
+    return "OK\r";
+  });
+
+  await client.sendRaw("ER");
+  await client.changeMode("RUN");
+  await client.changeMode("PROGRAM");
+  await client.clearError();
+  assert.equal(await client.checkErrorNo(), "0");
+  assert.equal(await client.confirmOperatingMode(), 1);
+
+  assert.deepEqual(frames, ["ER\r", "M1\r", "M0\r", "ER\r", "?E\r", "?M\r"]);
+});
+
+test("forced bit command helpers preserve exact CR-terminated frames", async () => {
+  const { client, frames } = createFrameRecorder();
+
+  await client.forcedSet("R10");
+  await client.forcedReset("MR15");
+  await client.forcedSetConsecutive("R11", 3);
+  await client.forcedResetConsecutive("MR00", 2);
+
+  assert.deepEqual(frames, ["ST R010\r", "RS MR015\r", "STS R011 3\r", "RSS MR000 2\r"]);
+});
+
+test("read and write command helpers preserve exact CR-terminated frames", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command.startsWith("RD ")) return "123\r";
+    if (command.startsWith("RDS ")) return "1 2 3\r";
+    return "OK\r";
+  });
+
+  assert.equal(await client.read("DM100"), 123);
+  assert.equal(await client.read("DM200", { dataFormat: ".S" }), 123);
+  assert.deepEqual(await client.readConsecutive("DM300", 3), [1, 2, 3]);
+  await client.write("DM400", 255, { dataFormat: ".H" });
+  await client.writeConsecutive("DM500", [1, 2, 3]);
+
+  assert.deepEqual(frames, [
+    "RD DM100.U\r",
+    "RD DM200.S\r",
+    "RDS DM300.U 3\r",
+    "WR DM400.H FF\r",
+    "WRS DM500.U 3 1 2 3\r",
+  ]);
+});
+
+test("set-value and monitor read helpers preserve exact CR-terminated frames", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command === "MBR") return "1 0 1\r";
+    if (command === "MWR") return "10 ABC 30\r";
+    return "OK\r";
+  });
+
+  await client.writeSetValue("T10", 123);
+  await client.writeSetValueConsecutive("C20", [111, 222]);
+  assert.deepEqual(await client.readMonitorBits(), [1, 0, 1]);
+  assert.deepEqual(await client.readMonitorWords(), ["10", "ABC", "30"]);
+
+  assert.deepEqual(frames, ["WS T10.D 123\r", "WSS C20.D 2 111 222\r", "MBR\r", "MWR\r"]);
 });
 
 test("readComments accepts XYM alias device types", async () => {
