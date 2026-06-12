@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.11 - 2026-06-12
+
+- bump the package revision for release alignment after the resolved live-validation pass
 
 ## 0.2.10 - 2026-05-14
 
