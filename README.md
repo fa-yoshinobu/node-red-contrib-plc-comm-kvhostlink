@@ -111,6 +111,15 @@ Supported high-level address forms include:
 - `T10:D`
 - `C10:D`
 
+High-level address syntax is shared across the PLC helper libraries:
+
+- use `:` for data types and special views: `DM100:U`, `DM100:S`, `DM100:D`,
+  `DM100:L`, `DM100:F`, `DM100:H`, `DM100:COMMENT`
+- use `.` only for bit-in-word access: `DM100.0` through `DM100.F`
+- `DM100.D` is bit `0xD` / bit 13, not a 32-bit data type request
+- Host Link frames still use the manual suffix form internally, so
+  `DM100:D` is sent as `RD DM100.D`
+
 ## Supported devices
 
 Input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
@@ -127,8 +136,8 @@ Supported word devices:
 
 - `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`
 - `TC`, `TS`, `CC`, `CS`
-- `AT` digital trimmer values, treated as 32-bit (`.D`) device points on
-  supported PLC families
+- `AT` digital trimmer values, treated as 32-bit device points on supported
+  PLC families; public helper text uses `AT0` or `AT0:D`
 - `CM`, `VM`
 - `D`, `E`, `F`
 
@@ -188,8 +197,9 @@ XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`,
 
 ## Known limitations
 
-- `AT` is not present on KV-X500. On KV-7500, `AT0.D` / `AT7.D` read and
-  default `AT0` high-level read were verified. `AT` is not listed in the
+- `AT` is not present on KV-X500. On KV-7500, raw Host Link reads
+  `RD AT0.D` / `RD AT7.D` and the public high-level `AT0` read were
+  verified. `AT` is not listed in the
   WR/WRS device table, so write helpers reject AT before sending; a raw WR
   probe returned PLC `E1`.
 - The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.

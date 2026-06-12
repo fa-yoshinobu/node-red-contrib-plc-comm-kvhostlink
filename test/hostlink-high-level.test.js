@@ -41,6 +41,14 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     hasCount: false,
     explicitDtype: false,
   });
+  assert.deepEqual(parseAddress("DM50.D"), {
+    base: "DM50",
+    dtype: "BIT_IN_WORD",
+    bitIndex: 13,
+    count: 1,
+    hasCount: false,
+    explicitDtype: false,
+  });
   assert.deepEqual(parseAddress("DM200:D,4"), {
     base: "DM200",
     dtype: "D",
@@ -71,8 +79,10 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
   assert.equal(normalizeAddress(" dm200:d,4 "), "DM200:D,4");
   assert.equal(normalizeAddress("100"), "R100");
   assert.equal(normalizeAddress("dm50.3"), "DM50.3");
+  assert.equal(normalizeAddress("dm50.d"), "DM50.D");
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
   assert.equal(formatParsedAddress(parseAddress("R10,4")), "R010,4");
+  assert.throws(() => normalizeAddress("dm50.s"), /invalid bit-in-word/i);
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {
@@ -118,6 +128,7 @@ test("readTyped uses preset value from timer and counter composite responses", a
   };
 
   assert.equal(await readTyped(fakeClient, "T10", "D"), 12345);
+  assert.equal(await readTyped(fakeClient, "T10", "U"), 12345);
   assert.equal(await readTyped(fakeClient, "C10", "D"), 12345);
 });
 
@@ -154,6 +165,24 @@ test("readTimerCounter returns status current and preset", async () => {
     current: 10,
     preset: 20,
   });
+});
+
+test("readNamed reads native 32-bit Z dword through native dword read", async () => {
+  const calls = [];
+  const fakeClient = {
+    async read(device, options = {}) {
+      calls.push({ device, dataFormat: options.dataFormat || "" });
+      if (device === "Z1" && options.dataFormat === ".D") {
+        return 70000;
+      }
+      throw new Error(`unexpected read ${device} ${options.dataFormat || ""}`);
+    },
+  };
+
+  assert.deepEqual(await readNamed(fakeClient, ["Z1:D"]), {
+    "Z1:D": 70000,
+  });
+  assert.deepEqual(calls, [{ device: "Z1", dataFormat: ".D" }]);
 });
 
 test("readNamed batches optimizable contiguous word requests", async () => {
@@ -297,7 +326,7 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
   });
 });
 
-test("readNamed reads AT dword arrays as AT device points", async () => {
+test("readNamed reads native 32-bit dword arrays as device points", async () => {
   const calls = [];
   const fakeClient = {
     async readConsecutive(device, count, options = {}) {
@@ -305,14 +334,21 @@ test("readNamed reads AT dword arrays as AT device points", async () => {
       if (device === "AT0" && count === 2 && options.dataFormat === ".D") {
         return [3533, 5543];
       }
+      if (device === "Z1" && count === 2 && options.dataFormat === ".D") {
+        return [70000, 80000];
+      }
       throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
     },
   };
 
-  assert.deepEqual(await readNamed(fakeClient, ["AT0,2"]), {
+  assert.deepEqual(await readNamed(fakeClient, ["AT0,2", "Z1:D,2"]), {
     "AT0,2": [3533, 5543],
+    "Z1:D,2": [70000, 80000],
   });
-  assert.deepEqual(calls, [{ device: "AT0", count: 2, dataFormat: ".D" }]);
+  assert.deepEqual(calls, [
+    { device: "AT0", count: 2, dataFormat: ".D" },
+    { device: "Z1", count: 2, dataFormat: ".D" },
+  ]);
 });
 
 test("poll reuses compiled read plan", async () => {
@@ -368,7 +404,12 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     "T10:D": 111,
     "T11:D": 222,
     "C10:D": 333,
-    "C11:D": 444
+    "C11:D": 444,
+    "Z1:D": 70000,
+    "Z2:D": 80000,
+    "TC0:D": 90000,
+    "TC1:D": 100000,
+    "T20:D,2": [555, 666],
   });
 
   assert.deepEqual(calls, [
@@ -381,5 +422,8 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     { kind: "writeConsecutive", device: "R100", values: [1, 0, 1, 0], dataFormat: "" },
     { kind: "writeSetValueConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
     { kind: "writeSetValueConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
+    { kind: "writeConsecutive", device: "Z1", values: [70000, 80000], dataFormat: ".D" },
+    { kind: "writeConsecutive", device: "TC0", values: [90000, 100000], dataFormat: ".D" },
+    { kind: "writeSetValueConsecutive", device: "T20", values: [555, 666], dataFormat: ".D" },
   ]);
 });

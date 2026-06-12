@@ -110,8 +110,9 @@ Latest retained KV Host Link matrix result:
 
 ## Known limitations
 
-- `AT` is not present on KV-X500. On KV-7500, `AT0.D`, `AT7.D`, default
-  high-level `AT0`, and `RDS AT0.D 8` were verified. `AT` is not listed in the
+- `AT` is not present on KV-X500. On KV-7500, raw Host Link reads `RD AT0.D`,
+  `RD AT7.D`, `RDS AT0.D 8`, and public high-level `AT0` were verified. `AT`
+  is not listed in the
   WR/WRS device table, so write helpers reject AT before sending.
 - `kvhostlink-device-matrix.json` is intended for validation and debugging, not as the first flow for a new user.
 
