@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kv-array",
         "name":  "Array sample: word and bit count forms",
-        "info":  "",
+        "info":  "Array read/write sample for count-qualified addresses. It reads and writes DM160,4 as word values and R200,4 as direct bit values.",
         "x":  260,
         "y":  40,
         "wires":  [

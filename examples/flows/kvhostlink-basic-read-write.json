@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kv-basic",
         "name":  "Start here: scalar read/write smoke test",
-        "info":  "",
+        "info":  "First-use scalar smoke test. Confirm the connection node uses host 192.168.250.100 and port 8501, deploy, trigger Read DM100, then trigger Write DM100=123 and read again.",
         "x":  270,
         "y":  40,
         "wires":  [
