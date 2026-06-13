@@ -245,6 +245,7 @@
   <p>Writes one or more KEYENCE KV Host Link values using the high-level helper API.</p>
   <p>Preferred dynamic input is <code>msg.payload</code> or <code>msg.updates</code> as an object, for example <code>{ "DM100": 123, "DM110:S": -5, "DM150.3": true }</code>.</p>
   <p>Count-qualified addresses expect arrays, for example <code>{ "DM160,4": [1,2,3,4], "R200,4": [true,false,true,true] }</code>.</p>
+  <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects or <code>address=value</code> lines.</p>
   <p>You can also send a single write with <code>msg.address</code>, optional <code>msg.dtype</code>, and the value in <code>msg.value</code> or <code>msg.payload</code>. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>

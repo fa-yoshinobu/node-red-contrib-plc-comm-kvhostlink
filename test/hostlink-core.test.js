@@ -6,10 +6,13 @@ const assert = require("node:assert/strict");
 const {
   HostLinkClient,
   buildFrame,
+  decodeCommentResponse,
   decodeResponse,
   deviceToString,
   splitDataTokens,
   parseDevice,
+  PLC_PROFILES,
+  normalizePlcProfile,
 } = require("../lib/hostlink");
 
 function createFrameRecorder(responseForCommand = () => "OK\r") {
@@ -45,10 +48,24 @@ test("parseDevice handles decimal and hex devices", () => {
   assert.throws(() => parseDevice("Y19A0"));
 });
 
+test("PLC profile input accepts canonical names only", () => {
+  assert.ok(PLC_PROFILES.includes("keyence:kv-x500"));
+  assert.equal(normalizePlcProfile(" keyence:kv-x500 "), "keyence:kv-x500");
+  assert.throws(() => normalizePlcProfile("KEYENCE:KV-X500"), /Unsupported PLC profile/);
+  assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
+});
+
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   const frame = buildFrame("RD DM100");
   assert.equal(frame.toString("ascii"), "RD DM100\r");
   assert.equal(decodeResponse(Buffer.from("123\r\n", "ascii")), "123");
+});
+
+test("decodeResponse rejects non-ASCII normal responses but comments can be Shift_JIS", () => {
+  const sjisA = Buffer.from([0x82, 0xa0, 0x0d]);
+
+  assert.throws(() => decodeResponse(sjisA), /Non-ASCII response byte 0x82 at offset 0/);
+  assert.equal(decodeCommentResponse(sjisA), "あ");
 });
 
 test("splitDataTokens supports timer and counter comma-separated responses", () => {
@@ -186,9 +203,11 @@ test("monitor registration accepts XYM bit aliases verified on KV-7500", async (
   };
 
   await client.registerMonitorBits("X100", "X101", "M100", "M101");
-  await client.registerMonitorWords("X100", "Y100", "D100", "E100", "F100", "M100", "L100");
+  await client.registerMonitorWords("X100", "Y100", "D100", "E100", "F100", "MR100", "LR100");
+  await assert.rejects(() => client.registerMonitorWords("M100"), /does not support device type 'M'/);
+  await assert.rejects(() => client.registerMonitorWords("L100"), /does not support device type 'L'/);
 
-  assert.deepEqual(commands, ["MBS X100 X101 M100 M101", "MWS X100 Y100 D100.U E100.U F100.U M100 L100"]);
+  assert.deepEqual(commands, ["MBS X100 X101 M100 M101", "MWS X100 Y100 D100.U E100.U F100.U MR100 LR100"]);
 });
 
 test("client rejects device spans crossing range before send", async () => {
@@ -203,12 +222,17 @@ test("client rejects device spans crossing range before send", async () => {
   await assert.rejects(() => client.read("DM65534", { dataFormat: ".D" }), /Device span out of range/);
   await assert.rejects(() => client.readConsecutive("DM65535", 2), /Device span out of range/);
   await assert.rejects(() => client.readConsecutive("Y1999F", 2), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("R199900", 2, { dataFormat: ".U" }), /Device span out of range/);
+  await assert.rejects(() => client.read("R199900", { dataFormat: ".D" }), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("CR7900", 2, { dataFormat: ".U" }), /Device span out of range/);
 
   assert.deepEqual(commands, []);
 
   assert.equal((await client.readConsecutive("CR7900", 16)).length, 16);
+  assert.equal((await client.read("R199900", { dataFormat: ".U" })).length, 16);
+  assert.equal((await client.read("R199800", { dataFormat: ".D" })).length, 16);
   await assert.rejects(() => client.readConsecutive("CR7900", 17), /Device span out of range/);
-  assert.deepEqual(commands, ["RDS CR7900 16"]);
+  assert.deepEqual(commands, ["RDS CR7900 16", "RD R199900.U", "RD R199800.D"]);
 });
 
 test("AT defaults to 32-bit values but spans by AT device point", async () => {

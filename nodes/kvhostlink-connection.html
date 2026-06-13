@@ -8,6 +8,23 @@
     return Number.isInteger(parsed) && parsed >= min && parsed <= max;
   }
 
+  const KVHOSTLINK_PLC_PROFILES = Object.freeze([
+    "keyence:kv-nano",
+    "keyence:kv-nano-xym",
+    "keyence:kv-3000-5000",
+    "keyence:kv-3000-5000-xym",
+    "keyence:kv-7000",
+    "keyence:kv-7000-xym",
+    "keyence:kv-8000",
+    "keyence:kv-8000-xym",
+    "keyence:kv-x500",
+    "keyence:kv-x500-xym"
+  ]);
+
+  function kvValidatePlcProfile(value) {
+    return KVHOSTLINK_PLC_PROFILES.includes(String(value == null ? "" : value).trim());
+  }
+
   RED.nodes.registerType("kvhostlink-connection", {
     category: "config",
     defaults: {
@@ -27,6 +44,11 @@
         validate: function (value) {
           return kvValidateIntegerInRange(value, 1, 2147483647);
         }
+      },
+      plcProfile: {
+        value: "keyence:kv-x500",
+        required: true,
+        validate: kvValidatePlcProfile
       }
     },
     label: function () {
@@ -59,10 +81,26 @@
     <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout ms</label>
     <input type="text" id="node-config-input-timeout" placeholder="3000" />
   </div>
+  <div class="form-row">
+    <label for="node-config-input-plcProfile"><i class="fa fa-microchip"></i> PLC Profile</label>
+    <select id="node-config-input-plcProfile">
+      <option value="keyence:kv-nano">keyence:kv-nano</option>
+      <option value="keyence:kv-nano-xym">keyence:kv-nano-xym</option>
+      <option value="keyence:kv-3000-5000">keyence:kv-3000-5000</option>
+      <option value="keyence:kv-3000-5000-xym">keyence:kv-3000-5000-xym</option>
+      <option value="keyence:kv-7000">keyence:kv-7000</option>
+      <option value="keyence:kv-7000-xym">keyence:kv-7000-xym</option>
+      <option value="keyence:kv-8000">keyence:kv-8000</option>
+      <option value="keyence:kv-8000-xym">keyence:kv-8000-xym</option>
+      <option value="keyence:kv-x500">keyence:kv-x500</option>
+      <option value="keyence:kv-x500-xym">keyence:kv-x500-xym</option>
+    </select>
+  </div>
 </script>
 
 <script type="text/html" data-help-name="kvhostlink-connection">
   <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
+  <p><b>PLC Profile</b> is saved as a canonical lowercase profile such as <code>keyence:kv-x500</code>. Legacy model labels such as <code>KV-X500</code> are not accepted as profile input.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
   <p>Commands are sent as Host Link command lines terminated with <code>CR</code>.</p>
   <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>

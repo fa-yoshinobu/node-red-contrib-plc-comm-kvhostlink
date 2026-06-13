@@ -1,6 +1,6 @@
 "use strict";
 
-const { HostLinkClient } = require("../lib/hostlink");
+const { HostLinkClient, normalizePlcProfile } = require("../lib/hostlink");
 
 module.exports = function registerKvHostLinkConnection(RED) {
   function KvHostLinkConnectionNode(config) {
@@ -11,12 +11,14 @@ module.exports = function registerKvHostLinkConnection(RED) {
     this.port = Number(config.port || 8501);
     this.transport = config.transport || "tcp";
     this.timeout = Number(config.timeout || 3000);
+    this.plcProfile = normalizePlcProfile(config.plcProfile);
 
     this.client = new HostLinkClient({
       host: this.host,
       port: this.port,
       transport: this.transport,
       timeout: this.timeout,
+      plcProfile: this.plcProfile,
     });
 
     this._setState = (fill, shape, text) => this.status({ fill, shape, text });

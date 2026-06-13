@@ -124,7 +124,8 @@ High-level address syntax is shared across the PLC helper libraries:
 
 Input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
 It also rejects spans that cross the common Host Link device-family bounds before a request is sent, including 32-bit reads that would run past the end of a word device area.
-It does not check PLC model-specific device ranges because the Node-RED connection profile does not select a PLC model.
+The connection profile requires a canonical `plcProfile` such as `keyence:kv-x500`; legacy model labels such as `KV-X500` are not accepted as profile input.
+Common validation remains protocol-wide; model-specific range enforcement is not yet enabled in the Node-RED nodes.
 If an address is valid for the common Host Link family but outside the connected PLC's actual range, the PLC response is returned as the runtime error.
 
 Supported bit devices:
