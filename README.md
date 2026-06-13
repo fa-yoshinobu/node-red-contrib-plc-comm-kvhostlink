@@ -1,5 +1,3 @@
-# Node-RED KV Host Link Nodes for KEYENCE PLCs
-
 [![CI](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml/badge.svg)](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/%40fa_yoshinobu%2Fnode-red-contrib-plc-comm-kvhostlink?logo=npm&color=CB3837)](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink)
 [![npm downloads](https://img.shields.io/npm/dm/%40fa_yoshinobu%2Fnode-red-contrib-plc-comm-kvhostlink?logo=npm&color=CB3837)](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink)
@@ -10,209 +8,80 @@
 ![Protocol](https://img.shields.io/badge/Protocol-KV%20Host%20Link-0A7D5C)
 ![Transport](https://img.shields.io/badge/Transport-TCP%20%2F%20UDP-005BAC)
 
-![Node-RED KV Host Link hero](https://raw.githubusercontent.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/main/docsrc/assets/node-red-kv.png)
+# Node-RED KV Host Link Nodes for KEYENCE PLCs
 
-Node-RED nodes for KEYENCE KV series PLC communication over KV Host Link (Upper Link), using the same high-level read/write model as the existing Python and .NET libraries.
+Node-RED nodes for KEYENCE KV PLC communication via Host Link.
+
+## Supported KV models
+
+The connection node accepts these PLC profile values.
+
+| PLC profile | Intended KV family |
+| --- | --- |
+| `keyence:kv-nano` | KV Nano |
+| `keyence:kv-nano-xym` | KV Nano with XYM-style addressing |
+| `keyence:kv-3000-5000` | KV-3000 / KV-5000 family |
+| `keyence:kv-3000-5000-xym` | KV-3000 / KV-5000 family with XYM-style addressing |
+| `keyence:kv-7000` | KV-7000 family |
+| `keyence:kv-7000-xym` | KV-7000 family with XYM-style addressing |
+| `keyence:kv-8000` | KV-8000 family |
+| `keyence:kv-8000-xym` | KV-8000 family with XYM-style addressing |
+| `keyence:kv-x500` | KV-X500 family |
+| `keyence:kv-x500-xym` | KV-X500 family with XYM-style addressing |
+
+## Supported device types
+
+Commonly used families include:
+
+| Family | Use |
+| --- | --- |
+| `DM`, `EM`, `FM` | Word data memory |
+| `W`, `TM`, `Z` | Link relay words, timer monitor words, and index registers |
+| `R`, `MR`, `LR`, `CR` | Bit-bank relay families |
+| `X`, `Y` | Input and output bits |
+| `M`, `L` | Internal bit aliases |
+| `T`, `C` | Timer and counter preset values |
+| `TC`, `TS`, `CC`, `CS` | Timer and counter current/contact families |
+| `CM`, `VM` | Control and variable memory words |
+
+See [supported registers](docsrc/user/SUPPORTED_REGISTERS.md) for the complete list and address rules.
+
+## Installation
+
+In Node-RED, open **Manage palette**, choose **Install**, and search for:
+
+```text
+@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink
+```
+
+Install the package, then restart Node-RED if your runtime asks you to.
 
 ## Quick start
 
-1. Install the package into your Node-RED user directory and restart Node-RED.
-2. Add one `kvhostlink-connection` config node and set `host`, `port`, `transport`, and `timeout`.
-3. Import [`kvhostlink-basic-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json) for the first smoke test.
-4. When scalar read/write works, move to [`kvhostlink-typed-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json) and [`kvhostlink-array-read-write.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json).
-5. Use [`kvhostlink-device-matrix.json`](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json) only after the basics are stable.
-
-## Release information
-
-- package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
-- package version: `0.2.11`
-- npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
-- Node-RED requirement: `>=3.0.0`
-- Node.js requirement: `>=18`
-- changelog: <https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/CHANGELOG.md>
-
-Install from npm:
-
-```bash
-cd ~/.node-red
-npm install @fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink
-```
-
-Install from this repository:
-
-```bash
-cd ~/.node-red
-npm install /path/to/node-red-contrib-plc-comm-kvhostlink
-```
-
-Optional local editor smoke test from the repository root:
-
-```bash
-npm run smoke:editor
-```
-
-This command installs the local package into an isolated temporary userDir, starts a temporary Node-RED runtime, imports `kvhostlink-basic-read-write.json`, verifies the flow starts, and then shuts the runtime down again.
-
-### Changes Since Older Flow Library Entries
-
-If your Node-RED Flow Library entry or an existing project is still on `0.2.0`,
-check these changes before updating a flow:
-
-- Host Link command framing is fixed to CR termination. If an old flow had an `Append LF` connection option, remove that assumption.
-- The connection node now exposes an explicit timeout setting.
-- Read/write nodes now expose metadata modes, connection control messages, comment reads, and canonical address helper exports.
-- `kvhostlink-device-matrix.json` now includes one-click run-all read/write buttons, an auto-run status lamp, timeout tracking, non-overlapping button layout, and JSONL logging.
-- The matrix write sequence skips entries marked `writable: false`; timer/counter `T` and `C` samples are circuit-dependent and not safe generic write targets.
+1. Open the Node-RED import menu.
+2. Import `examples/flows/kvhostlink-basic-read-write.json`.
+3. Open the `kvhostlink-connection` config node.
+4. Set **Host** to `192.168.250.100`.
+5. Set **Port** to `8501`.
+6. Deploy the flow.
+7. Trigger `Read DM100` and check the debug sidebar.
+8. Trigger `Write DM100=123`, then read again to confirm the value.
 
 ## Documentation
 
-- [User Guide](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/docsrc/user/USER_GUIDE.md)
-- [Example Flows](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/README.md)
-- [Future Device Support](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/TODO.md)
-- [Maintainer Notes](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/docsrc/maintainer/ARCHITECTURE.md)
-- [Validation Reports Directory](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/tree/main/docsrc/validation/reports)
-- [Documentation Index](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/docsrc/index.md)
+- [Getting started](docsrc/user/GETTING_STARTED.md)
+- [Usage guide](docsrc/user/USAGE_GUIDE.md)
+- [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md)
+- [PLC profiles](docsrc/user/PROFILES.md)
+- [Example flows](examples/flows/README.md)
 
-## Current scope
+## Hardware verified
 
-- TCP and UDP transport
-- Reusable `kvhostlink-connection` config node
-- explicit connection options for `host`, `port`, `transport`, and `timeout`
-- `kvhostlink-read` powered by the high-level helper API
-- `kvhostlink-write` powered by the high-level helper API
-- high-level scalar, signed, dword, long, float, bit-in-word, and `,count` forms
-- comment read helper and `:COMMENT` snapshot form
-- metadata emission modes for `msg.kvhostlink`: `full` / `minimal` / `off`
-- connection control via `connect` / `disconnect` / `reinitialize` messages
-- matrix-style debug flow with one-click run-all read/write, status lamp feedback, timeout tracking, and JSONL result logging
-- beginner-oriented sample flows for scalar, typed, and array patterns
-- local tests for protocol parsing and high-level helper behavior
-- helper exports also include `normalizeAddress`, `formatParsedAddress`,
-  `normalizeAddressList`, `readTimerCounter`, `readTimer`, and `readCounter`
-  for canonical address handling and timer/counter composite reads
-- the low-level `HostLinkClient` export includes expansion unit buffer helpers:
-  `readExpansionUnitBuffer()` and `writeExpansionUnitBuffer()`
-- the low-level `HostLinkClient` export includes `switchBank()` for PLC models
-  that support the Host Link `BE` bank-switch command; KV-X500 targets do not
-  use this command
-- optional local runtime smoke validation via `npm run smoke:editor`
+The latest retained Node-RED matrix result is from `2026-05-02` on a KV-5000 class target: 35 catalog samples produced 157 completed JSONL records, all marked `OK`.
+Additional notes record KV-7500 checks for `AT` digital trimmer reads on `2026-05-14`.
 
-Supported high-level address forms include:
+## License and registry
 
-- `DM100`
-- `DM110:S`
-- `DM120:D`
-- `DM130:L`
-- `DM140:F`
-- `DM145:COMMENT`
-- `DM150.3`
-- `DM160,4`
-- `R200,4`
-- `T10:D`
-- `C10:D`
-
-High-level address syntax is shared across the PLC helper libraries:
-
-- use `:` for data types and special views: `DM100:U`, `DM100:S`, `DM100:D`,
-  `DM100:L`, `DM100:F`, `DM100:H`, `DM100:COMMENT`
-- use `.` only for bit-in-word access: `DM100.0` through `DM100.F`
-- `DM100.D` is bit `0xD` / bit 13, not a 32-bit data type request
-- Host Link frames still use the manual suffix form internally, so
-  `DM100:D` is sent as `RD DM100.D`
-
-## Supported devices
-
-Input validation checks address syntax, device code support, suffix forms, bit notation, count syntax, and Host Link command constraints.
-It also rejects spans that cross the common Host Link device-family bounds before a request is sent, including 32-bit reads that would run past the end of a word device area.
-The connection profile requires a canonical `plcProfile` such as `keyence:kv-x500`; legacy model labels such as `KV-X500` are not accepted as profile input.
-Common validation remains protocol-wide; model-specific range enforcement is not yet enabled in the Node-RED nodes.
-If an address is valid for the common Host Link family but outside the connected PLC's actual range, the PLC response is returned as the runtime error.
-
-Supported bit devices:
-
-- `R`, `B`, `MR`, `LR`, `CR`, `VB`
-- `X`, `Y`, `M`, `L`
-
-Supported word devices:
-
-- `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`
-- `TC`, `TS`, `CC`, `CS`
-- `AT` digital trimmer values, treated as 32-bit device points on supported
-  PLC families; public helper text uses `AT0` or `AT0:D`
-- `CM`, `VM`
-- `D`, `E`, `F`
-
-`AT` is not listed in the WR/WRS device table, so write helpers reject AT before
-sending.
-
-Supported high-level timer and counter scalar forms:
-
-- `Tn:D`
-- `Cn:D`
-
-The high-level helper `readNamed(["T10"])` keeps returning the preset value for
-compatibility. Use the exported JS helpers `readTimerCounter(client, "T10")`,
-`readTimer(client, "T10")`, or `readCounter(client, "C10")` when the Host Link
-composite fields are needed: `status`, `current`, and `preset`.
-
-`Tn:D` and `Cn:D` depend on a corresponding timer or counter circuit existing in the PLC program.
-If the circuit is not present, a PLC error or timeout is an expected validation result rather than a device parser failure.
-Timer/counter preset writes use Host Link `WS` / `WSS` only on
-KV-8000/7000-series CPU units. Manuals state that other CPU units do not
-support those commands and return abnormal response `E1` when they are
-executed.
-Use `TC` / `TS` / `CC` / `CS` when checking the timer/counter current/contact device families directly.
-
-## Example flows
-
-- [kvhostlink-basic-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-basic-read-write.json)
-  First-step scalar read/write flow.
-- [kvhostlink-typed-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-typed-read-write.json)
-  Signed, dword, long, float, and bit-in-word examples.
-- [kvhostlink-array-read-write.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-array-read-write.json)
-  `,count` read/write examples for words and bits.
-- [kvhostlink-device-matrix.json](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-device-matrix.json)
-  High-level matrix-style verification flow with one-by-one controls, run-all read/write buttons, status lamp feedback, and JSONL logging. Completed results are appended to `logs/kvhostlink-device-matrix-<session>.jsonl` under your Node-RED user directory.
-
-## Connection and runtime behavior
-
-Connection settings on `kvhostlink-connection`:
-
-- host
-- port
-- transport: `tcp` or `udp`
-- timeout in milliseconds
-- command framing is fixed to Host Link CR termination
-
-Read and write nodes support:
-
-- full or minimal `msg.kvhostlink` metadata, or leaving it unchanged
-- `msg.connect`, `msg.disconnect`, and `msg.reinitialize`
-- `msg.topic = "connect" | "disconnect" | "reinitialize"`
-
-The read and write nodes keep the caller-visible logical request shape and do not silently retry one logical request as a different fallback split operation.
-
-Comment reads use the Host Link `RDC` command and return strings in the same payload shapes as other read values.
-
-XYM aliases are also accepted for comment reads, so forms such as `D10:COMMENT`, `M20:COMMENT`, and `X100:COMMENT` are valid.
-
-## Known limitations
-
-- `AT` is not present on KV-X500. On KV-7500, raw Host Link reads
-  `RD AT0.D` / `RD AT7.D` and the public high-level `AT0` read were
-  verified. `AT` is not listed in the
-  WR/WRS device table, so write helpers reject AT before sending; a raw WR
-  probe returned PLC `E1`.
-- The package now has beginner flows, but the validation coverage and example breadth are still narrower than `node-red-contrib-plc-comm-slmp`.
-
-## Latest Matrix Verification
-
-Latest retained KV Host Link Node-RED matrix result:
-
-- date: `2026-05-02`
-- target class: `KV-5000`
-- catalog samples: `35`
-- completed JSONL records: `157`
-- result: all records `OK`
-- log shape: each record includes `protocol`, `requestId`, `sessionId`, `logPath`, `operation`, `deviceCode`, `sampleLabel`, `address`, `status`, and timing fields
-
+- License: MIT
+- npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
+- Package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`

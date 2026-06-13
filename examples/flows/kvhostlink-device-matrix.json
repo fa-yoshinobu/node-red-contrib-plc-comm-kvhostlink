@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kvhostlink-device-matrix",
         "name":  "High-level one-by-one read/write sample with JSONL logging, timeout tracking, and auto run status",
-        "info":  "",
+        "info":  "Device-family matrix for one-by-one verification after the basic, typed, and array flows work. It can run reads or writes across the catalog and record JSONL results.",
         "x":  350,
         "y":  40,
         "wires":  [
@@ -23,7 +23,7 @@
         "type":  "comment",
         "z":  "tab-kvhostlink-device-matrix",
         "name":  "Edit the catalog in \u0027Prepare next device sample\u0027 before deploy. Completed results append to logs/kvhostlink-device-matrix-\u003csession\u003e.jsonl",
-        "info":  "",
+        "info":  "Before deploying, edit the catalog in the function node named Prepare next device sample if your PLC uses different test addresses. Completed results append to logs/kvhostlink-device-matrix-<session>.jsonl under your Node-RED user directory.",
         "x":  400,
         "y":  80,
         "wires":  [

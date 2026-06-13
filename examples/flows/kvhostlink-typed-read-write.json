@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kv-typed",
         "name":  "Typed sample: signed, dword, float, bit-in-word",
-        "info":  "",
+        "info":  "Typed read/write sample for DM110:S, DM120:D, DM130:L, DM140:F, and DM150.3. Use this after the basic DM100 flow works.",
         "x":  290,
         "y":  40,
         "wires":  [
