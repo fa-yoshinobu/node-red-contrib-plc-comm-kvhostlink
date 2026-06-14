@@ -23,7 +23,7 @@
         "type":  "comment",
         "z":  "tab-kvhostlink-device-matrix",
         "name":  "Edit the catalog in \u0027Prepare next device sample\u0027 before deploy. Completed results append to logs/kvhostlink-device-matrix-\u003csession\u003e.jsonl",
-        "info":  "Before deploying, edit the catalog in the function node named Prepare next device sample if your PLC uses different test addresses. Completed results append to logs/kvhostlink-device-matrix-<session>.jsonl under your Node-RED user directory.",
+        "info":  "Before deploying, confirm the connection node uses a canonical PLC Profile and edit the catalog in the function node named Prepare next device sample if your PLC uses different test addresses. Completed results append to logs/kvhostlink-device-matrix-<session>.jsonl under your Node-RED user directory.",
         "x":  400,
         "y":  80,
         "wires":  [

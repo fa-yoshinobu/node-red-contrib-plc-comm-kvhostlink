@@ -5,9 +5,9 @@
 The `kvhostlink-connection` node stores a canonical PLC profile value.
 Use the lowercase value from the table; legacy labels such as `KV-X500` are rejected.
 
-## Supported KV models
+## Supported profiles
 
-| PLC profile | Intended KV family | Addressing note |
+| Canonical profile | Intended KV family | Addressing note |
 | --- | --- | --- |
 | `keyence:kv-nano` | KV Nano | Standard profile. |
 | `keyence:kv-nano-xym` | KV Nano | XYM-style profile. |
@@ -37,6 +37,8 @@ Use the lowercase value from the table; legacy labels such as `KV-X500` are reje
 
 Common address validation is protocol-wide.
 If an address is valid for the common Host Link family but outside your PLC model's actual range, the PLC response is returned as the runtime error.
+
+The old combined KV-3000/KV-5000 profile is not accepted. Choose the exact KV-3000 or KV-5000 profile instead.
 
 Timer/counter preset writes use Host Link `WS` and `WSS`.
 Those commands are documented for KV-8000/7000-series CPU units; other CPU units may return PLC error `E1`.

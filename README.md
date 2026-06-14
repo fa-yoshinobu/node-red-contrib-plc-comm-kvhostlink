@@ -12,11 +12,11 @@
 
 Node-RED nodes for KEYENCE KV PLC communication via Host Link.
 
-## Supported KV models
+## Supported profiles
 
 The connection node accepts these PLC profile values.
 
-| PLC profile | Intended KV family |
+| Canonical profile | Intended KV family |
 | --- | --- |
 | `keyence:kv-nano` | KV Nano |
 | `keyence:kv-nano-xym` | KV Nano with XYM-style addressing |
@@ -50,6 +50,10 @@ See [supported registers](docsrc/user/SUPPORTED_REGISTERS.md) for the complete l
 
 ## Installation
 
+```text
+@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink
+```
+
 In Node-RED, open **Manage palette**, choose **Install**, and search for:
 
 ```text
@@ -65,9 +69,10 @@ Install the package, then restart Node-RED if your runtime asks you to.
 3. Open the `kvhostlink-connection` config node.
 4. Set **Host** to `192.168.250.100`.
 5. Set **Port** to `8501`.
-6. Deploy the flow.
-7. Trigger `Read DM100` and check the debug sidebar.
-8. Trigger `Write DM100=123`, then read again to confirm the value.
+6. Set **PLC Profile** to the exact canonical profile for your PLC, such as `keyence:kv-5000`.
+7. Deploy the flow.
+8. Trigger `Read DM100` and check the debug sidebar.
+9. Trigger `Write DM100=123`, then read again to confirm the value.
 
 ## Documentation
 
@@ -75,6 +80,7 @@ Install the package, then restart Node-RED if your runtime asks you to.
 - [Usage guide](docsrc/user/USAGE_GUIDE.md)
 - [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md)
 - [PLC profiles](docsrc/user/PROFILES.md)
+- [Gotchas](docsrc/user/GOTCHAS.md)
 - [Example flows](examples/flows/README.md)
 
 ## Hardware verified

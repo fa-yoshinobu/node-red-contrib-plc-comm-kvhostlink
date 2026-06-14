@@ -1,43 +1,65 @@
 # Gotchas
 
-## Flow shows "timeout" immediately
+## Timeout immediately
 
-Default port is `8501`, not `1025`.
+| Field | Detail |
+| --- | --- |
+| Symptom | The read or write node reports a timeout as soon as you deploy or trigger it. |
+| Root cause | KV Host Link uses port `8501`, not the SLMP/Computerlink port `1025`. |
+| Fix | Open the `kvhostlink-connection` node and set **Port** to `8501`. |
 
-Fix: open the `kvhostlink-connection` node and set Port to `8501`.
+## Timer/counter preset write error
 
-## Timer/counter preset write returns an error
+| Field | Detail |
+| --- | --- |
+| Symptom | Writing `T` or `C` preset values returns a PLC error such as `E1`. |
+| Root cause | Preset writes through Host Link `WS` and `WSS` are supported on KV-8000/7000-series CPU units, not every KV model. |
+| Fix | Do not write `T` or `C` presets on unsupported models; use read nodes for timer/counter monitoring. |
 
-Preset writes (`WS`/`WSS`) only work on KV-8000/7000-series CPU units.
+## X/Y address rejected
 
-Fix: do not write `T` or `C` presets on other models.
+| Field | Detail |
+| --- | --- |
+| Symptom | `X` or `Y` addresses are rejected by the editor or by the PLC. |
+| Root cause | `X` and `Y` use decimal-bank plus hex-bit notation. `X10F` means bank 10, bit F. |
+| Fix | Use `X10F`, not `X275`, and select an `-xym` profile when you want XYM aliases. |
 
-## X or Y address is rejected
+## keyence:kv-3000-5000 no longer in dropdown
 
-`X` and `Y` use decimal-bank plus hex-bit notation.
+| Field | Detail |
+| --- | --- |
+| Symptom | The old combined `keyence:kv-3000-5000` profile is not in the connection node dropdown. |
+| Root cause | KV-3000 and KV-5000 are separate canonical profiles. |
+| Fix | Select `keyence:kv-3000`, `keyence:kv-3000-xym`, `keyence:kv-5000`, or `keyence:kv-5000-xym`. |
 
-Fix: use `X10F`, not `X275`.
+## R/MR/LR/CR address rejected
 
-## R, MR, LR, or CR address is rejected
-
-Two-digit bit notation is required for these bit-bank families.
-
-Fix: use `R200`, not a hex-only form.
+| Field | Detail |
+| --- | --- |
+| Symptom | `R`, `MR`, `LR`, or `CR` addresses are rejected. |
+| Root cause | These bit-bank families require two-digit bit notation. |
+| Fix | Use `R200`, `MR100`, or another form whose low two digits are `00` through `15`. |
 
 ## DM100.D returns a bit, not a dword
 
-The dot form means bit-in-word access.
+| Field | Detail |
+| --- | --- |
+| Symptom | `DM100.D` behaves like a bit read instead of an unsigned 32-bit read. |
+| Root cause | Dot notation means bit-in-word access. |
+| Fix | Use `DM100:D` for an unsigned 32-bit value. |
 
-Fix: use `DM100:D` for an unsigned 32-bit value.
+## COMMENT write rejected
 
-## COMMENT write is rejected
+| Field | Detail |
+| --- | --- |
+| Symptom | A write to `DM145:COMMENT` is rejected. |
+| Root cause | `:COMMENT` is read-only through the high-level API. |
+| Fix | Use `DM145:COMMENT` only with `kvhostlink-read`. |
 
-`:COMMENT` is read-only through the high-level API.
+## Count with bit-in-word rejected
 
-Fix: use `DM145:COMMENT` only with `kvhostlink-read`.
-
-## Count with bit-in-word is rejected
-
-Bit-in-word addresses do not support `,count`.
-
-Fix: use `DM150.3` for one bit, or use a direct bit family such as `R200,4` for bit arrays.
+| Field | Detail |
+| --- | --- |
+| Symptom | `DM150.3,4` or a similar bit-in-word count is rejected. |
+| Root cause | Bit-in-word addresses do not support `,count`. |
+| Fix | Use `DM150.3` for one bit, or use a direct bit family such as `R200,4` for bit arrays. |
