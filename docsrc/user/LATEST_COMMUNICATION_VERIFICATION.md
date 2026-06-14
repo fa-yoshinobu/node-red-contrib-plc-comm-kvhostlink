@@ -1,4 +1,4 @@
-# Latest Communication Verification
+# Latest communication verification
 
 This page is the retained public summary for live-device checks that are
 referenced from the README.
