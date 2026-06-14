@@ -24,14 +24,6 @@
 | Root cause | `X` and `Y` use decimal-bank plus hex-bit notation. `X10F` means bank 10, bit F. |
 | Fix | Use `X10F`, not `X275`, and select an `-xym` profile when you want XYM aliases. |
 
-## KV-3000 and KV-5000 use separate profiles
-
-| Field | Detail |
-| --- | --- |
-| Symptom | The connection node offers separate KV-3000 and KV-5000 profile choices. |
-| Root cause | KV-3000 and KV-5000 are separate canonical profiles. |
-| Fix | Select `keyence:kv-3000`, `keyence:kv-3000-xym`, `keyence:kv-5000`, or `keyence:kv-5000-xym`. |
-
 ## R/MR/LR/CR address rejected
 
 | Field | Detail |
