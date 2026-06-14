@@ -81,6 +81,7 @@ Install the package, then restart Node-RED if your runtime asks you to.
 - [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md)
 - [PLC profiles](docsrc/user/PROFILES.md)
 - [Gotchas](docsrc/user/GOTCHAS.md)
+- [Full documentation site](https://github.com/fa-yoshinobu/plc-comm-docs-site)
 - [Example flows](examples/flows/README.md)
 
 ## Hardware verified
