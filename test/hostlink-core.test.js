@@ -49,11 +49,21 @@ test("parseDevice handles decimal and hex devices", () => {
 });
 
 test("PLC profile input accepts canonical names only", () => {
-  assert.ok(PLC_PROFILES.includes("keyence:kv-3000"));
-  assert.ok(PLC_PROFILES.includes("keyence:kv-5000-xym"));
-  assert.ok(PLC_PROFILES.includes("keyence:kv-x500"));
+  assert.deepEqual(PLC_PROFILES, [
+    "keyence:kv-nano",
+    "keyence:kv-nano-xym",
+    "keyence:kv-3000",
+    "keyence:kv-3000-xym",
+    "keyence:kv-5000",
+    "keyence:kv-5000-xym",
+    "keyence:kv-7000",
+    "keyence:kv-7000-xym",
+    "keyence:kv-8000",
+    "keyence:kv-8000-xym",
+    "keyence:kv-x500",
+    "keyence:kv-x500-xym",
+  ]);
   assert.equal(normalizePlcProfile(" keyence:kv-x500 "), "keyence:kv-x500");
-  assert.throws(() => normalizePlcProfile("keyence:kv-3000-5000"), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KEYENCE:KV-X500"), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
 });
