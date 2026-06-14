@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 - 2026-06-14
+
+- bump the package revision to 0.8.0 for the unified PLC communication library release
+
 ## 0.2.11 - 2026-06-12
 
 - bump the package revision for release alignment after the resolved live-validation pass
