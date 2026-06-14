@@ -8,45 +8,17 @@
 ![Protocol](https://img.shields.io/badge/Protocol-KV%20Host%20Link-0A7D5C)
 ![Transport](https://img.shields.io/badge/Transport-TCP%20%2F%20UDP-005BAC)
 
-# Node-RED KV Host Link Nodes for KEYENCE PLCs
+# Node-RED KEYENCE KV Host Link Nodes
 
 Node-RED nodes for KEYENCE KV PLC communication via Host Link.
 
-## Supported profiles
+## Supported PLC profiles
 
-The connection node accepts these PLC profile values.
-
-| Canonical profile | Intended KV family |
-| --- | --- |
-| `keyence:kv-nano` | KV Nano |
-| `keyence:kv-nano-xym` | KV Nano with XYM-style addressing |
-| `keyence:kv-3000` | KV-3000 |
-| `keyence:kv-3000-xym` | KV-3000 with XYM-style addressing |
-| `keyence:kv-5000` | KV-5000 |
-| `keyence:kv-5000-xym` | KV-5000 with XYM-style addressing |
-| `keyence:kv-7000` | KV-7000 family |
-| `keyence:kv-7000-xym` | KV-7000 family with XYM-style addressing |
-| `keyence:kv-8000` | KV-8000 family |
-| `keyence:kv-8000-xym` | KV-8000 family with XYM-style addressing |
-| `keyence:kv-x500` | KV-X500 family |
-| `keyence:kv-x500-xym` | KV-X500 family with XYM-style addressing |
+The maintained profile table is in [PLC profiles](docsrc/user/PROFILES.md). Choose one exact canonical PLC profile from that table.
 
 ## Supported device types
 
-Commonly used families include:
-
-| Family | Use |
-| --- | --- |
-| `DM`, `EM`, `FM` | Word data memory |
-| `W`, `TM`, `Z` | Link relay words, timer monitor words, and index registers |
-| `R`, `MR`, `LR`, `CR` | Bit-bank relay families |
-| `X`, `Y` | Input and output bits |
-| `M`, `L` | Internal bit aliases |
-| `T`, `C` | Timer and counter preset values |
-| `TC`, `TS`, `CC`, `CS` | Timer and counter current/contact families |
-| `CM`, `VM` | Control and variable memory words |
-
-See [supported registers](docsrc/user/SUPPORTED_REGISTERS.md) for the complete list and address rules.
+The maintained device and range tables are in [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md). Use that page for supported device families, address syntax, and profile-specific notes.
 
 ## Installation
 
@@ -76,21 +48,25 @@ Install the package, then restart Node-RED if your runtime asks you to.
 
 ## Documentation
 
-- [Getting started](docsrc/user/GETTING_STARTED.md)
-- [Usage guide](docsrc/user/USAGE_GUIDE.md)
-- [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md)
-- [PLC profiles](docsrc/user/PROFILES.md)
-- [Gotchas](docsrc/user/GOTCHAS.md)
-- [Full documentation site](https://github.com/fa-yoshinobu/plc-comm-docs-site)
-- [Example flows](examples/flows/README.md)
+| Page | Use it for |
+| --- | --- |
+| [Full documentation site](https://fa-yoshinobu.github.io/plc-comm-docs-site/) | Unified docs for all PLC communication libraries. |
+| [Getting started](docsrc/user/GETTING_STARTED.md) | Install the nodes, configure a connection, and run your first flow. |
+| [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
+| [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md) | Check device families, address ranges, and numbering rules. |
+| [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile for the target KV family. |
+| [Gotchas](docsrc/user/GOTCHAS.md) | Troubleshoot common profile, address, timer/counter, and transport issues. |
+| [Example flows](examples/flows/README.md) | Import maintained Node-RED example flows. |
 
 ## Hardware verified
 
-The latest retained Node-RED matrix result is from `2026-05-02` on a KV-5000 class target: 35 catalog samples produced 157 completed JSONL records, all marked `OK`.
-Additional notes record KV-7500 checks for `AT` digital trimmer reads on `2026-05-14`.
+Live-device verification is maintained in [Latest communication verification](docsrc/user/LATEST_COMMUNICATION_VERIFICATION.md).
+See that page for verified PLC models, transports, dates, limitations, and retained validation notes.
 
 ## License and registry
 
-- License: MIT
-- npm package: <https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink>
-- Package name: `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink`
+| Item | Value |
+| --- | --- |
+| License | [MIT](LICENSE) |
+| Registry | [npm](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink) |
+| Package | `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` |
