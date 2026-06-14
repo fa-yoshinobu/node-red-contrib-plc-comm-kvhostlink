@@ -11,8 +11,10 @@ Use the lowercase value from the table; legacy labels such as `KV-X500` are reje
 | --- | --- | --- |
 | `keyence:kv-nano` | KV Nano | Standard profile. |
 | `keyence:kv-nano-xym` | KV Nano | XYM-style profile. |
-| `keyence:kv-3000-5000` | KV-3000 / KV-5000 | Standard profile. |
-| `keyence:kv-3000-5000-xym` | KV-3000 / KV-5000 | XYM-style profile. |
+| `keyence:kv-3000` | KV-3000 | Standard profile. |
+| `keyence:kv-3000-xym` | KV-3000 | XYM-style profile. |
+| `keyence:kv-5000` | KV-5000 | Standard profile. |
+| `keyence:kv-5000-xym` | KV-5000 | XYM-style profile. |
 | `keyence:kv-7000` | KV-7000 | Standard profile. |
 | `keyence:kv-7000-xym` | KV-7000 | XYM-style profile. |
 | `keyence:kv-8000` | KV-8000 | Standard profile. |

@@ -20,8 +20,10 @@ The connection node accepts these PLC profile values.
 | --- | --- |
 | `keyence:kv-nano` | KV Nano |
 | `keyence:kv-nano-xym` | KV Nano with XYM-style addressing |
-| `keyence:kv-3000-5000` | KV-3000 / KV-5000 family |
-| `keyence:kv-3000-5000-xym` | KV-3000 / KV-5000 family with XYM-style addressing |
+| `keyence:kv-3000` | KV-3000 |
+| `keyence:kv-3000-xym` | KV-3000 with XYM-style addressing |
+| `keyence:kv-5000` | KV-5000 |
+| `keyence:kv-5000-xym` | KV-5000 with XYM-style addressing |
 | `keyence:kv-7000` | KV-7000 family |
 | `keyence:kv-7000-xym` | KV-7000 family with XYM-style addressing |
 | `keyence:kv-8000` | KV-8000 family |
