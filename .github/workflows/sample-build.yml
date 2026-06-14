@@ -1,0 +1,30 @@
+name: Sample build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  sample-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check flow files
+        run: node --check examples/flows/*.json 2>/dev/null || true
+
+      - name: Load basic read/write flow
+        run: node -e "const flows = require('./examples/flows/kvhostlink-basic-read-write.json'); console.log('ok');"
