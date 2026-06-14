@@ -1,4 +1,4 @@
 # Documentation Index
 
-- [User Guide](./user/USER_GUIDE.md)
+- [Usage Guide](./user/USAGE_GUIDE.md)
 - [Maintainer Notes](./maintainer/ARCHITECTURE.md)
