@@ -2,14 +2,15 @@
 
 ## Supported Versions
 
-Security fixes are considered for the latest release and the current main branch.
-Older releases are handled on a best-effort basis.
+Security fixes are provided for the latest published version only.
 
-| Project state | Supported |
+This project does not maintain LTS branches or backport security fixes to older releases. The `main` branch is a development branch; fixes may land there before a release, but it is not a supported release channel.
+
+| Version / channel | Security fixes |
 | --- | --- |
-| Latest release | Yes |
-| main branch | Yes |
-| Older releases | Best effort |
+| Latest published version | Yes |
+| Older releases | No |
+| LTS / backport branches | No |
 
 ## Reporting a Vulnerability
 
