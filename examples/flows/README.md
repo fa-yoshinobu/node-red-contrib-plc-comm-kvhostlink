@@ -12,7 +12,7 @@ Start with the basic flow, then move through typed and array examples before usi
 3. Paste the JSON from the flow file.
 4. Import the flow.
 5. Open the `kvhostlink-connection` config node.
-6. Confirm host `192.168.250.100`, port `8501`, and the canonical PLC Profile for your PLC.
+6. Confirm host `192.168.250.100`, port `8501`, and change the example PLC Profile if your PLC is not `keyence:kv-5000`.
 7. Deploy.
 
 ## Flow index
