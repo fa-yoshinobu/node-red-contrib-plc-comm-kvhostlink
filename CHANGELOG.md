@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0 - 2026-06-21
+
+- bump the package revision to 0.9.0 for the explicit PLC profile release
+- update example flows to include a canonical Host Link PLC profile
+
 ## 0.8.0 - 2026-06-14
 
 - bump the package revision to 0.8.0 for the unified PLC communication library release
