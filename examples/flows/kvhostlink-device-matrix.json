@@ -429,7 +429,8 @@
         "host":  "192.168.250.100",
         "port":  "8501",
         "transport":  "tcp",
-        "timeout":  "3000"
+        "timeout":  "3000",
+        "plcProfile":  "keyence:kv-5000"
     },
     {
         "id":  "inject-device-matrix-summary",
