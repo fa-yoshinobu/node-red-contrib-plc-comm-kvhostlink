@@ -3,6 +3,7 @@
 const { HostLinkClient, normalizePlcProfile } = require("../lib/hostlink");
 
 const DEFAULT_PORT = 8501;
+const DEFAULT_TIMEOUT = 3000;
 
 function parseRequiredInteger(value, name, min, max, fallback) {
   const source = value === undefined || value === null ? fallback : value;
@@ -16,6 +17,18 @@ function parseRequiredInteger(value, name, min, max, fallback) {
   return parsed;
 }
 
+function parsePositiveNumber(value, name, fallback) {
+  const source = value === undefined || value === null ? fallback : value;
+  if (String(source).trim() === "") {
+    throw new Error(`kvhostlink-connection ${name} is required`);
+  }
+  const parsed = Number(source);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`kvhostlink-connection ${name} must be > 0: ${source}`);
+  }
+  return parsed;
+}
+
 module.exports = function registerKvHostLinkConnection(RED) {
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
@@ -24,7 +37,7 @@ module.exports = function registerKvHostLinkConnection(RED) {
     this.host = config.host;
     this.port = parseRequiredInteger(config.port, "port", 1, 65535, DEFAULT_PORT);
     this.transport = config.transport || "tcp";
-    this.timeout = Number(config.timeout || 3000);
+    this.timeout = parsePositiveNumber(config.timeout, "timeout", DEFAULT_TIMEOUT);
     this.plcProfile = normalizePlcProfile(config.plcProfile);
 
     this.client = new HostLinkClient({
@@ -42,6 +55,7 @@ module.exports = function registerKvHostLinkConnection(RED) {
       port: this.port,
       transport: this.transport,
       timeout: this.timeout,
+      plcProfile: this.plcProfile,
     });
     this.connect = async () => {
       this._setState("yellow", "ring", "connecting");

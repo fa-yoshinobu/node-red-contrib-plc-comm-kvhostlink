@@ -373,7 +373,7 @@ test("poll reuses compiled read plan", async () => {
   await iterator.return();
 });
 
-test("kvhostlink-connection defaults missing port but rejects invalid ports", async () => {
+test("kvhostlink-connection validates runtime options and exposes PLC profile", async () => {
   const constructorOptions = [];
 
   class FakeHostLinkClient {
@@ -390,13 +390,22 @@ test("kvhostlink-connection defaults missing port but rejects invalid ports", as
     const { RED, create } = createMockRed();
     require("../nodes/kvhostlink-connection")(RED);
 
-    create("kvhostlink-connection", {
+    const node = create("kvhostlink-connection", {
       id: "conn-missing-port",
       host: "192.168.0.10",
       plcProfile: "keyence:kv-5000",
     });
 
     assert.equal(constructorOptions[0].port, 8501);
+    assert.equal(constructorOptions[0].timeout, 3000);
+    assert.equal(constructorOptions[0].plcProfile, "keyence:kv-5000");
+    assert.deepEqual(node.getProfile(), {
+      host: "192.168.0.10",
+      port: 8501,
+      transport: "tcp",
+      timeout: 3000,
+      plcProfile: "keyence:kv-5000",
+    });
     assert.throws(
       () =>
         create("kvhostlink-connection", {
@@ -416,6 +425,16 @@ test("kvhostlink-connection defaults missing port but rejects invalid ports", as
           plcProfile: "keyence:kv-5000",
         }),
       /kvhostlink-connection port out of range/
+    );
+    assert.throws(
+      () =>
+        create("kvhostlink-connection", {
+          id: "conn-invalid-timeout",
+          host: "192.168.0.10",
+          timeout: "0",
+          plcProfile: "keyence:kv-5000",
+        }),
+      /kvhostlink-connection timeout must be > 0/
     );
   });
 });
