@@ -2,6 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   HostLinkClient,
@@ -66,6 +68,60 @@ test("PLC profile input accepts canonical names only", () => {
   assert.equal(normalizePlcProfile(" keyence:kv-x500 "), "keyence:kv-x500");
   assert.throws(() => normalizePlcProfile("KEYENCE:KV-X500"), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
+});
+
+test("Node-RED editor shows human-readable PLC profile labels but keeps canonical values", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "nodes", "kvhostlink-connection.html"), "utf8");
+  const expectedOptions = [
+    ["keyence:kv-nano", "KV-Nano"],
+    ["keyence:kv-nano-xym", "KV-Nano (X/Y/M aliases)"],
+    ["keyence:kv-3000", "KV-3000"],
+    ["keyence:kv-3000-xym", "KV-3000 (X/Y/M aliases)"],
+    ["keyence:kv-5000", "KV-5000 / KV-5500"],
+    ["keyence:kv-5000-xym", "KV-5000 / KV-5500 (X/Y/M aliases)"],
+    ["keyence:kv-7000", "KV-7000 / KV-7300 / KV-7500"],
+    ["keyence:kv-7000-xym", "KV-7000 / KV-7300 / KV-7500 (X/Y/M aliases)"],
+    ["keyence:kv-8000", "KV-8000 / KV-8000A"],
+    ["keyence:kv-8000-xym", "KV-8000 / KV-8000A (X/Y/M aliases)"],
+    ["keyence:kv-x500", "KV-X500 family"],
+    ["keyence:kv-x500-xym", "KV-X500 family (X/Y/M aliases)"],
+  ];
+
+  for (const [value, label] of expectedOptions) {
+    assert.match(html, new RegExp(`<option value="${value}">${label.replace(/[()/.]/g, "\\$&")}</option>`));
+  }
+});
+
+test("HostLinkClient defaults missing port to 8501 but rejects invalid ports", () => {
+  assert.equal(new HostLinkClient({ host: "127.0.0.1" }).port, 8501);
+  assert.equal(new HostLinkClient({ host: "127.0.0.1", port: "8502" }).port, 8502);
+
+  for (const port of ["", " ", 0, -1, "abc", 65536, 1.5]) {
+    assert.throws(
+      () => new HostLinkClient({ host: "127.0.0.1", port }),
+      /port (is required|out of range)/
+    );
+  }
+});
+
+test("HostLinkClient validates timeout and keeps optional PLC profile metadata", () => {
+  assert.equal(new HostLinkClient({ host: "127.0.0.1" }).timeout, 3000);
+  assert.equal(new HostLinkClient({ host: "127.0.0.1", timeout: "2500" }).timeout, 2500);
+  assert.equal(
+    new HostLinkClient({ host: "127.0.0.1", plcProfile: " keyence:kv-5000 " }).plcProfile,
+    "keyence:kv-5000"
+  );
+
+  for (const timeout of ["", " ", 0, -1, "abc", Number.POSITIVE_INFINITY]) {
+    assert.throws(
+      () => new HostLinkClient({ host: "127.0.0.1", timeout }),
+      /timeout must be > 0/
+    );
+  }
+  assert.throws(
+    () => new HostLinkClient({ host: "127.0.0.1", plcProfile: "KV-X500" }),
+    /Unsupported PLC profile/
+  );
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {

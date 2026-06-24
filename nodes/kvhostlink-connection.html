@@ -86,25 +86,25 @@
   <div class="form-row">
     <label for="node-config-input-plcProfile"><i class="fa fa-microchip"></i> PLC Profile</label>
     <select id="node-config-input-plcProfile">
-      <option value="keyence:kv-nano">keyence:kv-nano</option>
-      <option value="keyence:kv-nano-xym">keyence:kv-nano-xym</option>
-      <option value="keyence:kv-3000">keyence:kv-3000</option>
-      <option value="keyence:kv-3000-xym">keyence:kv-3000-xym</option>
-      <option value="keyence:kv-5000">keyence:kv-5000</option>
-      <option value="keyence:kv-5000-xym">keyence:kv-5000-xym</option>
-      <option value="keyence:kv-7000">keyence:kv-7000</option>
-      <option value="keyence:kv-7000-xym">keyence:kv-7000-xym</option>
-      <option value="keyence:kv-8000">keyence:kv-8000</option>
-      <option value="keyence:kv-8000-xym">keyence:kv-8000-xym</option>
-      <option value="keyence:kv-x500">keyence:kv-x500</option>
-      <option value="keyence:kv-x500-xym">keyence:kv-x500-xym</option>
+      <option value="keyence:kv-nano">KV-Nano</option>
+      <option value="keyence:kv-nano-xym">KV-Nano (X/Y/M aliases)</option>
+      <option value="keyence:kv-3000">KV-3000</option>
+      <option value="keyence:kv-3000-xym">KV-3000 (X/Y/M aliases)</option>
+      <option value="keyence:kv-5000">KV-5000 / KV-5500</option>
+      <option value="keyence:kv-5000-xym">KV-5000 / KV-5500 (X/Y/M aliases)</option>
+      <option value="keyence:kv-7000">KV-7000 / KV-7300 / KV-7500</option>
+      <option value="keyence:kv-7000-xym">KV-7000 / KV-7300 / KV-7500 (X/Y/M aliases)</option>
+      <option value="keyence:kv-8000">KV-8000 / KV-8000A</option>
+      <option value="keyence:kv-8000-xym">KV-8000 / KV-8000A (X/Y/M aliases)</option>
+      <option value="keyence:kv-x500">KV-X500 family</option>
+      <option value="keyence:kv-x500-xym">KV-X500 family (X/Y/M aliases)</option>
     </select>
   </div>
 </script>
 
 <script type="text/html" data-help-name="kvhostlink-connection">
   <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
-  <p><b>PLC Profile</b> is saved as a canonical lowercase profile such as <code>keyence:kv-x500</code>. Legacy model labels such as <code>KV-X500</code> are not accepted as profile input.</p>
+  <p><b>PLC Profile</b> is shown as a model-family label, but saved as a canonical lowercase profile such as <code>keyence:kv-x500</code>. Legacy model labels such as <code>KV-X500</code> are not accepted as profile input.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
   <p>Commands are sent as Host Link command lines terminated with <code>CR</code>.</p>
   <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>

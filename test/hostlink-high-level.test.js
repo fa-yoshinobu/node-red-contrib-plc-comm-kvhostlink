@@ -1,5 +1,6 @@
 "use strict";
 
+const { EventEmitter } = require("node:events");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -372,6 +373,72 @@ test("poll reuses compiled read plan", async () => {
   await iterator.return();
 });
 
+test("kvhostlink-connection validates runtime options and exposes PLC profile", async () => {
+  const constructorOptions = [];
+
+  class FakeHostLinkClient {
+    constructor(options) {
+      constructorOptions.push(options);
+    }
+
+    async connect() {}
+
+    async close() {}
+  }
+
+  await withMockedHostlink({ HostLinkClient: FakeHostLinkClient }, async () => {
+    const { RED, create } = createMockRed();
+    require("../nodes/kvhostlink-connection")(RED);
+
+    const node = create("kvhostlink-connection", {
+      id: "conn-missing-port",
+      host: "192.168.0.10",
+      plcProfile: "keyence:kv-5000",
+    });
+
+    assert.equal(constructorOptions[0].port, 8501);
+    assert.equal(constructorOptions[0].timeout, 3000);
+    assert.equal(constructorOptions[0].plcProfile, "keyence:kv-5000");
+    assert.deepEqual(node.getProfile(), {
+      host: "192.168.0.10",
+      port: 8501,
+      transport: "tcp",
+      timeout: 3000,
+      plcProfile: "keyence:kv-5000",
+    });
+    assert.throws(
+      () =>
+        create("kvhostlink-connection", {
+          id: "conn-blank-port",
+          host: "192.168.0.10",
+          port: "",
+          plcProfile: "keyence:kv-5000",
+        }),
+      /kvhostlink-connection port is required/
+    );
+    assert.throws(
+      () =>
+        create("kvhostlink-connection", {
+          id: "conn-out-of-range-port",
+          host: "192.168.0.10",
+          port: "65536",
+          plcProfile: "keyence:kv-5000",
+        }),
+      /kvhostlink-connection port out of range/
+    );
+    assert.throws(
+      () =>
+        create("kvhostlink-connection", {
+          id: "conn-invalid-timeout",
+          host: "192.168.0.10",
+          timeout: "0",
+          plcProfile: "keyence:kv-5000",
+        }),
+      /kvhostlink-connection timeout must be > 0/
+    );
+  });
+});
+
 test("writeNamed batches consecutive writes and keeps special cases correct", async () => {
   const calls = [];
   const fakeClient = {
@@ -427,3 +494,78 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     { kind: "writeSetValueConsecutive", device: "T20", values: [555, 666], dataFormat: ".D" },
   ]);
 });
+
+function createMockRed() {
+  const registeredTypes = new Map();
+  const nodes = new Map();
+
+  const RED = {
+    nodes: {
+      createNode(node, config) {
+        const emitter = new EventEmitter();
+        node.on = emitter.on.bind(emitter);
+        node.once = emitter.once.bind(emitter);
+        node.emit = emitter.emit.bind(emitter);
+        node.removeListener = emitter.removeListener.bind(emitter);
+        node.statusCalls = [];
+        node.status = (status) => node.statusCalls.push(status);
+        node.id = config.id;
+        node.credentials = config.credentials || {};
+        if (config.id) {
+          nodes.set(config.id, node);
+        }
+      },
+      registerType(name, constructor) {
+        registeredTypes.set(name, constructor);
+      },
+      getNode(id) {
+        return nodes.get(id);
+      },
+    },
+  };
+
+  return {
+    RED,
+    create(name, config) {
+      const Constructor = registeredTypes.get(name);
+      assert.ok(Constructor, `Node type ${name} is not registered`);
+      return new Constructor(config);
+    },
+  };
+}
+
+async function withMockedHostlink(overrides, work) {
+  const hostlinkModulePath = require.resolve("../lib/hostlink");
+  const originalHostlinkModule = require.cache[hostlinkModulePath];
+  const nodeModulePaths = [require.resolve("../nodes/kvhostlink-connection")];
+  const originalNodeModules = new Map(nodeModulePaths.map((modulePath) => [modulePath, require.cache[modulePath]]));
+  const actual = require("../lib/hostlink");
+
+  require.cache[hostlinkModulePath] = {
+    id: hostlinkModulePath,
+    filename: hostlinkModulePath,
+    loaded: true,
+    exports: { ...actual, ...overrides },
+  };
+
+  for (const modulePath of nodeModulePaths) {
+    delete require.cache[modulePath];
+  }
+
+  try {
+    await work();
+  } finally {
+    if (originalHostlinkModule) {
+      require.cache[hostlinkModulePath] = originalHostlinkModule;
+    } else {
+      delete require.cache[hostlinkModulePath];
+    }
+    for (const [modulePath, cachedModule] of originalNodeModules.entries()) {
+      if (cachedModule) {
+        require.cache[modulePath] = cachedModule;
+      } else {
+        delete require.cache[modulePath];
+      }
+    }
+  }
+}
