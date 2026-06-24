@@ -2,13 +2,27 @@
 
 const { HostLinkClient, normalizePlcProfile } = require("../lib/hostlink");
 
+const DEFAULT_PORT = 8501;
+
+function parseRequiredInteger(value, name, min, max, fallback) {
+  const source = value === undefined || value === null ? fallback : value;
+  if (String(source).trim() === "") {
+    throw new Error(`kvhostlink-connection ${name} is required`);
+  }
+  const parsed = Number(source);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`kvhostlink-connection ${name} out of range (${min}..${max}): ${source}`);
+  }
+  return parsed;
+}
+
 module.exports = function registerKvHostLinkConnection(RED) {
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
 
     this.name = config.name;
     this.host = config.host;
-    this.port = Number(config.port || 8501);
+    this.port = parseRequiredInteger(config.port, "port", 1, 65535, DEFAULT_PORT);
     this.transport = config.transport || "tcp";
     this.timeout = Number(config.timeout || 3000);
     this.plcProfile = normalizePlcProfile(config.plcProfile);

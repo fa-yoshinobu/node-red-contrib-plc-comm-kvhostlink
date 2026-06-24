@@ -68,6 +68,18 @@ test("PLC profile input accepts canonical names only", () => {
   assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
 });
 
+test("HostLinkClient defaults missing port to 8501 but rejects invalid ports", () => {
+  assert.equal(new HostLinkClient({ host: "127.0.0.1" }).port, 8501);
+  assert.equal(new HostLinkClient({ host: "127.0.0.1", port: "8502" }).port, 8502);
+
+  for (const port of ["", " ", 0, -1, "abc", 65536, 1.5]) {
+    assert.throws(
+      () => new HostLinkClient({ host: "127.0.0.1", port }),
+      /port (is required|out of range)/
+    );
+  }
+});
+
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   const frame = buildFrame("RD DM100");
   assert.equal(frame.toString("ascii"), "RD DM100\r");
