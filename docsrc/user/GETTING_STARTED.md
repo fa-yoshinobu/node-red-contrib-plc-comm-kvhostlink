@@ -93,6 +93,7 @@ For a single manual write, configure a `kvhostlink-write` node like this:
 | Errors | `Second output` |
 
 Use only a test address that is safe for your machine and PLC program.
+The imported starter flow writes the sample value and does not restore the previous value automatically.
 
 ## Confirm success
 
@@ -103,6 +104,7 @@ Use only a test address that is safe for your machine and PLC program.
 | Debug output | The debug sidebar shows `msg.payload`. |
 | Error output | The error output stays quiet. |
 | Write readback | The follow-up read shows the value written to your test address. |
+| Restore plan | You use a test-only address or add a follow-up write that restores the previous value. |
 
 ## If it does not work
 

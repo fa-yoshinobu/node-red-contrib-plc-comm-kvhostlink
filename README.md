@@ -39,6 +39,7 @@ Install the package, then restart Node-RED if your runtime asks you to.
 7. Deploy the flow.
 8. Trigger `Read DM100` and check the debug sidebar.
 9. Trigger `Write DM100=123`, then read again to confirm the value.
+10. The starter flow does not restore the previous value; use only a test address or add a restore write before production use.
 
 ## Documentation
 

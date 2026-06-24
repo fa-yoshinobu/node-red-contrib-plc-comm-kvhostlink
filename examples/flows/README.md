@@ -4,6 +4,7 @@
 
 This directory contains importable Node-RED JSON flows for `kvhostlink-read`, `kvhostlink-write`, and the shared `kvhostlink-connection` node.
 Start with the basic flow, then move through typed and array examples before using the device matrix.
+Write examples intentionally keep the flow simple and do not restore previous values automatically; run them only against test addresses or add a restore write in your copied flow.
 
 ## How to import
 
