@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.1] - 2026-06-25
 
 ### Changed
-- Removed the Node-RED editor default PLC profile selection so users must choose an explicit canonical profile.
-- Require `plcProfile` when constructing `HostLinkClient` directly, rejecting empty or omitted profile values.
+- [Node-RED editor] Removed the default PLC profile selection so users must choose an explicit canonical profile.
+- [Library] Require `plcProfile` when constructing `HostLinkClient` directly, rejecting empty or omitted profile values.
+- [Docs/Samples] Clarified that write examples restore the original PLC values after demonstration writes.
+
+### Fixed
+- [CI] Check npm duplicate package versions through registry metadata instead of requiring the local npm CLI.
 
 ## [1.0.0] - 2026-06-24
 
