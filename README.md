@@ -65,3 +65,9 @@ See that page for verified PLC models, transports, dates, limitations, and retai
 | License | [MIT](LICENSE) |
 | Registry | [npm](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink) |
 | Package | `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` |
+
+## Commercial support
+
+If you plan to embed this library in a paid or commercial product, please consider a separate support agreement or supporting the project as a sponsor.
+
+Contact: <https://fa-labo.com/contact.html>
