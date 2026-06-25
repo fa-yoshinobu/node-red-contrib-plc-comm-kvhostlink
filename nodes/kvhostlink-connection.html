@@ -48,7 +48,7 @@
         }
       },
       plcProfile: {
-        value: "keyence:kv-x500",
+        value: "",
         required: true,
         validate: kvValidatePlcProfile
       }
@@ -86,6 +86,7 @@
   <div class="form-row">
     <label for="node-config-input-plcProfile"><i class="fa fa-microchip"></i> PLC Profile</label>
     <select id="node-config-input-plcProfile">
+      <option value="">Select PLC profile...</option>
       <option value="keyence:kv-nano">KV-Nano</option>
       <option value="keyence:kv-nano-xym">KV-Nano (X/Y/M aliases)</option>
       <option value="keyence:kv-3000">KV-3000</option>

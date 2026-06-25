@@ -17,8 +17,14 @@ const {
   normalizePlcProfile,
 } = require("../lib/hostlink");
 
+const TEST_PLC_PROFILE = "keyence:kv-x500";
+
+function createTestClient(options = {}) {
+  return new HostLinkClient({ host: "127.0.0.1", plcProfile: TEST_PLC_PROFILE, ...options });
+}
+
 function createFrameRecorder(responseForCommand = () => "OK\r") {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const frames = [];
 
   client._exchange = async (payload) => {
@@ -93,33 +99,37 @@ test("Node-RED editor shows human-readable PLC profile labels but keeps canonica
 });
 
 test("HostLinkClient defaults missing port to 8501 but rejects invalid ports", () => {
-  assert.equal(new HostLinkClient({ host: "127.0.0.1" }).port, 8501);
-  assert.equal(new HostLinkClient({ host: "127.0.0.1", port: "8502" }).port, 8502);
+  assert.equal(createTestClient().port, 8501);
+  assert.equal(createTestClient({ port: "8502" }).port, 8502);
 
   for (const port of ["", " ", 0, -1, "abc", 65536, 1.5]) {
     assert.throws(
-      () => new HostLinkClient({ host: "127.0.0.1", port }),
+      () => createTestClient({ port }),
       /port (is required|out of range)/
     );
   }
 });
 
-test("HostLinkClient validates timeout and keeps optional PLC profile metadata", () => {
-  assert.equal(new HostLinkClient({ host: "127.0.0.1" }).timeout, 3000);
-  assert.equal(new HostLinkClient({ host: "127.0.0.1", timeout: "2500" }).timeout, 2500);
+test("HostLinkClient validates timeout and requires PLC profile metadata", () => {
+  assert.throws(
+    () => new HostLinkClient({ host: "127.0.0.1" }),
+    /plcProfile is required/
+  );
+  assert.equal(createTestClient().timeout, 3000);
+  assert.equal(createTestClient({ timeout: "2500" }).timeout, 2500);
   assert.equal(
-    new HostLinkClient({ host: "127.0.0.1", plcProfile: " keyence:kv-5000 " }).plcProfile,
+    createTestClient({ plcProfile: " keyence:kv-5000 " }).plcProfile,
     "keyence:kv-5000"
   );
 
   for (const timeout of ["", " ", 0, -1, "abc", Number.POSITIVE_INFINITY]) {
     assert.throws(
-      () => new HostLinkClient({ host: "127.0.0.1", timeout }),
+      () => createTestClient({ timeout }),
       /timeout must be > 0/
     );
   }
   assert.throws(
-    () => new HostLinkClient({ host: "127.0.0.1", plcProfile: "KV-X500" }),
+    () => createTestClient({ plcProfile: "KV-X500" }),
     /Unsupported PLC profile/
   );
 });
@@ -142,7 +152,7 @@ test("splitDataTokens supports timer and counter comma-separated responses", () 
 });
 
 test("client serializes queued requests", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   let active = 0;
   let maxActive = 0;
 
@@ -249,7 +259,7 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
 });
 
 test("readComments accepts XYM alias device types", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -263,7 +273,7 @@ test("readComments accepts XYM alias device types", async () => {
 });
 
 test("monitor registration accepts XYM bit aliases verified on KV-7500", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -280,7 +290,7 @@ test("monitor registration accepts XYM bit aliases verified on KV-7500", async (
 });
 
 test("client rejects device spans crossing range before send", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -305,7 +315,7 @@ test("client rejects device spans crossing range before send", async () => {
 });
 
 test("AT defaults to 32-bit values but spans by AT device point", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -321,7 +331,7 @@ test("AT defaults to 32-bit values but spans by AT device point", async () => {
 });
 
 test("native 32-bit device families span by device point", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -353,7 +363,7 @@ test("native 32-bit device families span by device point", async () => {
 });
 
 test("AT writes are rejected before sending WR or WRS", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -368,7 +378,7 @@ test("AT writes are rejected before sending WR or WRS", async () => {
 });
 
 test("expansion unit buffer uses address-suffix command form", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -391,7 +401,7 @@ test("expansion unit buffer uses address-suffix command form", async () => {
 });
 
 test("switchBank sends BE and validates the bank number", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -406,7 +416,7 @@ test("switchBank sends BE and validates the bank number", async () => {
 });
 
 test("setTime sends WRT with Sunday-based weekday", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
@@ -427,7 +437,7 @@ test("setTime sends WRT with Sunday-based weekday", async () => {
 });
 
 test("queryModel returns the raw model code and known model label", async () => {
-  const client = new HostLinkClient({ host: "127.0.0.1" });
+  const client = createTestClient();
   const commands = [];
 
   client._exchange = async (payload) => {
