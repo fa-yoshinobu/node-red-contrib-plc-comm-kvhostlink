@@ -150,16 +150,17 @@ switch ($Registry) {
         }
     }
     "npm" {
-        $npm = (Get-Command npm -ErrorAction SilentlyContinue).Source
-        if (-not $npm) {
-            throw "npm was not found; cannot verify registry duplicate version."
+        $packagePart = [System.Uri]::EscapeDataString($Package)
+        $result = Get-HttpResult "https://registry.npmjs.org/$packagePart"
+        if ($result.StatusCode -eq 404) {
+            break
         }
-        $output = & $npm view "$Package@$version" version --json 2>&1 | Out-String
-        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($output)) {
+        if ($result.StatusCode -ne 200) {
+            throw "Unexpected npm response $($result.StatusCode) while checking '$Package@$version'."
+        }
+        $metadata = $result.Content | ConvertFrom-Json
+        if ($metadata.versions.PSObject.Properties.Name -contains $version) {
             throw "npm package '$Package@$version' is already published. Bump the version before release."
-        }
-        if ($LASTEXITCODE -ne 0 -and $output -notmatch 'E404|404|not found') {
-            throw "Failed to query npm package '$Package@$version'. $output"
         }
     }
     "platformio" {
