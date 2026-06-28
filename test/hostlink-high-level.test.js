@@ -84,6 +84,21 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
   assert.equal(formatParsedAddress(parseAddress("R10,4")), "R010,4");
   assert.throws(() => normalizeAddress("dm50.s"), /invalid bit-in-word/i);
+  assert.throws(() => parseAddress("DM50:BIT_IN_WORD"), /no bit index/i);
+});
+
+test("readNamed and writeNamed reject BIT_IN_WORD without an explicit bit index", async () => {
+  const fakeClient = {
+    async read() {
+      throw new Error("unexpected read");
+    },
+    async write() {
+      throw new Error("unexpected write");
+    },
+  };
+
+  await assert.rejects(() => readNamed(fakeClient, ["DM50:BIT_IN_WORD"]), /no bit index/i);
+  await assert.rejects(() => writeNamed(fakeClient, { "DM50:BIT_IN_WORD": true }), /no bit index/i);
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {
