@@ -15,6 +15,7 @@ const {
   readTimerCounter,
   readTyped,
   writeNamed,
+  writeTyped,
 } = require("../lib/hostlink");
 
 test("parseAddress supports dtype, count, and bit-in-word", () => {
@@ -75,6 +76,8 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     explicitDtype: true,
   });
   assert.throws(() => parseAddress("DM100"), /requires an explicit data type/);
+  assert.throws(() => parseAddress("DM100:"), /requires a dtype after/);
+  assert.throws(() => parseAddress("DM100:BOGUS"), /unsupported dtype/i);
 });
 
 test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
@@ -84,6 +87,7 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
   assert.equal(normalizeAddress("dm50.d"), "DM50.D");
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
   assert.equal(formatParsedAddress(parseAddress("R10:BIT,4")), "R010:BIT,4");
+  assert.throws(() => normalizeAddress("dm100:bogus"), /unsupported dtype/i);
   assert.throws(() => normalizeAddress("dm50.s"), /invalid bit-in-word/i);
   assert.throws(() => parseAddress("DM50:BIT_IN_WORD"), /no bit index/i);
 });
@@ -100,6 +104,22 @@ test("readNamed and writeNamed reject BIT_IN_WORD without an explicit bit index"
 
   await assert.rejects(() => readNamed(fakeClient, ["DM50:BIT_IN_WORD"]), /no bit index/i);
   await assert.rejects(() => writeNamed(fakeClient, { "DM50:BIT_IN_WORD": true }), /no bit index/i);
+});
+
+test("readNamed and writeNamed reject unknown dtype suffixes", async () => {
+  const fakeClient = {
+    async read() {
+      throw new Error("unexpected read");
+    },
+    async write() {
+      throw new Error("unexpected write");
+    },
+  };
+
+  await assert.rejects(() => readNamed(fakeClient, ["DM100:BOGUS"]), /unsupported dtype/i);
+  await assert.rejects(() => writeNamed(fakeClient, { "DM100:BOGUS": 7 }), /unsupported dtype/i);
+  await assert.rejects(() => readTyped(fakeClient, "DM100", "BOGUS"), /unsupported dtype/i);
+  await assert.rejects(() => writeTyped(fakeClient, "DM100", "BOGUS", 7), /unsupported dtype/i);
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {
