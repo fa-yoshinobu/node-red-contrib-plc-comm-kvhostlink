@@ -9,7 +9,7 @@
   const KVHOSTLINK_DEVICE_CODES = Object.keys(KVHOSTLINK_DEVICE_BASES).sort(function (left, right) {
     return right.length - left.length || left.localeCompare(right);
   });
-  const KVHOSTLINK_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H", "COMMENT"]);
+  const KVHOSTLINK_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H", "BIT", "COMMENT"]);
   const KVHOSTLINK_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
@@ -94,6 +94,9 @@
         return false;
       }
       text = bitMatch[1].trim();
+    }
+    if (!suffixMatch && !bitMatch) {
+      return false;
     }
 
     return kvValidateDeviceToken(text);
@@ -227,7 +230,7 @@
   </div>
   <div class="form-row" id="node-input-addressesLiteralRow">
     <label for="node-input-addressesLiteral"><i class="fa fa-list"></i> Addresses</label>
-    <textarea id="node-input-addressesLiteral" style="height: 140px;" placeholder="DM100&#10;DM110:S&#10;DM120:D&#10;DM140:COMMENT&#10;DM150.3&#10;DM160,4"></textarea>
+    <textarea id="node-input-addressesLiteral" style="height: 140px;" placeholder="DM100:U&#10;DM110:S&#10;DM120:D&#10;DM140:COMMENT&#10;DM150.3&#10;DM160:U,4&#10;R010:BIT"></textarea>
   </div>
   <div class="form-row">
     <label for="node-input-outputMode"><i class="fa fa-sign-out"></i> Output</label>
@@ -257,12 +260,12 @@
 
 <script type="text/html" data-help-name="kvhostlink-read">
   <p>Reads one or more KEYENCE KV Host Link addresses and writes the result to <code>msg.payload</code>.</p>
-  <p>Supported forms include <code>DM100</code>, <code>DM110:S</code>, <code>DM120:D</code>, <code>DM130:L</code>, <code>DM140:F</code>, <code>DM145:COMMENT</code>, <code>DM150.3</code>, <code>DM160,4</code>, <code>R200,4</code>, <code>T10:D</code>, and <code>C10:D</code>.</p>
+  <p>Supported forms include <code>DM100:U</code>, <code>DM110:S</code>, <code>DM120:D</code>, <code>DM130:L</code>, <code>DM140:F</code>, <code>DM145:COMMENT</code>, <code>DM150.3</code>, <code>DM160:U,4</code>, <code>R200:BIT,4</code>, <code>T10:D</code>, and <code>C10:D</code>.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>Output can be an object keyed by address, an array in address order, or a single scalar when exactly one address is requested.</p>
   <p>Comment addresses such as <code>DM145:COMMENT</code> return strings via the Host Link <code>RDC</code> command.</p>
   <p>Metadata can emit full <code>msg.kvhostlink</code>, a minimal object with item count only, or leave <code>msg.kvhostlink</code> unchanged.</p>
-  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, <code>msg.addresses</code> or a string/array in <code>msg.payload</code> still take priority.</p>
+  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, <code>msg.addresses</code> takes priority over the configured source.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
   <p>The node keeps the caller-visible logical request shape. It does not silently retry one logical read as a different fallback split request.</p>
 </script>

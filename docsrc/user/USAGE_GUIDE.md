@@ -36,7 +36,6 @@ Accepted profile values are listed in [PLC profiles](PROFILES.md).
 | Input msg field | Description |
 | --- | --- |
 | `msg.addresses` | String or array of addresses. Takes priority over the configured source. |
-| `msg.payload` | String or array of addresses when `msg.addresses` is not set. |
 | `msg.topic` | `connect`, `disconnect`, or `reinitialize` for connection control. |
 | `msg.connect` | Set to `true` to connect. |
 | `msg.disconnect` | Set to `true` to disconnect. |
@@ -55,17 +54,16 @@ Accepted profile values are listed in [PLC profiles](PROFILES.md).
 | Name | Display name. |
 | Connection | `kvhostlink-connection` config node. |
 | Source | Literal text, `msg`, `flow`, `global`, or `env`. |
-| Static updates | JSON object or `address=value` lines when Source is `str`. |
+| Static updates | JSON object when Source is `str`. |
 | Metadata | `full`, `minimal`, or `off`. |
 | Errors | `throw`, `msg.error`, or second output. |
 
 | Input msg field | Description |
 | --- | --- |
-| `msg.updates` | Object or string updates. Takes priority over `msg.payload`. |
-| `msg.payload` | Object or string updates when `msg.updates` is not set. |
+| `msg.updates` | Object or JSON string updates. |
 | `msg.address` | Single address for one write. |
-| `msg.dtype` | Optional data type inserted into `msg.address` when the address has no type suffix. |
-| `msg.value` | Single write value. If omitted, `msg.payload` is used. |
+| `msg.dtype` | Data type inserted into `msg.address` when the address has no type suffix. |
+| `msg.value` | Single write value. Required when `msg.address` is used. |
 | `msg.topic` | `connect`, `disconnect`, or `reinitialize` for connection control. |
 | `msg.connect` | Set to `true` to connect. |
 | `msg.disconnect` | Set to `true` to disconnect. |
@@ -83,7 +81,7 @@ The second output receives a copy of the message with `error` when Errors is `Se
 
 | Form | Example | Meaning |
 | --- | --- | --- |
-| Word value | `DM100` | Read or write the default unsigned word value. |
+| Word value | `DM100:U` | Read or write an unsigned word value. |
 | Signed 16-bit | `DM100:S` | Interpret one word as signed 16-bit. |
 | Unsigned 32-bit | `DM120:D` | Interpret two words as unsigned 32-bit. |
 | Signed 32-bit | `DM130:L` | Interpret two words as signed 32-bit. |
@@ -91,17 +89,18 @@ The second output receives a copy of the message with `error` when Errors is `Se
 | Hex word | `DM140:H` | Read or write a word as uppercase hexadecimal text. |
 | Comment read | `DM145:COMMENT` | Read the device comment string. |
 | Bit in word | `DM150.3` | Read or write bit 3 in `DM150`. |
-| Word array | `DM160,4` | Read or write four consecutive default values. |
-| Bit array | `R200,4` | Read or write four consecutive relay bits. |
-| Timer preset | `T10` | Read timer preset value. |
-| Counter preset | `C10` | Read counter preset value. |
+| Word array | `DM160:U,4` | Read or write four consecutive unsigned word values. |
+| Bit array | `R200:BIT,4` | Read or write four consecutive relay bits. |
+| Timer preset | `T10:D` | Read timer preset value. |
+| Counter preset | `C10:D` | Read counter preset value. |
 
 Use `:` for data types and `.0` through `.F` for bit-in-word access.
 `DM100.D` means bit `D` inside `DM100`; use `DM100:D` for a 32-bit value.
+High-level read/write addresses must specify the data type explicitly, such as `:U`, `:D`, or `:BIT`.
 
 ## Timer and counter
 
-`T10` and `C10` use the high-level timer/counter behavior.
+`T10:D` and `C10:D` use the high-level timer/counter behavior.
 Reads return the preset value for compatibility with ordinary scalar reads.
 Timer/counter preset writes use Host Link `WS` and `WSS`, which are supported only on KV-8000/7000-series CPU units.
 Other CPU units may return PLC error `E1`.

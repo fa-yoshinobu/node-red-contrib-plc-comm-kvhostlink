@@ -54,4 +54,4 @@
 | --- | --- |
 | Symptom | `DM150.3,4` or a similar bit-in-word count is rejected. |
 | Root cause | Bit-in-word addresses do not support `,count`. |
-| Fix | Use `DM150.3` for one bit, or use a direct bit family such as `R200,4` for bit arrays. |
+| Fix | Use `DM150.3` for one bit, or use a direct bit family such as `R200:BIT,4` for bit arrays. |

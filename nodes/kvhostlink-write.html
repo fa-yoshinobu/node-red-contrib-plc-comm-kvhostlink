@@ -9,7 +9,7 @@
   const KVHOSTLINK_WRITE_DEVICE_CODES = Object.keys(KVHOSTLINK_WRITE_DEVICE_BASES).sort(function (left, right) {
     return right.length - left.length || left.localeCompare(right);
   });
-  const KVHOSTLINK_WRITE_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H"]);
+  const KVHOSTLINK_WRITE_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H", "BIT"]);
   const KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_WRITE_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
@@ -59,6 +59,9 @@
       }
       text = bitMatch[1].trim();
     }
+    if (!suffixMatch && !bitMatch) {
+      return false;
+    }
 
     return kvValidateWriteDeviceToken(text);
   }
@@ -102,23 +105,8 @@
       }
       return Object.keys(parsed).every(kvValidateWriteAddress);
     } catch (_error) {
+      return false;
     }
-
-    const lines = text.split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) {
-        continue;
-      }
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) {
-        return false;
-      }
-      if (!kvValidateWriteAddress(trimmed.slice(0, separatorIndex).trim())) {
-        return false;
-      }
-    }
-    return true;
   }
 
   function kvValidateWriteSourceField(value, typeSelector, literalValidator, fallbackType) {
@@ -221,7 +209,7 @@
   </div>
   <div class="form-row" id="node-input-updatesLiteralRow">
     <label for="node-input-updatesLiteral"><i class="fa fa-pencil"></i> Static updates</label>
-    <textarea id="node-input-updatesLiteral" style="height: 140px;" placeholder="{&quot;DM100&quot;:123,&quot;DM110:S&quot;:-5,&quot;DM150.3&quot;:true}&#10;&#10;or&#10;DM100=123&#10;DM160,4=[1,2,3,4]"></textarea>
+    <textarea id="node-input-updatesLiteral" style="height: 140px;" placeholder="{&quot;DM100:U&quot;:123,&quot;DM110:S&quot;:-5,&quot;DM150.3&quot;:true,&quot;R010:BIT&quot;:true}"></textarea>
   </div>
   <div class="form-row">
     <label for="node-input-metadataMode"><i class="fa fa-database"></i> Metadata</label>
@@ -243,11 +231,11 @@
 
 <script type="text/html" data-help-name="kvhostlink-write">
   <p>Writes one or more KEYENCE KV Host Link values using the high-level helper API.</p>
-  <p>Preferred dynamic input is <code>msg.payload</code> or <code>msg.updates</code> as an object, for example <code>{ "DM100": 123, "DM110:S": -5, "DM150.3": true }</code>.</p>
-  <p>Count-qualified addresses expect arrays, for example <code>{ "DM160,4": [1,2,3,4], "R200,4": [true,false,true,true] }</code>.</p>
+  <p>Preferred dynamic input is <code>msg.updates</code> as an object, for example <code>{ "DM100:U": 123, "DM110:S": -5, "DM150.3": true, "R010:BIT": true }</code>.</p>
+  <p>Count-qualified addresses expect arrays, for example <code>{ "DM160:U,4": [1,2,3,4], "R200:BIT,4": [true,false,true,true] }</code>.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
-  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects or <code>address=value</code> lines.</p>
-  <p>You can also send a single write with <code>msg.address</code>, optional <code>msg.dtype</code>, and the value in <code>msg.value</code> or <code>msg.payload</code>. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix.</p>
+  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects only.</p>
+  <p>You can also send a single write with <code>msg.address</code>, optional <code>msg.dtype</code>, and the value in <code>msg.value</code>. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
   <p>The node keeps the caller-visible logical write shape. It does not silently retry one logical update as a different fallback split request.</p>
 </script>

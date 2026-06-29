@@ -63,12 +63,12 @@ async function resolveUpdates(RED, node, msg) {
   if (isUpdateSource(msg.updates)) {
     return normalizeUpdatesSource(msg.updates);
   }
-  if (isUpdateSource(msg.payload)) {
-    return normalizeUpdatesSource(msg.payload);
-  }
   if (typeof msg.address === "string" && msg.address.trim()) {
+    if (!Object.prototype.hasOwnProperty.call(msg, "value")) {
+      throw new Error("msg.value is required when msg.address is used");
+    }
     return {
-      [withDtype(msg.address, msg.dtype)]: msg.value !== undefined ? msg.value : msg.payload,
+      [withDtype(msg.address, msg.dtype)]: msg.value,
     };
   }
   const configured = await evaluateConfiguredValue(RED, node, msg, node.updates, node.updatesType, "updates");
@@ -123,39 +123,9 @@ function parseConfiguredUpdates(value) {
     if (isPlainObject(parsed)) {
       return parsed;
     }
-  } catch (_error) {
-  }
-  const updates = {};
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) {
-      continue;
-    }
-    const separatorIndex = trimmed.indexOf("=");
-    if (separatorIndex <= 0) {
-      throw new Error(`Invalid update line: ${trimmed}`);
-    }
-    const key = trimmed.slice(0, separatorIndex).trim();
-    const rawValue = trimmed.slice(separatorIndex + 1).trim();
-    updates[key] = parseScalar(rawValue);
-  }
-  return updates;
-}
-
-function parseScalar(value) {
-  if (value === "true") {
-    return true;
-  }
-  if (value === "false") {
-    return false;
-  }
-  if (/^-?\d+(\.\d+)?$/.test(value)) {
-    return Number(value);
-  }
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return value;
+    throw new Error("Static updates must be a JSON object");
+  } catch (error) {
+    throw new Error(`Unable to parse updates JSON: ${error.message}`);
   }
 }
 

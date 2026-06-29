@@ -45,7 +45,7 @@ These device families and ranges come from the node source validation layer.
 
 | Form | Example | Meaning |
 | --- | --- | --- |
-| Default word | `DM100` | Read/write using the default format for the device family. |
+| Unsigned word | `DM100:U` | Read/write using an explicit unsigned word format. |
 | Signed word | `DM100:S` | Signed 16-bit value. |
 | Unsigned dword | `DM120:D` | Unsigned 32-bit value. |
 | Signed long | `DM130:L` | Signed 32-bit value. |
@@ -53,10 +53,10 @@ These device families and ranges come from the node source validation layer.
 | Hex | `DM140:H` | Hexadecimal word text. |
 | Comment | `DM145:COMMENT` | Read device comment text. |
 | Bit in word | `DM150.3` | Bit 3 in `DM150`. |
-| Count | `DM160,4` | Four consecutive values. |
-| Direct bit count | `R200,4` | Four consecutive direct bits. |
-| Timer | `T10` | Timer preset value. |
-| Counter | `C10` | Counter preset value. |
+| Count | `DM160:U,4` | Four consecutive unsigned word values. |
+| Direct bit count | `R200:BIT,4` | Four consecutive direct bits. |
+| Timer | `T10:D` | Timer preset value. |
+| Counter | `C10:D` | Counter preset value. |
 
 ## Addressing notes
 

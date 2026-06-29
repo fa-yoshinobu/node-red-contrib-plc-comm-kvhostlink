@@ -18,13 +18,13 @@ const {
 } = require("../lib/hostlink");
 
 test("parseAddress supports dtype, count, and bit-in-word", () => {
-  assert.deepEqual(parseAddress("DM100"), {
+  assert.deepEqual(parseAddress("DM100:U"), {
     base: "DM100",
     dtype: "U",
     bitIndex: null,
     count: 1,
     hasCount: false,
-    explicitDtype: false,
+    explicitDtype: true,
   });
   assert.deepEqual(parseAddress("DM100:F"), {
     base: "DM100",
@@ -66,23 +66,24 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     hasCount: false,
     explicitDtype: true,
   });
-  assert.deepEqual(parseAddress("AT0,8"), {
+  assert.deepEqual(parseAddress("AT0:D,8"), {
     base: "AT0",
     dtype: "D",
     bitIndex: null,
     count: 8,
     hasCount: true,
-    explicitDtype: false,
+    explicitDtype: true,
   });
+  assert.throws(() => parseAddress("DM100"), /requires an explicit data type/);
 });
 
 test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
   assert.equal(normalizeAddress(" dm200:d,4 "), "DM200:D,4");
-  assert.equal(normalizeAddress("100"), "R100");
+  assert.throws(() => normalizeAddress("100"), /Invalid device string/);
   assert.equal(normalizeAddress("dm50.3"), "DM50.3");
   assert.equal(normalizeAddress("dm50.d"), "DM50.D");
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
-  assert.equal(formatParsedAddress(parseAddress("R10,4")), "R010,4");
+  assert.equal(formatParsedAddress(parseAddress("R10:BIT,4")), "R010:BIT,4");
   assert.throws(() => normalizeAddress("dm50.s"), /invalid bit-in-word/i);
   assert.throws(() => parseAddress("DM50:BIT_IN_WORD"), /no bit index/i);
 });
@@ -102,8 +103,8 @@ test("readNamed and writeNamed reject BIT_IN_WORD without an explicit bit index"
 });
 
 test("normalizeAddressList keeps count suffixes intact", () => {
-  assert.deepEqual(normalizeAddressList("DM100,10 DM200:F DM50.3"), ["DM100,10", "DM200:F", "DM50.3"]);
-  assert.deepEqual(normalizeAddressList('["DM100","DM200:D,2"]'), ["DM100", "DM200:D,2"]);
+  assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
+  assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
 });
 
 test("readTyped reads float through two words", async () => {
@@ -161,9 +162,9 @@ test("readNamed uses preset value from timer and counter composite responses", a
     },
   };
 
-  assert.deepEqual(await readNamed(fakeClient, ["T10", "C10"]), {
-    T10: 20,
-    C10: 30,
+  assert.deepEqual(await readNamed(fakeClient, ["T10:D", "C10:D"]), {
+    "T10:D": 20,
+    "C10:D": 30,
   });
 });
 
@@ -221,9 +222,9 @@ test("readNamed batches optimizable contiguous word requests", async () => {
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM102:D", "DM104:F", "DM106.3"]);
+  const snapshot = await readNamed(fakeClient, ["DM100:U", "DM101:S", "DM102:D", "DM104:F", "DM106.3"]);
   assert.deepEqual(snapshot, {
-    DM100: 123,
+    "DM100:U": 123,
     "DM101:S": -5,
     "DM102:D": 0x12345678,
     "DM104:F": 3.5,
@@ -247,15 +248,15 @@ test("readNamed batches direct bit requests", async () => {
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["X100", "X101", "R0", "R1", "R2", "R3"]);
+  const snapshot = await readNamed(fakeClient, ["X100:BIT", "X101:BIT", "R0:BIT", "R1:BIT", "R2:BIT", "R3:BIT"]);
 
   assert.deepEqual(snapshot, {
-    X100: true,
-    X101: false,
-    R0: true,
-    R1: false,
-    R2: true,
-    R3: false,
+    "X100:BIT": true,
+    "X101:BIT": false,
+    "R0:BIT": true,
+    "R1:BIT": false,
+    "R2:BIT": true,
+    "R3:BIT": false,
   });
   assert.deepEqual(calls, [
     { device: "X100", count: 2, dataFormat: "" },
@@ -275,13 +276,13 @@ test("readNamed batches bit-bank direct bits across display bank boundary", asyn
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["CR3614", "CR3615", "CR3700", "CR3701"]);
+  const snapshot = await readNamed(fakeClient, ["CR3614:BIT", "CR3615:BIT", "CR3700:BIT", "CR3701:BIT"]);
 
   assert.deepEqual(snapshot, {
-    CR3614: false,
-    CR3615: true,
-    CR3700: false,
-    CR3701: true,
+    "CR3614:BIT": false,
+    "CR3615:BIT": true,
+    "CR3700:BIT": false,
+    "CR3701:BIT": true,
   });
   assert.deepEqual(calls, [{ device: "CR3614", count: 4, dataFormat: "" }]);
 });
@@ -328,17 +329,17 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["DM100", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R010", "DM250:COMMENT", "DM400,3", "R010,4"]);
+  const snapshot = await readNamed(fakeClient, ["DM100:U", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R010:BIT", "DM250:COMMENT", "DM400:U,3", "R010:BIT,4"]);
   assert.deepEqual(snapshot, {
-    DM100: 123,
+    "DM100:U": 123,
     "DM101:S": -5,
     "DM200:D": 0x12345678,
     "DM300:F": 3.5,
     "DM50.3": true,
-    R010: true,
+    "R010:BIT": true,
     "DM250:COMMENT": "MAIN COMMENT",
-    "DM400,3": [1, 2, 3],
-    "R010,4": [true, false, true, false],
+    "DM400:U,3": [1, 2, 3],
+    "R010:BIT,4": [true, false, true, false],
   });
 });
 
@@ -357,8 +358,8 @@ test("readNamed reads native 32-bit dword arrays as device points", async () => 
     },
   };
 
-  assert.deepEqual(await readNamed(fakeClient, ["AT0,2", "Z1:D,2"]), {
-    "AT0,2": [3533, 5543],
+  assert.deepEqual(await readNamed(fakeClient, ["AT0:D,2", "Z1:D,2"]), {
+    "AT0:D,2": [3533, 5543],
     "Z1:D,2": [70000, 80000],
   });
   assert.deepEqual(calls, [
@@ -379,12 +380,12 @@ test("poll reuses compiled read plan", async () => {
     },
   };
 
-  const iterator = poll(fakeClient, ["DM100", "DM101"], 0);
+  const iterator = poll(fakeClient, ["DM100:U", "DM101:U"], 0);
   const first = await iterator.next();
   const second = await iterator.next();
 
-  assert.deepEqual(first.value, { DM100: 11, DM101: 21 });
-  assert.deepEqual(second.value, { DM100: 12, DM101: 22 });
+  assert.deepEqual(first.value, { "DM100:U": 11, "DM101:U": 21 });
+  assert.deepEqual(second.value, { "DM100:U": 12, "DM101:U": 22 });
   await iterator.return();
 });
 
@@ -472,17 +473,17 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
   };
 
   await writeNamed(fakeClient, {
-    DM100: 123,
-    DM101: 456,
+    "DM100:U": 123,
+    "DM101:U": 456,
     "DM102:S": -5,
     "DM103:S": -6,
     "DM200:F": 2.5,
     "DM202:F": 3.5,
     "DM50.3": true,
-    "DM300,3": [1, 2, 3],
-    R010: true,
-    R011: false,
-    "R100,4": [true, false, true, false],
+    "DM300:U,3": [1, 2, 3],
+    "R010:BIT": true,
+    "R011:BIT": false,
+    "R100:BIT,4": [true, false, true, false],
     "T10:D": 111,
     "T11:D": 222,
     "C10:D": 333,

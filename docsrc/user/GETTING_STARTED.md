@@ -56,7 +56,7 @@ Add or edit a `kvhostlink-connection` config node.
 | 2 | Import `examples/flows/kvhostlink-basic-read-write.json`. |
 | 3 | Confirm the connection node uses host `192.168.250.100`, port `8501`, and your canonical PLC profile. |
 | 4 | Deploy. |
-| 5 | Trigger `Read DM100`. |
+| 5 | Trigger `Read DM100:U`. |
 | 6 | Check the debug sidebar for a value. |
 
 ## Read your first value
@@ -67,7 +67,7 @@ For a single manual read, configure a `kvhostlink-read` node like this:
 | --- | --- |
 | Connection | Your `kvhostlink-connection` node |
 | Source | `str` |
-| Addresses | `DM100` |
+| Addresses | `DM100:U` |
 | Output | `Single value when one address` |
 | Metadata | `Minimal msg.kvhostlink` |
 | Errors | `Second output` |
@@ -88,7 +88,7 @@ For a single manual write, configure a `kvhostlink-write` node like this:
 | --- | --- |
 | Connection | Your `kvhostlink-connection` node |
 | Source | `str` |
-| Static updates | `{"DM100":123}` |
+| Static updates | `{"DM100:U":123}` |
 | Metadata | `Minimal msg.kvhostlink` |
 | Errors | `Second output` |
 

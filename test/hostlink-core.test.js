@@ -54,6 +54,7 @@ test("parseDevice handles decimal and hex devices", () => {
   assert.throws(() => parseDevice("R016"));
   assert.throws(() => parseDevice("X3F0"));
   assert.throws(() => parseDevice("Y19A0"));
+  assert.throws(() => parseDevice("100"));
 });
 
 test("PLC profile input accepts canonical names only", () => {
@@ -227,11 +228,11 @@ test("read and write command helpers preserve exact CR-terminated frames", async
     return "OK\r";
   });
 
-  assert.equal(await client.read("DM100"), 123);
+  assert.equal(await client.read("DM100.U"), 123);
   assert.equal(await client.read("DM200", { dataFormat: ".S" }), 123);
-  assert.deepEqual(await client.readConsecutive("DM300", 3), [1, 2, 3]);
+  assert.deepEqual(await client.readConsecutive("DM300.U", 3), [1, 2, 3]);
   await client.write("DM400", 255, { dataFormat: ".H" });
-  await client.writeConsecutive("DM500", [1, 2, 3]);
+  await client.writeConsecutive("DM500.U", [1, 2, 3]);
 
   assert.deepEqual(frames, [
     "RD DM100.U\r",
@@ -249,11 +250,11 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
     return "OK\r";
   });
 
-  await client.writeSetValue("T10", 123);
-  await client.writeSetValueConsecutive("C20", [111, 222]);
+  await client.writeSetValue("T10.D", 123);
+  await client.writeSetValueConsecutive("C20.D", [111, 222]);
   assert.deepEqual(await client.readMonitorBits(), [1, 0, 1]);
   assert.deepEqual(await client.readMonitorWords(), ["10", "ABC", "30"]);
-  await assert.rejects(() => client.writeSetValueConsecutive("T0", Array(121).fill(0)), /count out of range/);
+  await assert.rejects(() => client.writeSetValueConsecutive("T0.D", Array(121).fill(0)), /count out of range/);
 
   assert.deepEqual(frames, ["WS T10.D 123\r", "WSS C20.D 2 111 222\r", "MBR\r", "MWR\r"]);
 });
@@ -282,7 +283,7 @@ test("monitor registration accepts XYM bit aliases verified on KV-7500", async (
   };
 
   await client.registerMonitorBits("X100", "X101", "M100", "M101");
-  await client.registerMonitorWords("X100", "Y100", "D100", "E100", "F100", "MR100", "LR100");
+  await client.registerMonitorWords("X100", "Y100", "D100.U", "E100.U", "F100.U", "MR100", "LR100");
   await assert.rejects(() => client.registerMonitorWords("M100"), /does not support device type 'M'/);
   await assert.rejects(() => client.registerMonitorWords("L100"), /does not support device type 'L'/);
 
@@ -299,7 +300,7 @@ test("client rejects device spans crossing range before send", async () => {
   };
 
   await assert.rejects(() => client.read("DM65534", { dataFormat: ".D" }), /Device span out of range/);
-  await assert.rejects(() => client.readConsecutive("DM65535", 2), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("DM65535.U", 2), /Device span out of range/);
   await assert.rejects(() => client.readConsecutive("Y1999F", 2), /Device span out of range/);
   await assert.rejects(() => client.readConsecutive("R199900", 2, { dataFormat: ".U" }), /Device span out of range/);
   await assert.rejects(() => client.read("R199900", { dataFormat: ".D" }), /Device span out of range/);
@@ -314,7 +315,7 @@ test("client rejects device spans crossing range before send", async () => {
   assert.deepEqual(commands, ["RDS CR7900 16", "RD R199900.U", "RD R199800.D"]);
 });
 
-test("AT defaults to 32-bit values but spans by AT device point", async () => {
+test("AT 32-bit values span by AT device point", async () => {
   const client = createTestClient();
   const commands = [];
 
@@ -323,9 +324,9 @@ test("AT defaults to 32-bit values but spans by AT device point", async () => {
     return Buffer.from("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000\r", "ascii");
   };
 
-  await client.read("AT7");
-  await client.readConsecutive("AT0", 8);
-  await assert.rejects(() => client.readConsecutive("AT1", 8), /Device span out of range/);
+  await client.read("AT7.D");
+  await client.readConsecutive("AT0.D", 8);
+  await assert.rejects(() => client.readConsecutive("AT1.D", 8), /Device span out of range/);
 
   assert.deepEqual(commands, ["RD AT7.D", "RDS AT0.D 8"]);
 });
@@ -352,11 +353,11 @@ test("native 32-bit device families span by device point", async () => {
     return Buffer.from("OK\r", "ascii");
   };
 
-  await client.read("T3999");
+  await client.read("T3999.D");
   await client.read("Z12", { dataFormat: ".D" });
-  await client.readConsecutive("T3880", 120);
+  await client.readConsecutive("T3880.D", 120);
   await client.readConsecutive("Z1", 12, { dataFormat: ".D" });
-  await assert.rejects(() => client.readConsecutive("T3881", 120), /Device span out of range/);
+  await assert.rejects(() => client.readConsecutive("T3881.D", 120), /Device span out of range/);
   await assert.rejects(() => client.readConsecutive("Z2", 12, { dataFormat: ".D" }), /Device span out of range/);
 
   assert.deepEqual(commands, ["RD T3999.D", "RD Z12.D", "RDS T3880.D 120", "RDS Z1.D 12"]);
@@ -371,8 +372,8 @@ test("AT writes are rejected before sending WR or WRS", async () => {
     return Buffer.from("OK\r", "ascii");
   };
 
-  await assert.rejects(() => client.write("AT0", 3533), /does not support device type 'AT'/);
-  await assert.rejects(() => client.writeConsecutive("AT0", [3533, 5543]), /does not support device type 'AT'/);
+  await assert.rejects(() => client.write("AT0.D", 3533), /does not support device type 'AT'/);
+  await assert.rejects(() => client.writeConsecutive("AT0.D", [3533, 5543]), /does not support device type 'AT'/);
 
   assert.deepEqual(commands, []);
 });

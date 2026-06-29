@@ -64,9 +64,6 @@ async function resolveAddresses(RED, node, msg) {
   if (Array.isArray(msg.addresses) || typeof msg.addresses === "string") {
     return normalizeAddressList(msg.addresses);
   }
-  if (Array.isArray(msg.payload) || typeof msg.payload === "string") {
-    return normalizeAddressList(msg.payload);
-  }
   const configured = await evaluateConfiguredValue(RED, node, msg, node.addresses, node.addressesType, "addresses");
   return normalizeAddressList(configured);
 }

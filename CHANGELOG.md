@@ -18,9 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-06-28
 
+### Changed
+- Library: Made Host Link device parsing require explicit device areas and value-format suffixes; numeric-only devices no longer default to `R`, and suffixless named addresses no longer infer a default format.
+- Library: Removed `msg.payload` fallback for read/write parameters; read messages must use `msg.addresses`, and write messages must use `msg.updates` or `msg.address` plus `msg.value`.
+- Node-RED editor: Static write updates now require a JSON object; `address=value` line parsing and scalar value fallback are no longer accepted.
+- Docs: Updated Node-RED Host Link getting-started, gotchas, supported-register, and usage guidance for explicit message fields and explicit device/value-format requirements.
+
 ### Fixed
 - Library: Made `BIT_IN_WORD` helper addresses require an explicit bit index such as `DM100.0` through `DM100.F`; `DM100:BIT_IN_WORD` now fails in `parseAddress`, `formatParsedAddress`, `readNamed`, and `writeNamed` instead of silently reading or writing bit 0.
 - Tests: Added coverage for rejecting `BIT_IN_WORD` addresses without an explicit bit index.
+- Tests: Updated core and high-level tests for explicit device/value-format requirements, no `msg.payload` fallback, and JSON-only static updates.
 
 ## [1.0.1] - 2026-06-25
 
