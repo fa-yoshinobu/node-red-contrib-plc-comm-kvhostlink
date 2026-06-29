@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kv-typed",
         "name":  "Typed sample: signed, dword, float, bit-in-word",
-        "info":  "Typed read/write sample for DM110:S, DM120:D, DM130:L, DM140:F, and DM150.3. Confirm the connection node uses a canonical PLC Profile, and use this after the basic DM100 flow works.",
+        "info":  "Typed read/write sample for DM110:S, DM120:D, DM130:L, DM140:F, and DM150.3. Confirm the connection node uses a canonical PLC Profile, and use this after the basic DM100:U flow works.",
         "x":  290,
         "y":  40,
         "wires":  [

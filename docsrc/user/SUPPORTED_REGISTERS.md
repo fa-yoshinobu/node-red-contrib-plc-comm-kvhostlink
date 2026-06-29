@@ -61,10 +61,10 @@ These device families and ranges come from the node source validation layer.
 ## Addressing notes
 
 `X` and `Y` use decimal bank plus hexadecimal bit notation.
-Use `X10F`, not `X275`.
+Use `X10F:BIT`, not `X275:BIT`.
 
 `R`, `MR`, `LR`, and `CR` use two-digit bit notation inside a decimal bank.
-Use `R200`, not a hex-only form.
+Use `R200:BIT`, not a hex-only form.
 
 `AT` is validated for reads but rejected by the high-level write helpers before sending because it is not listed in the Host Link `WR`/`WRS` device table.
 

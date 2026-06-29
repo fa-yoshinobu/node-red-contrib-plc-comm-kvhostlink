@@ -37,8 +37,8 @@ Install the package, then restart Node-RED if your runtime asks you to.
 5. Set **Port** to `8501`.
 6. Set **PLC Profile** to the exact canonical profile for your PLC, such as `keyence:kv-5000`.
 7. Deploy the flow.
-8. Trigger `Read DM100` and check the debug sidebar.
-9. Trigger `Write DM100=123`, then read again to confirm the value.
+8. Trigger `Read DM100:U` and check the debug sidebar.
+9. Trigger `Write DM100:U=123`, then read again to confirm the value.
 10. The starter flow does not restore the previous value; use only a test address or add a restore write before production use.
 
 ## Documentation

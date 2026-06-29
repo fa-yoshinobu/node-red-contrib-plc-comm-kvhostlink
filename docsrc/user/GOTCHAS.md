@@ -22,7 +22,7 @@
 | --- | --- |
 | Symptom | `X` or `Y` addresses are rejected by the editor or by the PLC. |
 | Root cause | `X` and `Y` use decimal-bank plus hex-bit notation. `X10F` means bank 10, bit F. |
-| Fix | Use `X10F`, not `X275`, and select an `-xym` profile when you want XYM aliases. |
+| Fix | Use `X10F:BIT`, not `X275:BIT`, and select an `-xym` profile when you want XYM aliases. |
 
 ## R/MR/LR/CR address rejected
 
@@ -30,7 +30,7 @@
 | --- | --- |
 | Symptom | `R`, `MR`, `LR`, or `CR` addresses are rejected. |
 | Root cause | These bit-bank families require two-digit bit notation. |
-| Fix | Use `R200`, `MR100`, or another form whose low two digits are `00` through `15`. |
+| Fix | Use `R200:BIT`, `MR100:BIT`, or another form whose low two digits are `00` through `15`. |
 
 ## DM100.D returns a bit, not a dword
 

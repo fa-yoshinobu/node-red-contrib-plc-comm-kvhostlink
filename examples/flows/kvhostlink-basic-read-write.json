@@ -11,7 +11,7 @@
         "type":  "comment",
         "z":  "tab-kv-basic",
         "name":  "Start here: scalar read/write smoke test",
-        "info":  "First-use scalar smoke test. Confirm the connection node uses host 192.168.250.100, port 8501, and the canonical PLC Profile for your PLC, deploy, trigger Read DM100, then trigger Write DM100=123 and read again.",
+        "info":  "First-use scalar smoke test. Confirm the connection node uses host 192.168.250.100, port 8501, and the canonical PLC Profile for your PLC, deploy, trigger Read DM100:U, then trigger Write DM100:U=123 and read again.",
         "x":  270,
         "y":  40,
         "wires":  [
@@ -22,7 +22,7 @@
         "id":  "inject-kv-basic-read",
         "type":  "inject",
         "z":  "tab-kv-basic",
-        "name":  "Read DM100",
+        "name":  "Read DM100:U",
         "props":  [
                       {
                           "p":  "payload"
@@ -47,7 +47,7 @@
         "id":  "inject-kv-basic-write",
         "type":  "inject",
         "z":  "tab-kv-basic",
-        "name":  "Write DM100=123",
+        "name":  "Write DM100:U=123",
         "props":  [
                       {
                           "p":  "payload"
@@ -58,7 +58,7 @@
         "once":  false,
         "onceDelay":  0.1,
         "topic":  "",
-        "payload":  "{\"DM100\":123}",
+        "payload":  "{\"DM100:U\":123}",
         "payloadType":  "json",
         "x":  130,
         "y":  180,
@@ -72,9 +72,9 @@
         "id":  "read-kv-basic",
         "type":  "kvhostlink-read",
         "z":  "tab-kv-basic",
-        "name":  "Read DM100",
+        "name":  "Read DM100:U",
         "connection":  "cfg-kv-basic",
-        "addresses":  "DM100",
+        "addresses":  "DM100:U",
         "addressesType":  "str",
         "outputMode":  "value",
         "errorHandling":  "output2",
@@ -94,7 +94,7 @@
         "id":  "write-kv-basic",
         "type":  "kvhostlink-write",
         "z":  "tab-kv-basic",
-        "name":  "Write DM100",
+        "name":  "Write DM100:U",
         "connection":  "cfg-kv-basic",
         "updates":  "payload",
         "updatesType":  "msg",

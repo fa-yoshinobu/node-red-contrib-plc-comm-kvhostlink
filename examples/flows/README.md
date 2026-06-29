@@ -20,7 +20,7 @@ Write examples intentionally keep the flow simple and do not restore previous va
 
 | File | What it demonstrates | First-time use order |
 | --- | --- | --- |
-| `kvhostlink-basic-read-write.json` | Reads `DM100`, writes `DM100=123`, and reads back the value. | 1 |
+| `kvhostlink-basic-read-write.json` | Reads `DM100:U`, writes `DM100:U=123`, and reads back the value. | 1 |
 | `kvhostlink-typed-read-write.json` | Uses `:S`, `:D`, `:L`, `:F`, and `.bit` forms. | 2 |
-| `kvhostlink-array-read-write.json` | Uses `,count` forms such as `DM160,4` and `R200,4`. | 3 |
+| `kvhostlink-array-read-write.json` | Uses `,count` forms such as `DM160:U,4` and `R200:BIT,4`. | 3 |
 | `kvhostlink-device-matrix.json` | Runs one-by-one read/write checks across many device families and records JSONL results. | After the first three flows work |
