@@ -50,7 +50,7 @@ Install the package, then restart Node-RED if your runtime asks you to.
 | [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
 | [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile for the target KV family. |
 | [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
-| [KV Host Link Error Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/error-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
+| [KV Host Link Troubleshooting & Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
 | [Gotchas](docsrc/user/GOTCHAS.md) | Check whether this library has any current library-specific caveats. |
 | [Example flows](examples/flows/README.md) | Import maintained Node-RED example flows. |
 
