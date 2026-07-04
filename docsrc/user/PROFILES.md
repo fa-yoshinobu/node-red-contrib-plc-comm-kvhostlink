@@ -5,6 +5,12 @@
 The `kvhostlink-connection` node stores a canonical PLC profile value.
 Use the lowercase value from the table; legacy labels such as `KV-X500` are rejected.
 
+## Device families and ranges
+
+Device-family notation, type suffixes, XYM aliases, and static range tables are shared across the KV Host Link libraries. Use the common [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) page for those details.
+
+The table below only identifies the canonical profile values available in the connection node.
+
 ## Supported PLC profiles
 
 | Canonical profile | Intended KV family | Addressing note |

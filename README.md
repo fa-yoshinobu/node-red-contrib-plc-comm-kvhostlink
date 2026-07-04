@@ -12,7 +12,7 @@ The maintained profile table is in [PLC profiles](docsrc/user/PROFILES.md). Choo
 
 ## Supported device types
 
-The maintained device and range tables are in [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md). Use that page for supported device families, address syntax, and profile-specific notes.
+The shared device and range tables are in the [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) page. Use that page for supported device families, address syntax, and profile-specific notes.
 
 ## Installation
 
@@ -48,9 +48,10 @@ Install the package, then restart Node-RED if your runtime asks you to.
 | [Full documentation site](https://fa-yoshinobu.github.io/plc-comm-docs-site/) | Unified docs for all PLC communication libraries. |
 | [Getting started](docsrc/user/GETTING_STARTED.md) | Install the nodes, configure a connection, and run your first flow. |
 | [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
-| [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md) | Check device families, address ranges, and numbering rules. |
 | [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile for the target KV family. |
-| [Gotchas](docsrc/user/GOTCHAS.md) | Troubleshoot common profile, address, timer/counter, and transport issues. |
+| [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
+| [KV Host Link Error Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/error-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
+| [Gotchas](docsrc/user/GOTCHAS.md) | Check whether this library has any current library-specific caveats. |
 | [Example flows](examples/flows/README.md) | Import maintained Node-RED example flows. |
 
 ## License and registry

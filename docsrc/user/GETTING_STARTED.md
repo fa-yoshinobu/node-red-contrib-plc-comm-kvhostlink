@@ -115,12 +115,3 @@ The imported starter flow writes the sample value and does not restore the previ
 | First import feels too large | Import `kvhostlink-basic-read-write.json` first, not the device-matrix flow. |
 | Timer/counter preset write fails | Timer/counter preset writes only work on KV-8000/7000-series CPU units. |
 | Transport fails | Check that your PLC Host Link setting allows the selected TCP or UDP transport. |
-
-## Next pages
-
-| Page | Link |
-| --- | --- |
-| Usage guide | [USAGE_GUIDE.md](USAGE_GUIDE.md) |
-| Supported registers | [SUPPORTED_REGISTERS.md](SUPPORTED_REGISTERS.md) |
-| PLC profiles | [PROFILES.md](PROFILES.md) |
-| Gotchas | [GOTCHAS.md](GOTCHAS.md) |
