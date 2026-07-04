@@ -1,0 +1,271 @@
+[
+  {
+    "id": "tab-kv-multi-monitor",
+    "type": "tab",
+    "label": "KV Host Link Multi PLC Monitor",
+    "disabled": false,
+    "info": "Read-only two-PLC monitor. Successful reads produce long-form rows with timestamp, plc, tag, and value. Errors transition through lost/reconnecting and send msg.reinitialize after a 1s to 30s backoff."
+  },
+  {
+    "id": "comment-kv-multi-monitor",
+    "type": "comment",
+    "z": "tab-kv-multi-monitor",
+    "name": "Read-only multi-PLC monitor with reconnect backoff",
+    "info": "Configure the two KV Host Link connection nodes before deploy. This flow uses only kvhostlink-read nodes; no PLC write node is in the polling path.",
+    "x": 330,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "inject-kv-monitor",
+    "type": "inject",
+    "z": "tab-kv-multi-monitor",
+    "name": "Poll every 1s",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "1",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 120,
+    "y": 120,
+    "wires": [
+      [
+        "read-kv-line-a",
+        "read-kv-line-b"
+      ]
+    ]
+  },
+  {
+    "id": "read-kv-line-a",
+    "type": "kvhostlink-read",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-a DM100",
+    "connection": "cfg-kv-monitor-a",
+    "addresses": "DM100:U",
+    "addressesType": "str",
+    "outputMode": "object",
+    "errorHandling": "output2",
+    "metadataMode": "minimal",
+    "x": 350,
+    "y": 100,
+    "wires": [
+      [
+        "fn-kv-line-a-ok"
+      ],
+      [
+        "fn-kv-line-a-error"
+      ]
+    ]
+  },
+  {
+    "id": "read-kv-line-b",
+    "type": "kvhostlink-read",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-b DM100",
+    "connection": "cfg-kv-monitor-b",
+    "addresses": "DM100:U",
+    "addressesType": "str",
+    "outputMode": "object",
+    "errorHandling": "output2",
+    "metadataMode": "minimal",
+    "x": 350,
+    "y": 180,
+    "wires": [
+      [
+        "fn-kv-line-b-ok"
+      ],
+      [
+        "fn-kv-line-b-error"
+      ]
+    ]
+  },
+  {
+    "id": "fn-kv-line-a-ok",
+    "type": "function",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-a rows + state",
+    "func": "const plc = 'line-a';\nconst state = flow.get('kvMultiMonitorState') || {};\nconst previous = state[plc] && state[plc].state;\nstate[plc] = { state: previous === 'reconnecting' ? 'recovered' : 'connected', backoff: 1000 };\nflow.set('kvMultiMonitorState', state);\nconst timestamp = new Date().toISOString();\nconst values = msg.payload || {};\nmsg.payload = Object.entries(values).map(([tag, value]) => ({ timestamp, plc, tag, value }));\nmsg.state = state[plc].state;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 600,
+    "y": 100,
+    "wires": [
+      [
+        "debug-kv-monitor-rows"
+      ]
+    ]
+  },
+  {
+    "id": "fn-kv-line-b-ok",
+    "type": "function",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-b rows + state",
+    "func": "const plc = 'line-b';\nconst state = flow.get('kvMultiMonitorState') || {};\nconst previous = state[plc] && state[plc].state;\nstate[plc] = { state: previous === 'reconnecting' ? 'recovered' : 'connected', backoff: 1000 };\nflow.set('kvMultiMonitorState', state);\nconst timestamp = new Date().toISOString();\nconst values = msg.payload || {};\nmsg.payload = Object.entries(values).map(([tag, value]) => ({ timestamp, plc, tag, value }));\nmsg.state = state[plc].state;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 600,
+    "y": 180,
+    "wires": [
+      [
+        "debug-kv-monitor-rows"
+      ]
+    ]
+  },
+  {
+    "id": "fn-kv-line-a-error",
+    "type": "function",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-a lost/reconnecting",
+    "func": "const plc = 'line-a';\nconst state = flow.get('kvMultiMonitorState') || {};\nconst current = state[plc] || { backoff: 1000 };\nconst status = { plc, state: 'lost', retryMs: current.backoff, error: msg.error || msg.payload };\nmsg.delay = current.backoff;\nmsg.topic = 'reinitialize';\nmsg.reinitialize = true;\nmsg.state = 'reconnecting';\nmsg.payload = status;\nstate[plc] = { state: 'reconnecting', backoff: Math.min(current.backoff * 2, 30000) };\nflow.set('kvMultiMonitorState', state);\nreturn [msg, { payload: status }];",
+    "outputs": 2,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 620,
+    "y": 140,
+    "wires": [
+      [
+        "delay-kv-line-a"
+      ],
+      [
+        "debug-kv-monitor-state"
+      ]
+    ]
+  },
+  {
+    "id": "fn-kv-line-b-error",
+    "type": "function",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-b lost/reconnecting",
+    "func": "const plc = 'line-b';\nconst state = flow.get('kvMultiMonitorState') || {};\nconst current = state[plc] || { backoff: 1000 };\nconst status = { plc, state: 'lost', retryMs: current.backoff, error: msg.error || msg.payload };\nmsg.delay = current.backoff;\nmsg.topic = 'reinitialize';\nmsg.reinitialize = true;\nmsg.state = 'reconnecting';\nmsg.payload = status;\nstate[plc] = { state: 'reconnecting', backoff: Math.min(current.backoff * 2, 30000) };\nflow.set('kvMultiMonitorState', state);\nreturn [msg, { payload: status }];",
+    "outputs": 2,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 620,
+    "y": 220,
+    "wires": [
+      [
+        "delay-kv-line-b"
+      ],
+      [
+        "debug-kv-monitor-state"
+      ]
+    ]
+  },
+  {
+    "id": "delay-kv-line-a",
+    "type": "delay",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-a backoff",
+    "pauseType": "delayv",
+    "timeout": "1",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 860,
+    "y": 140,
+    "wires": [
+      [
+        "read-kv-line-a"
+      ]
+    ]
+  },
+  {
+    "id": "delay-kv-line-b",
+    "type": "delay",
+    "z": "tab-kv-multi-monitor",
+    "name": "line-b backoff",
+    "pauseType": "delayv",
+    "timeout": "1",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 860,
+    "y": 220,
+    "wires": [
+      [
+        "read-kv-line-b"
+      ]
+    ]
+  },
+  {
+    "id": "debug-kv-monitor-rows",
+    "type": "debug",
+    "z": "tab-kv-multi-monitor",
+    "name": "CSV rows",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 860,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "debug-kv-monitor-state",
+    "type": "debug",
+    "z": "tab-kv-multi-monitor",
+    "name": "state",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 850,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "cfg-kv-monitor-a",
+    "type": "kvhostlink-connection",
+    "name": "line-a KV TCP",
+    "host": "192.168.250.100",
+    "port": "8501",
+    "transport": "tcp",
+    "timeout": "3000",
+    "plcProfile": "keyence:kv-5000"
+  },
+  {
+    "id": "cfg-kv-monitor-b",
+    "type": "kvhostlink-connection",
+    "name": "line-b KV TCP",
+    "host": "192.168.250.101",
+    "port": "8501",
+    "transport": "tcp",
+    "timeout": "3000",
+    "plcProfile": "keyence:kv-5000"
+  }
+]
