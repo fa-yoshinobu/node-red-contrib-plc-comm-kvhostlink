@@ -32,6 +32,8 @@ For config-driven polling, keep the config in an Inject or Function node and fee
 {"plcs":[{"name":"line-a","connection":"cfg-kv-monitor-a","tags":[{"name":"dm100","address":"DM100:U"}]}],"interval":1,"initialBackoffMs":1000,"maxBackoffMs":30000}
 ```
 
+To persist CSV-equivalent rows, route the long-form row messages through a CSV node with `timestamp`, `plc`, `tag`, and `value` columns, then into a File node in append mode.
+
 ## Flow index
 
 | File | What it demonstrates | First-time use order |

@@ -147,6 +147,8 @@ The `examples/flows/kvhostlink-multi-plc-monitor.json` flow is a read-only multi
 
 For config-driven polling, keep a JSON config in an Inject or Function node and feed `msg.addresses` into `kvhostlink-read`; no extra node type is required.
 
+To persist CSV-equivalent rows, route the long-form row messages through a CSV node with `timestamp`, `plc`, `tag`, and `value` columns, then into a File node in append mode.
+
 ## Metadata output
 
 | Metadata mode | `msg.kvhostlink` fields |
