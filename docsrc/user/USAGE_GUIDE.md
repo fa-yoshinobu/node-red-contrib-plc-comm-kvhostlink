@@ -141,6 +141,12 @@ Both read and write nodes accept connection control messages.
 | `msg.disconnect = true` | Disconnect the shared connection. |
 | `msg.reinitialize = true` | Disconnect, then connect again. |
 
+## Operational recipes
+
+The `examples/flows/kvhostlink-multi-plc-monitor.json` flow is a read-only multi-PLC monitor. It polls `DM100:U`, emits long-form rows shaped as `timestamp,plc,tag,value`, and uses `connected`, `lost`, `reconnecting`, and `recovered` state transitions with a 1 second to 30 second backoff.
+
+For config-driven polling, keep a JSON config in an Inject or Function node and feed `msg.addresses` into `kvhostlink-read`; no extra node type is required.
+
 ## Metadata output
 
 | Metadata mode | `msg.kvhostlink` fields |
