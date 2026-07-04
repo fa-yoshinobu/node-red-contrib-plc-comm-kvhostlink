@@ -21,6 +21,27 @@
 
 Accepted profile values are listed in [PLC profiles](PROFILES.md).
 
+## Performance notes
+
+For stable local networks, UDP usually has the lowest latency. TCP is the safer
+default for remote or less predictable networks because the OS handles
+retransmission.
+
+Reuse one `kvhostlink-connection` config node for repeated reads and writes.
+Prefer reading one address list or one array address over many separate
+single-address messages when one application snapshot can be read together.
+
+## Connection reuse and concurrent requests
+
+Share one `kvhostlink-connection` config node between read and write nodes that
+talk to the same PLC endpoint. Requests through the shared connection are queued
+so concurrent Node-RED messages do not interleave Host Link frames on one
+connection.
+
+Use the connection control messages `connect`, `disconnect`, and `reinitialize`
+for deliberate connection control. Create separate connection config nodes only
+when you intentionally want separate PLC sessions.
+
 ## kvhostlink-read node
 
 | Config field | Description |

@@ -1,3 +1,5 @@
 # TODO
 
-No active TODOs are currently tracked for Node-RED KV HostLink.
+## Live verification
+
+- Verify high-level `:H` hexadecimal word read and write on a live KEYENCE KV PLC.
