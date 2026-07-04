@@ -4,7 +4,7 @@
 
 This directory contains importable Node-RED JSON flows for `kvhostlink-read`, `kvhostlink-write`, and the shared `kvhostlink-connection` node.
 Start with the basic flow, then move through typed and array examples before using the device matrix.
-Write examples intentionally keep the flow simple and do not restore previous values automatically; run them only against test addresses or add a restore write in your copied flow.
+Use only test addresses that are safe for your PLC program before you run any write example. These flows intentionally keep writes simple and do not restore previous values automatically; add a restore write in your copied flow when needed.
 
 ## How to import
 
@@ -15,6 +15,12 @@ Write examples intentionally keep the flow simple and do not restore previous va
 5. Open the `kvhostlink-connection` config node.
 6. Confirm host `192.168.250.100`, port `8501`, and change the example PLC Profile if your PLC is not `keyence:kv-5000`.
 7. Deploy.
+
+## Polling reconnect
+
+The `kvhostlink-connection` config node does not run a background reconnect timer by itself. It keeps one shared client and lets `kvhostlink-read` / `kvhostlink-write` send `connect`, `disconnect`, or `reinitialize` control messages through `msg.topic` or `msg.reinitialize`.
+
+For a 24-hour polling flow, use an Inject node for the read interval, route the read node's error output or a Catch node to a Delay node, then send `msg.topic = "reinitialize"` back to the same read node before the next read. Start with a 1 second delay and cap the retry delay around 30 seconds. Keep the polling path read-only unless the flow is deliberately testing writes.
 
 ## Flow index
 
