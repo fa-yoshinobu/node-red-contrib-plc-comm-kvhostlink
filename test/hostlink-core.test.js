@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const canonicalKvProfiles = require("./fixtures/kv_device_ranges.json");
 
 const {
   HostLinkClient,
@@ -75,6 +76,14 @@ test("PLC profile input accepts canonical names only", () => {
   assert.equal(normalizePlcProfile(" keyence:kv-x500 "), "keyence:kv-x500");
   assert.throws(() => normalizePlcProfile("KEYENCE:KV-X500"), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
+});
+
+test("PLC profile list matches canonical HostLink fixture", () => {
+  assert.deepEqual(PLC_PROFILES, Object.keys(canonicalKvProfiles.profiles));
+  for (const [profileId, profile] of Object.entries(canonicalKvProfiles.profiles)) {
+    assert.equal(typeof profile.display_name, "string", profileId);
+    assert.notEqual(profile.display_name.trim(), "", profileId);
+  }
 });
 
 test("Node-RED editor shows human-readable PLC profile labels but keeps canonical values", () => {
