@@ -53,11 +53,6 @@ Install the package, then restart Node-RED if your runtime asks you to.
 | [Gotchas](docsrc/user/GOTCHAS.md) | Troubleshoot common profile, address, timer/counter, and transport issues. |
 | [Example flows](examples/flows/README.md) | Import maintained Node-RED example flows. |
 
-## Hardware verified
-
-Live-device verification is maintained in [Latest communication verification](docsrc/user/LATEST_COMMUNICATION_VERIFICATION.md).
-See that page for verified PLC models, transports, dates, limitations, and retained validation notes.
-
 ## License and registry
 
 | Item | Value |
