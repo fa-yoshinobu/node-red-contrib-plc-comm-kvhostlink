@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Tooling`: Developer/operator command-line tools and helper utilities.
 - `CI`: Release checks, workflow scripts, or automation-only changes.
 
+## [Unreleased]
+
+### Changed
+- CI: Added a tag-driven release workflow that re-runs checks and attaches the npm package tarball to the GitHub release.
+
 ## [1.2.0] - 2026-07-05
 
 ### Changed
