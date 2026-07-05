@@ -28,12 +28,12 @@ The connection node requires an exact canonical PLC profile string. Start with t
 
 | PLC family | Profile to select |
 | --- | --- |
-| KV-3000 | `keyence:kv-3000` or `keyence:kv-3000-xym` |
-| KV-5000 / KV-5500 | `keyence:kv-5000` or `keyence:kv-5000-xym` |
-| KV-7000 / KV-7300 / KV-7500 | `keyence:kv-7000` or `keyence:kv-7000-xym` |
-| KV-8000 | `keyence:kv-8000` or `keyence:kv-8000-xym` |
-| KV-X500 family | `keyence:kv-x500` or `keyence:kv-x500-xym` |
-| KV-NANO | `keyence:kv-nano` or `keyence:kv-nano-xym` |
+| KEYENCE KV-3000 | `keyence:kv-3000` or `keyence:kv-3000-xym` |
+| KEYENCE KV-5000 family | `keyence:kv-5000` or `keyence:kv-5000-xym` |
+| KEYENCE KV-7000 family | `keyence:kv-7000` or `keyence:kv-7000-xym` |
+| KEYENCE KV-8000 | `keyence:kv-8000` or `keyence:kv-8000-xym` |
+| KEYENCE KV-X500 family | `keyence:kv-x500` or `keyence:kv-x500-xym` |
+| KEYENCE KV-NANO | `keyence:kv-nano` or `keyence:kv-nano-xym` |
 
 ## Create a connection node
 

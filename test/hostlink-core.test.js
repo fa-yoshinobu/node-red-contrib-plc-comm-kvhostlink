@@ -15,6 +15,7 @@ const {
   splitDataTokens,
   parseDevice,
   PLC_PROFILES,
+  displayName,
   normalizePlcProfile,
 } = require("../lib/hostlink");
 
@@ -83,25 +84,14 @@ test("PLC profile list matches canonical HostLink fixture", () => {
   for (const [profileId, profile] of Object.entries(canonicalKvProfiles.profiles)) {
     assert.equal(typeof profile.display_name, "string", profileId);
     assert.notEqual(profile.display_name.trim(), "", profileId);
+    assert.equal(displayName(profileId), profile.display_name);
   }
 });
 
 test("Node-RED editor shows human-readable PLC profile labels but keeps canonical values", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "nodes", "kvhostlink-connection.html"), "utf8");
-  const expectedOptions = [
-    ["keyence:kv-nano", "KV-Nano"],
-    ["keyence:kv-nano-xym", "KV-Nano (X/Y/M aliases)"],
-    ["keyence:kv-3000", "KV-3000"],
-    ["keyence:kv-3000-xym", "KV-3000 (X/Y/M aliases)"],
-    ["keyence:kv-5000", "KV-5000 / KV-5500"],
-    ["keyence:kv-5000-xym", "KV-5000 / KV-5500 (X/Y/M aliases)"],
-    ["keyence:kv-7000", "KV-7000 / KV-7300 / KV-7500"],
-    ["keyence:kv-7000-xym", "KV-7000 / KV-7300 / KV-7500 (X/Y/M aliases)"],
-    ["keyence:kv-8000", "KV-8000 / KV-8000A"],
-    ["keyence:kv-8000-xym", "KV-8000 / KV-8000A (X/Y/M aliases)"],
-    ["keyence:kv-x500", "KV-X500 family"],
-    ["keyence:kv-x500-xym", "KV-X500 family (X/Y/M aliases)"],
-  ];
+  const expectedOptions = Object.entries(canonicalKvProfiles.profiles)
+    .map(([value, profile]) => [value, profile.display_name]);
 
   for (const [value, label] of expectedOptions) {
     assert.match(html, new RegExp(`<option value="${value}">${label.replace(/[()/.]/g, "\\$&")}</option>`));

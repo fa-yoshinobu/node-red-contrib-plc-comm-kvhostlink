@@ -4,6 +4,9 @@
 
 The `kvhostlink-connection` node stores a canonical PLC profile value.
 Use the lowercase value from the table; legacy labels such as `KV-X500` are rejected.
+Use `displayName(profileId)` from `lib/hostlink/plc-profile` when you need the
+same UI label outside the editor. Store the canonical profile string, not the
+display name.
 
 ## Device families and ranges
 
@@ -13,20 +16,20 @@ The table below only identifies the canonical profile values available in the co
 
 ## Supported PLC profiles
 
-| Canonical profile | Intended KV family | Addressing note |
+| Canonical profile | Display name | Addressing note |
 | --- | --- | --- |
-| `keyence:kv-nano` | KV Nano | Standard profile. |
-| `keyence:kv-nano-xym` | KV Nano | XYM-style profile. |
-| `keyence:kv-3000` | KV-3000 | Standard profile. |
-| `keyence:kv-3000-xym` | KV-3000 | XYM-style profile. |
-| `keyence:kv-5000` | KV-5000 | Standard profile. |
-| `keyence:kv-5000-xym` | KV-5000 | XYM-style profile. |
-| `keyence:kv-7000` | KV-7000 | Standard profile. |
-| `keyence:kv-7000-xym` | KV-7000 | XYM-style profile. |
-| `keyence:kv-8000` | KV-8000 | Standard profile. |
-| `keyence:kv-8000-xym` | KV-8000 | XYM-style profile. |
-| `keyence:kv-x500` | KV-X500 | Standard profile. |
-| `keyence:kv-x500-xym` | KV-X500 | XYM-style profile. |
+| `keyence:kv-nano` | KEYENCE KV-NANO | Standard profile. |
+| `keyence:kv-nano-xym` | KEYENCE KV-NANO (XYM) | XYM-style profile. |
+| `keyence:kv-3000` | KEYENCE KV-3000 | Standard profile. |
+| `keyence:kv-3000-xym` | KEYENCE KV-3000 (XYM) | XYM-style profile. |
+| `keyence:kv-5000` | KEYENCE KV-5000 | Standard profile. |
+| `keyence:kv-5000-xym` | KEYENCE KV-5000 (XYM) | XYM-style profile. |
+| `keyence:kv-7000` | KEYENCE KV-7000 | Standard profile. |
+| `keyence:kv-7000-xym` | KEYENCE KV-7000 (XYM) | XYM-style profile. |
+| `keyence:kv-8000` | KEYENCE KV-8000 | Standard profile. |
+| `keyence:kv-8000-xym` | KEYENCE KV-8000 (XYM) | XYM-style profile. |
+| `keyence:kv-x500` | KEYENCE KV-X500 | Standard profile. |
+| `keyence:kv-x500-xym` | KEYENCE KV-X500 (XYM) | XYM-style profile. |
 
 ## How to configure the connection node
 
