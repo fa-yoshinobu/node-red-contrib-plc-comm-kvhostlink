@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Library: Synced the embedded KV Host Link device-range fixture to `plc-comm-hostlink-profiles` `v1.0.1`, including `display_name` labels for KEYENCE model families and XYM variants.
+- Library: Added `displayName(profileId)` as the public UI-label helper while keeping stored PLC profile values canonical.
+- Node-RED editor: Updated the `kvhostlink-connection` PLC profile selector to show canonical `display_name` labels while preserving canonical `keyence:...` option values.
+- Docs: Documented the profile display-name helper and canonical-ID storage guidance.
+- Tests: Added canonical fixture parity and editor-option coverage for profile `display_name` values.
 - Samples: Added a read-only `kvhostlink-multi-plc-monitor.json` operational flow with long-form row output and reconnect backoff guidance.
 - Docs: Removed the per-library troubleshooting/code page; shared KV Host Link troubleshooting and code guidance now lives in the PLC Setup Guide.
 - Docs: Removed the per-library latest communication verification page and links so user docs stay focused on usage, not verification logs.
