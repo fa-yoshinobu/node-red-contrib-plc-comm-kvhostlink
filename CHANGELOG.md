@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Tooling`: Developer/operator command-line tools and helper utilities.
 - `CI`: Release checks, workflow scripts, or automation-only changes.
 
-## [Unreleased]
+## [1.2.0] - 2026-07-05
 
 ### Changed
+- Release: Bumped package metadata to `1.2.0`.
+- Tooling: Normalized line-ending handling in the canonical profile JSON update script so `-SourceRoot` runs no longer report false changes.
 - Library: Synced the embedded KV Host Link device-range fixture to `plc-comm-hostlink-profiles` `v1.0.1`, including `display_name` labels for KEYENCE model families and XYM variants.
 - Library: Added `displayName(profileId)` as the public UI-label helper while keeping stored PLC profile values canonical.
 - Node-RED editor: Updated the `kvhostlink-connection` PLC profile selector to show canonical `display_name` labels while preserving canonical `keyence:...` option values.
