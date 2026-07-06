@@ -18,8 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-06
+
+### BREAKING
+- Release: No npm package name changed; this package is versioned at `2.0.0` to align with the plc-comm family breaking release wave.
+
 ### Added
 - Docs: Added `docsrc/user/API_REFERENCE.md` as the standard user-facing API index and linked it from the README.
+
+### Changed
+- Release: Bumped npm package metadata to `2.0.0`.
+- Docs: Added the plc-comm family package matrix link to the README.
+- CI: Kept the tag-driven release workflow for the npm package tarball.
 
 ## [1.3.0] - 2026-07-06
 
