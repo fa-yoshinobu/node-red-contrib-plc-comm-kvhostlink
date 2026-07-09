@@ -1,5 +1,7 @@
 # TODO
 
-## Live verification
+Current active TODOs only.
 
-- Verify high-level `:H` hexadecimal word read and write on a live KEYENCE KV PLC.
+## Current Status
+
+No active TODOs are currently tracked.
