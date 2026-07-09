@@ -35,9 +35,11 @@ function parsePositiveNumber(value, name, fallback) {
 }
 
 module.exports = function registerKvHostLinkConnection(RED) {
-  RED.httpAdmin.get("/plc-comm/kvhostlink/profiles", (_request, response) => {
-    response.json(availablePlcProfiles().map((name) => ({ name, displayName: displayName(name) })));
-  });
+  if (RED.httpAdmin && typeof RED.httpAdmin.get === "function") {
+    RED.httpAdmin.get("/plc-comm/kvhostlink/profiles", (_request, response) => {
+      response.json(availablePlcProfiles().map((name) => ({ name, displayName: displayName(name) })));
+    });
+  }
 
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
