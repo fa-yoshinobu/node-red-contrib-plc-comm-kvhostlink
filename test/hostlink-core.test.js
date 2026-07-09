@@ -90,12 +90,9 @@ test("PLC profile list matches canonical HostLink fixture", () => {
 
 test("Node-RED editor shows human-readable PLC profile labels but keeps canonical values", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "nodes", "kvhostlink-connection.html"), "utf8");
-  const expectedOptions = Object.entries(canonicalKvProfiles.profiles)
-    .map(([value, profile]) => [value, profile.display_name]);
-
-  for (const [value, label] of expectedOptions) {
-    assert.match(html, new RegExp(`<option value="${value}">${label.replace(/[()/.]/g, "\\$&")}</option>`));
-  }
+  assert.match(html, /getJSON\("plc-comm\/kvhostlink\/profiles"/);
+  assert.match(html, /\.val\(profile\.name\)/);
+  assert.match(html, /\.text\(profile\.displayName\)/);
 });
 
 test("HostLinkClient defaults missing port to 8501 but rejects invalid ports", () => {
