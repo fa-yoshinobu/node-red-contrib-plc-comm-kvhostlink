@@ -1,6 +1,11 @@
 "use strict";
 
-const { HostLinkClient, normalizePlcProfile } = require("../lib/hostlink");
+const {
+  HostLinkClient,
+  availablePlcProfiles,
+  displayName,
+  normalizePlcProfile,
+} = require("../lib/hostlink");
 
 const DEFAULT_PORT = 8501;
 const DEFAULT_TIMEOUT = 3000;
@@ -30,6 +35,12 @@ function parsePositiveNumber(value, name, fallback) {
 }
 
 module.exports = function registerKvHostLinkConnection(RED) {
+  if (RED.httpAdmin && typeof RED.httpAdmin.get === "function") {
+    RED.httpAdmin.get("/plc-comm/kvhostlink/profiles", (_request, response) => {
+      response.json(availablePlcProfiles().map((name) => ({ name, displayName: displayName(name) })));
+    });
+  }
+
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
 

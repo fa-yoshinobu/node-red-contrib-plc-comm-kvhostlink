@@ -50,7 +50,7 @@ The main low-level client type is `HostLinkClient` from
 | --- | --- |
 | Frame helpers | `buildFrame`, `decodeResponse`, `decodeCommentResponse`, `ensureSuccess` |
 | Response token helpers | `splitDataTokens`, `parseScalarToken`, `parseDataTokens` |
-| Profile lookup | `PLC_PROFILES`, `normalizePlcProfile`, `displayName` |
+| Profile lookup | `PLC_PROFILES`, `availablePlcProfiles`, `normalizePlcProfile`, `profileFromName`, `displayName` |
 | Errors | `ValueError`, `HostLinkBaseError`, `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError` |
 
 ## Public Symbol Index
@@ -59,9 +59,10 @@ The low-level library module exports these public names:
 
 `CR`, `HostLinkBaseError`, `HostLinkClient`, `HostLinkConnectionError`,
 `HostLinkError`, `HostLinkProtocolError`, `MODEL_CODES`, `PLC_PROFILES`,
+`availablePlcProfiles`,
 `ValueError`, `buildFrame`, `decodeCommentResponse`, `decodeResponse`,
 `deviceToString`, `displayName`, `ensureSuccess`, `formatParsedAddress`,
-`normalizeAddress`, `normalizeAddressList`, `normalizePlcProfile`,
+`normalizeAddress`, `normalizeAddressList`, `normalizePlcProfile`, `profileFromName`,
 `normalizeSuffix`, `openAndConnect`, `parseAddress`, `parseDataTokens`,
 `parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
 `readComments`, `readCounter`, `readDWords`, `readNamed`, `readTimer`,

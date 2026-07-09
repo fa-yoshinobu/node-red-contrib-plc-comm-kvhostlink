@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-07-10
+
+### Changed
+- Release: Bumped npm package and lockfile metadata to `2.0.1`.
+
+### Added
+- Library: Added `availablePlcProfiles()` and `profileFromName()` for profile enumeration and descriptor access.
+- Node-RED editor: Added a runtime profile metadata endpoint for the connection editor dropdown.
+
+### Docs
+- Docs: Documented the Host Link profile descriptor and enumeration helpers.
+
 ## [2.0.0] - 2026-07-06
 
 ### BREAKING
