@@ -92,5 +92,5 @@ jobs:
           if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
             gh release upload "${tag}" "${asset}" --clobber --repo "${GITHUB_REPOSITORY}"
           else
-            gh release create "${tag}" "${asset}" --verify-tag --repo "${GITHUB_REPOSITORY}" --title "Release ${tag}" --generate-notes
+            gh release create "${tag}" "${asset}" --verify-tag --repo "${GITHUB_REPOSITORY}" --title "Release ${tag}" --generate-notes --draft
           fi

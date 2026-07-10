@@ -61,9 +61,9 @@
       const current = select.val();
       $.getJSON("plc-comm/kvhostlink/profiles", function (profiles) {
         select.find("option:not(:first)").remove();
-        profiles.forEach(function (profile) {
+        profiles.filter(function (profile) { return profile.connectable; }).forEach(function (profile) {
           $("<option>")
-            .val(profile.name)
+            .val(profile.canonicalName)
             .text(profile.displayName)
             .appendTo(select);
         });
