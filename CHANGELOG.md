@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Release: Bumped npm package and lockfile metadata to `3.0.0`.
+- Security: Protected the profile metadata admin endpoint with the `flows.read` permission.
+- Docs: Replaced relative README links with absolute URLs so they resolve on package registry pages.
 
 ### Added
 - Library: Added `availablePlcProfiles()` and `profileFromName()` for profile enumeration and descriptor access.

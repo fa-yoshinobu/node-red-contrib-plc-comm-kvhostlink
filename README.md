@@ -1,6 +1,6 @@
 [![CI](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml/badge.svg)](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/%40fa_yoshinobu%2Fnode-red-contrib-plc-comm-kvhostlink?logo=npm&color=CB3837)](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/LICENSE)
 
 # Node-RED KEYENCE KV Host Link Nodes
 
@@ -12,7 +12,7 @@ This library is part of the plc-comm family. See the [package matrix](https://fa
 
 ## Supported PLC profiles
 
-The maintained profile table is in [PLC profiles](docsrc/user/PROFILES.md). Choose one exact canonical PLC profile from that table.
+The maintained profile table is in [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/PROFILES/). Choose one exact canonical PLC profile from that table.
 
 ## Supported device types
 
@@ -50,20 +50,20 @@ Install the package, then restart Node-RED if your runtime asks you to.
 | Page | Use it for |
 | --- | --- |
 | [Full documentation site](https://fa-yoshinobu.github.io/plc-comm-docs-site/) | Unified docs for all PLC communication libraries. |
-| [Getting started](docsrc/user/GETTING_STARTED.md) | Install the nodes, configure a connection, and run your first flow. |
-| [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
-| [API reference](docsrc/user/API_REFERENCE.md) | Find public client methods, helpers, profile APIs, and error types. |
-| [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile for the target KV family. |
+| [Getting started](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/GETTING_STARTED/) | Install the nodes, configure a connection, and run your first flow. |
+| [Usage guide](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/USAGE_GUIDE/) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
+| [API reference](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/API_REFERENCE/) | Find public client methods, helpers, profile APIs, and error types. |
+| [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/PROFILES/) | Choose the canonical profile for the target KV family. |
 | [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
 | [KV Host Link Troubleshooting & Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
-| [Gotchas](docsrc/user/GOTCHAS.md) | Check whether this library has any current library-specific caveats. |
-| [Example flows](examples/flows/README.md) | Import maintained Node-RED example flows. |
+| [Gotchas](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/GOTCHAS/) | Check whether this library has any current library-specific caveats. |
+| [Example flows](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/README.md) | Import maintained Node-RED example flows. |
 
 ## License and registry
 
 | Item | Value |
 | --- | --- |
-| License | [MIT](LICENSE) |
+| License | [MIT](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/LICENSE) |
 | Registry | [npm](https://www.npmjs.com/package/@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink) |
 | Package | `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` |
 
