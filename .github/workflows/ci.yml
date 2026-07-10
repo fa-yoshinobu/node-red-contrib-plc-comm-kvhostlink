@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -32,6 +32,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check release workflows do not auto-publish
+        shell: pwsh
+        run: ./scripts/check_no_auto_publish.ps1
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
