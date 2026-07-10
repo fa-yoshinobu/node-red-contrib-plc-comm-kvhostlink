@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -18,10 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.1] - 2026-07-10
+## [3.0.0] - 2026-07-10
 
 ### Changed
-- Release: Bumped npm package and lockfile metadata to `2.0.1`.
+- Release: Bumped npm package and lockfile metadata to `3.0.0`.
 
 ### Added
 - Library: Added `availablePlcProfiles()` and `profileFromName()` for profile enumeration and descriptor access.
