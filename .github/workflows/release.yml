@@ -24,18 +24,23 @@ jobs:
       - name: Resolve release version
         id: version
         run: |
+          set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             version="${{ github.event.inputs.version }}"
           else
             version="${GITHUB_REF_NAME#v}"
           fi
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release version: ${version}"
+            exit 1
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
-      - name: Check out repository
+      - name: Check out release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.version.outputs.tag }}
+          ref: refs/tags/${{ steps.version.outputs.tag }}
 
       - name: Check canonical HostLink profile JSONs
         shell: pwsh
@@ -49,21 +54,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify tag and package version
+        env:
+          EXPECTED_TAG: ${{ steps.version.outputs.tag }}
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          actual_tag="$(git describe --tags --exact-match HEAD)"
+          test "${actual_tag}" = "${EXPECTED_TAG}"
+          actual_version="$(node -p 'require("./package.json").version')"
+          test "${actual_version}" = "${EXPECTED_VERSION}"
+
       - name: Run tests
         run: npm test
 
+      - name: Run editor smoke test
+        run: npm run smoke:editor
+
       - name: Pack npm package
-        run: npm pack
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          asset="fa_yoshinobu-node-red-contrib-plc-comm-kvhostlink-${EXPECTED_VERSION}.tgz"
+          packed="$(npm pack --silent)"
+          test "${packed}" = "${asset}"
+          test -f "${asset}"
 
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           tag="${{ steps.version.outputs.tag }}"
           asset="fa_yoshinobu-node-red-contrib-plc-comm-kvhostlink-${{ steps.version.outputs.version }}.tgz"
           test -f "${asset}"
           if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
             gh release upload "${tag}" "${asset}" --clobber --repo "${GITHUB_REPOSITORY}"
           else
-            gh release create "${tag}" "${asset}" --repo "${GITHUB_REPOSITORY}" --title "Release ${tag}" --generate-notes --target main
+            gh release create "${tag}" "${asset}" --verify-tag --repo "${GITHUB_REPOSITORY}" --title "Release ${tag}" --generate-notes
           fi

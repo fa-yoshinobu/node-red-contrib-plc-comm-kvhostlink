@@ -122,6 +122,38 @@ test("readNamed and writeNamed reject unknown dtype suffixes", async () => {
   await assert.rejects(() => writeTyped(fakeClient, "DM100", "BOGUS", 7), /unsupported dtype/i);
 });
 
+test("writeTyped parses BIT values explicitly and rejects ambiguous input", async () => {
+  const writes = [];
+  const fakeClient = {
+    async write(device, value) {
+      writes.push([device, value]);
+    },
+  };
+
+  await writeTyped(fakeClient, "R0", "BIT", false);
+  await writeTyped(fakeClient, "R1", "BIT", "false");
+  await writeTyped(fakeClient, "R2", "BIT", "0");
+  await writeTyped(fakeClient, "R3", "BIT", true);
+  await writeTyped(fakeClient, "R4", "BIT", "ON");
+  await writeTyped(fakeClient, "R5", "BIT", 1);
+
+  assert.deepEqual(writes, [
+    ["R0", 0],
+    ["R1", 0],
+    ["R2", 0],
+    ["R3", 1],
+    ["R4", 1],
+    ["R5", 1],
+  ]);
+  await assert.rejects(() => writeTyped(fakeClient, "R6", "BIT", "not-a-bit"), /invalid BIT value/i);
+  await assert.rejects(() => writeTyped(fakeClient, "R7", "BIT", 2), /invalid BIT value/i);
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "R10:BIT,2": ["false", "not-a-bit"] }),
+    /invalid BIT value/i,
+  );
+  await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": "not-a-bit" }), /invalid BIT value/i);
+});
+
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
@@ -501,9 +533,9 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     "DM202:F": 3.5,
     "DM50.3": true,
     "DM300:U,3": [1, 2, 3],
-    "R010:BIT": true,
-    "R011:BIT": false,
-    "R100:BIT,4": [true, false, true, false],
+    "R010:BIT": "true",
+    "R011:BIT": "false",
+    "R100:BIT,4": ["ON", "OFF", 1, 0],
     "T10:D": 111,
     "T11:D": 222,
     "C10:D": 333,
