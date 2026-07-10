@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-07-10
+
+### Fixed
+- Library: Parse scalar and batched `BIT` writes strictly so `"false"` and `"0"` write OFF, while ambiguous values fail before transport.
+- Docs: Removed the hand-maintained Getting Started navigation block in favor of site navigation.
+
 ## [3.0.0] - 2026-07-10
 
 ### Changed
