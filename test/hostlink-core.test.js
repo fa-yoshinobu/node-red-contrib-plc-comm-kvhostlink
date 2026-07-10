@@ -17,6 +17,7 @@ const {
   PLC_PROFILES,
   displayName,
   normalizePlcProfile,
+  profileDescriptors,
 } = require("../lib/hostlink");
 
 const TEST_PLC_PROFILE = "keyence:kv-x500";
@@ -88,10 +89,25 @@ test("PLC profile list matches canonical HostLink fixture", () => {
   }
 });
 
+test("profile descriptors match canonical HostLink profile metadata", () => {
+  const descriptors = profileDescriptors();
+  assert.deepEqual(
+    descriptors.map((descriptor) => descriptor.canonicalName),
+    Object.keys(canonicalKvProfiles.profiles),
+  );
+  for (const descriptor of descriptors) {
+    const profile = canonicalKvProfiles.profiles[descriptor.canonicalName];
+    assert.equal(descriptor.displayName, profile.display_name);
+    assert.equal(descriptor.connectable, true);
+    assert.equal(descriptor.baseProfile, profile.base_profile || null);
+  }
+});
+
 test("Node-RED editor shows human-readable PLC profile labels but keeps canonical values", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "nodes", "kvhostlink-connection.html"), "utf8");
   assert.match(html, /getJSON\("plc-comm\/kvhostlink\/profiles"/);
-  assert.match(html, /\.val\(profile\.name\)/);
+  assert.match(html, /\.filter\(function \(profile\) \{ return profile\.connectable; \}\)/);
+  assert.match(html, /\.val\(profile\.canonicalName\)/);
   assert.match(html, /\.text\(profile\.displayName\)/);
 });
 

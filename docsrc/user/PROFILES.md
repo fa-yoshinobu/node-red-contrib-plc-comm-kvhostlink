@@ -4,9 +4,9 @@
 
 The `kvhostlink-connection` node stores a canonical PLC profile value.
 Use the lowercase value from the table; legacy labels such as `KV-X500` are rejected.
-Use `displayName(profileId)` from `lib/hostlink/plc-profile` when you need the
-same UI label outside the editor. Store the canonical profile string, not the
-display name.
+Use `profileDescriptors()` from `lib/hostlink/plc-profile` when a UI needs
+canonical names, display labels, connection eligibility, and XYM base-profile
+metadata. Store the canonical profile string, not the display name.
 
 ## Device families and ranges
 

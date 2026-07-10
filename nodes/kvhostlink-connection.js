@@ -2,9 +2,8 @@
 
 const {
   HostLinkClient,
-  availablePlcProfiles,
-  displayName,
   normalizePlcProfile,
+  profileDescriptors,
 } = require("../lib/hostlink");
 
 const DEFAULT_PORT = 8501;
@@ -44,7 +43,7 @@ module.exports = function registerKvHostLinkConnection(RED) {
       "/plc-comm/kvhostlink/profiles",
       needsPermission,
       (_request, response) => {
-        response.json(availablePlcProfiles().map((name) => ({ name, displayName: displayName(name) })));
+        response.json(profileDescriptors());
       },
     );
   }
