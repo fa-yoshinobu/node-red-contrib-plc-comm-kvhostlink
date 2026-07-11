@@ -20,6 +20,9 @@
 | PLC Profile | Yes | `keyence:kv-x500` | Canonical lowercase profile value. |
 
 Accepted profile values are listed in [PLC profiles](PROFILES.md).
+The values shown in a newly created editor node are initial form values. A
+saved flow must retain explicit port and transport fields; the runtime does not
+repair missing values.
 
 ## Performance notes
 
@@ -83,7 +86,7 @@ when you intentionally want separate PLC sessions.
 | --- | --- |
 | `msg.updates` | Object or JSON string updates. |
 | `msg.address` | Single address for one write. |
-| `msg.dtype` | Data type inserted into `msg.address` when the address has no type suffix. |
+| `msg.dtype` | Explicit uppercase data type for an unsuffixed `msg.address`. Specify the type in exactly one place: the address suffix or this field. |
 | `msg.value` | Single write value. Required when `msg.address` is used. |
 | `msg.topic` | `connect`, `disconnect`, or `reinitialize` for connection control. |
 | `msg.connect` | Set to `true` to connect. |
@@ -153,8 +156,8 @@ To persist CSV-equivalent rows, route the long-form row messages through a CSV n
 
 | Metadata mode | `msg.kvhostlink` fields |
 | --- | --- |
-| `full` | Read nodes add `addresses` and `connection`; write nodes add `updates` and `connection`. |
-| `minimal` | Adds `itemCount` and `metadataMode`. |
+| `full` | Adds current `operation`, `itemCount`, `metadataMode`, connection, and current read `addresses` or write `updates`. |
+| `minimal` | Adds current `operation`, `itemCount`, and `metadataMode`; owned full-mode fields are removed. |
 | `off` | Leaves `msg.kvhostlink` unchanged. |
 
 The connection metadata contains `host`, `port`, `transport`, and `timeout`.

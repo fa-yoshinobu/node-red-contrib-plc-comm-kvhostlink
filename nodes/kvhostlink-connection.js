@@ -6,29 +6,26 @@ const {
   profileDescriptors,
 } = require("../lib/hostlink");
 
-const DEFAULT_PORT = 8501;
 const DEFAULT_TIMEOUT = 3000;
 
-function parseRequiredInteger(value, name, min, max, fallback) {
-  const source = value === undefined || value === null ? fallback : value;
-  if (String(source).trim() === "") {
-    throw new Error(`kvhostlink-connection ${name} is required`);
+function parseRequiredInteger(value, name, min, max) {
+  if (typeof value === "boolean" || value === null || value === undefined || (typeof value === "string" && !/^\d+$/.test(value.trim()))) {
+    throw new Error(`kvhostlink-connection ${name} is required and must be an integer in the range ${min}..${max}`);
   }
-  const parsed = Number(source);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`kvhostlink-connection ${name} out of range (${min}..${max}): ${source}`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`kvhostlink-connection ${name} out of range (${min}..${max}): ${value}`);
   }
   return parsed;
 }
 
-function parsePositiveNumber(value, name, fallback) {
-  const source = value === undefined || value === null ? fallback : value;
-  if (String(source).trim() === "") {
-    throw new Error(`kvhostlink-connection ${name} is required`);
+function parseTimeout(value) {
+  if (typeof value === "boolean" || value === null || value === undefined || (typeof value === "string" && !/^\d+$/.test(value.trim()))) {
+    throw new Error("kvhostlink-connection timeout must be an integer in the range 1..2147483647");
   }
-  const parsed = Number(source);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`kvhostlink-connection ${name} must be > 0: ${source}`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 0x7fffffff) {
+    throw new Error(`kvhostlink-connection timeout out of range (1..2147483647): ${value}`);
   }
   return parsed;
 }
@@ -51,11 +48,17 @@ module.exports = function registerKvHostLinkConnection(RED) {
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
 
-    this.name = config.name;
-    this.host = config.host;
-    this.port = parseRequiredInteger(config.port, "port", 1, 65535, DEFAULT_PORT);
-    this.transport = config.transport || "tcp";
-    this.timeout = parsePositiveNumber(config.timeout, "timeout", DEFAULT_TIMEOUT);
+    this.name = typeof config.name === "string" ? config.name.trim() : "";
+    if (typeof config.host !== "string" || !config.host.trim()) {
+      throw new Error("kvhostlink-connection host is required and must be a non-empty string");
+    }
+    this.host = config.host.trim();
+    this.port = parseRequiredInteger(config.port, "port", 1, 65535);
+    if (typeof config.transport !== "string" || !["tcp", "udp"].includes(config.transport)) {
+      throw new Error("kvhostlink-connection transport is required and must be 'tcp' or 'udp'");
+    }
+    this.transport = config.transport;
+    this.timeout = Object.prototype.hasOwnProperty.call(config, "timeout") ? parseTimeout(config.timeout) : DEFAULT_TIMEOUT;
     this.plcProfile = normalizePlcProfile(config.plcProfile);
 
     this.client = new HostLinkClient({

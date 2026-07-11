@@ -1,18 +1,20 @@
 "use strict";
 
 const { writeNamed } = require("../lib/hostlink");
+const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
+const SINGLE_WRITE_DTYPES = new Set(["BIT", "U", "S", "D", "L", "F", "H", "COMMENT"]);
 
 module.exports = function registerKvHostLinkWrite(RED) {
   function KvHostLinkWriteNode(config) {
     RED.nodes.createNode(this, config);
 
-    this.name = config.name;
+    this.name = normalizeDisplayName(config.name);
     this.connection = RED.nodes.getNode(config.connection);
     this.updates = config.updates || "";
-    this.updatesType = config.updatesType || "str";
-    this.errorHandling = config.errorHandling || "throw";
-    this.metadataMode = normalizeMetadataMode(config.metadataMode);
-    this.outputs = this.errorHandling === "output2" ? 2 : 1;
+    this.updatesType = requireSourceType(config, "updatesType");
+    this.errorHandling = requireEnum(config, "errorHandling", ["throw", "msg", "output2"]);
+    this.metadataMode = requireEnum(config, "metadataMode", ["full", "minimal", "off"]);
+    this.outputs = validateOutputs(config, this.errorHandling);
 
     this.on("input", async (msg, send, done) => {
       send = send || ((message) => this.send(message));
@@ -39,6 +41,7 @@ module.exports = function registerKvHostLinkWrite(RED) {
           throw new Error("No KV Host Link updates were provided");
         }
 
+        await this.connection.connect();
         const client = this.connection.getClient();
         await writeNamed(client, updates);
         const profile = this.connection.getProfile();
@@ -60,16 +63,36 @@ module.exports = function registerKvHostLinkWrite(RED) {
 };
 
 async function resolveUpdates(RED, node, msg) {
-  if (isUpdateSource(msg.updates)) {
-    return normalizeUpdatesSource(msg.updates);
+  const hasUpdates = hasOwn(msg, "updates");
+  const hasAddress = hasOwn(msg, "address");
+  const hasValue = hasOwn(msg, "value");
+  const hasDtype = hasOwn(msg, "dtype");
+  if (hasUpdates && hasAddress) {
+    throw new Error("msg.updates and msg.address are mutually exclusive");
   }
-  if (typeof msg.address === "string" && msg.address.trim()) {
-    if (!Object.prototype.hasOwnProperty.call(msg, "value")) {
+  if (hasUpdates) {
+    const updates = normalizeUpdatesSource(msg.updates, "msg.updates");
+    if (Object.keys(updates).length === 0) {
+      throw new Error("msg.updates must not be empty");
+    }
+    if (hasValue || hasDtype) {
+      throw new Error("msg.value and msg.dtype may only be used with msg.address");
+    }
+    return updates;
+  }
+  if (hasAddress) {
+    if (typeof msg.address !== "string" || !msg.address.trim()) {
+      throw new Error("msg.address must be a non-empty string");
+    }
+    if (!hasValue) {
       throw new Error("msg.value is required when msg.address is used");
     }
     return {
       [withDtype(msg.address, msg.dtype)]: msg.value,
     };
+  }
+  if (hasValue || hasDtype) {
+    throw new Error("msg.value and msg.dtype require msg.address");
   }
   const configured = await evaluateConfiguredValue(RED, node, msg, node.updates, node.updatesType, "updates");
   return normalizeUpdatesSource(configured);
@@ -77,10 +100,18 @@ async function resolveUpdates(RED, node, msg) {
 
 function withDtype(address, dtype) {
   const trimmed = String(address).trim();
-  if (!dtype || trimmed.includes(":") || trimmed.includes(".")) {
+  const embedded = trimmed.includes(":") || trimmed.includes(".");
+  const hasDtype = dtype !== undefined;
+  if (embedded && hasDtype) {
+    throw new Error("dtype must be specified exactly once: either in msg.address or msg.dtype");
+  }
+  if (embedded) {
     return trimmed;
   }
-  const normalizedDtype = String(dtype).trim().toUpperCase();
+  if (!hasDtype || typeof dtype !== "string" || !SINGLE_WRITE_DTYPES.has(dtype)) {
+    throw new Error("msg.dtype is required for a bare address and must be an exact supported uppercase dtype");
+  }
+  const normalizedDtype = dtype;
   const countMatch = /^(.*?)(,\s*\d+)$/.exec(trimmed);
   if (countMatch) {
     return `${countMatch[1]}:${normalizedDtype}${countMatch[2]}`;
@@ -103,14 +134,14 @@ function evaluateConfiguredValue(RED, node, msg, value, type, label) {
   });
 }
 
-function normalizeUpdatesSource(value) {
+function normalizeUpdatesSource(value, label = "updates") {
   if (isPlainObject(value)) {
     return value;
   }
   if (typeof value === "string") {
     return parseConfiguredUpdates(value);
   }
-  return {};
+  throw new Error(`${label} must be a JSON object or JSON object string`);
 }
 
 function parseConfiguredUpdates(value) {
@@ -137,31 +168,34 @@ function isUpdateSource(value) {
   return isPlainObject(value) || typeof value === "string";
 }
 
-function normalizeMetadataMode(value) {
-  const normalized = String(value || "full").trim().toLowerCase();
-  return normalized === "minimal" || normalized === "off" ? normalized : "full";
-}
-
 function applyMetadata(msg, mode, metadata) {
-  const normalizedMode = normalizeMetadataMode(mode);
-  if (normalizedMode === "off") {
+  if (mode === "off") {
     return;
   }
-  if (normalizedMode === "minimal") {
-    const next = isPlainObject(msg.kvhostlink) ? { ...msg.kvhostlink } : {};
-    delete next.addresses;
-    delete next.updates;
-    delete next.connection;
+  if (mode === "minimal") {
+    const next = clearOwnedMetadata(msg.kvhostlink);
+    next.operation = "write";
     next.itemCount = metadata.itemCount;
     next.metadataMode = "minimal";
     msg.kvhostlink = next;
     return;
   }
   msg.kvhostlink = {
-    ...(isPlainObject(msg.kvhostlink) ? msg.kvhostlink : {}),
+    ...clearOwnedMetadata(msg.kvhostlink),
+    operation: "write",
+    metadataMode: "full",
+    itemCount: metadata.itemCount,
     updates: metadata.updates,
     connection: metadata.connection,
   };
+}
+
+function clearOwnedMetadata(existing) {
+  const next = isPlainObject(existing) ? { ...existing } : {};
+  for (const key of ["addresses", "updates", "connection", "itemCount", "metadataMode", "operation"]) {
+    delete next[key];
+  }
+  return next;
 }
 
 function fail(node, msg, send, done, error) {

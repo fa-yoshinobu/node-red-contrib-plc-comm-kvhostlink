@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING
+- Library: `HostLinkClient` now requires explicit `port`, `transport`, and PLC profile metadata; commands require an explicit successful `connect()` after construction, close, or transport failure.
+- Library: Low-level numeric device APIs now accept a base device and a separate required `dataFormat`; suffix-bearing inputs such as `DM100.D` are rejected. Expansion-unit buffer access also requires an explicit format.
+- Library: `sendRaw` returns undecoded response body bytes, `setTime` requires an explicit value, comment padding options are removed, and public buffer/trace options are removed.
+- Node-RED: Saved source types, output/metadata/error modes, terminal counts, and single-write dtype intent are required and validated without runtime fallback.
+
+### Fixed
+- Library: `readTyped(..., "BIT")` now recognizes `ON`/`OFF` and `1`/`0` exactly instead of treating `ON` as false.
+- Library: Bit-in-word updates on one client serialize the complete read-modify-write sequence, preventing concurrent updates from overwriting each other.
+- Library: Numeric writes reject fractional, non-finite, string, and out-of-range values instead of masking or coercing them; typed numeric responses no longer fall back to strings.
+- Library: TCP response state and UDP socket generations are invalidated on timeout/failure, and the internal response cap is not user-adjustable.
+
+### Changed
+- Samples: All saved connection and runtime mode fields are explicit.
+- Docs: Updated the API and usage contracts for explicit lifecycle, data formats, and Node-RED runtime validation.
+
 ## [3.1.0] - 2026-07-10
 
 ### Added

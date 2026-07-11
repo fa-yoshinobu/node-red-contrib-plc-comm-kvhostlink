@@ -43,7 +43,7 @@ Add or edit a `kvhostlink-connection` config node.
 | --- | --- | --- |
 | Name | `KV Host Link TCP` | Display name in the editor. |
 | Host | `192.168.250.100` | IP address or host name for your PLC. |
-| Port | `8501` | Default KEYENCE KV Host Link TCP/UDP port. |
+| Port | `8501` | Explicit PLC endpoint port. The editor initially displays the commonly used Host Link port. |
 | Transport | `tcp` | Use `tcp` or `udp`. |
 | Timeout | `3000` | Response timeout in milliseconds. |
 | PLC Profile | `keyence:kv-5000` | Exact canonical profile value for your PLC. |
@@ -110,7 +110,7 @@ The imported starter flow writes the sample value and does not restore the previ
 
 | Symptom | Check |
 | --- | --- |
-| Timeout immediately | Default port is `8501`, not `1025`. |
+| Timeout immediately | Confirm the explicitly saved port; Host Link commonly uses `8501`, not SLMP port `1025`. |
 | Profile dropdown rejects a value | Use only the exact values in [PLC profiles](PROFILES.md). |
 | First import feels too large | Import `kvhostlink-basic-read-write.json` first, not the device-matrix flow. |
 | Timer/counter preset write fails | Timer/counter preset writes only work on KV-8000/7000-series CPU units. |
