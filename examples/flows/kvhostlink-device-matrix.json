@@ -216,7 +216,9 @@
         "addresses":  "addresses",
         "addressesType":  "msg",
         "outputMode":  "value",
+        "metadataMode":  "full",
         "errorHandling":  "output2",
+        "outputs":  2,
         "x":  760,
         "y":  180,
         "wires":  [
@@ -236,7 +238,9 @@
         "connection":  "cfg-kvhostlink-device-matrix",
         "updates":  "payload",
         "updatesType":  "msg",
+        "metadataMode":  "full",
         "errorHandling":  "output2",
+        "outputs":  2,
         "x":  760,
         "y":  280,
         "wires":  [

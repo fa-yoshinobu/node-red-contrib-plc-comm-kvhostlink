@@ -13,12 +13,16 @@
   const KVHOSTLINK_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
-  function kvGetCurrentType(typeSelector, fallback) {
-    const field = $(typeSelector);
-    if (field.length > 0 && field.val()) {
-      return field.val();
+  function kvGetCurrentType(typeSelector, savedType, node) {
+    const activeNode = RED.editor && RED.editor.activeNode;
+    const isActiveNode = Boolean(node && activeNode && (node === activeNode || (node.id && activeNode.id === node.id)));
+    if (isActiveNode) {
+      const field = $(typeSelector);
+      if (field.length > 0 && field.val()) {
+        return field.val();
+      }
     }
-    return fallback || "str";
+    return savedType;
   }
 
   function kvValidateReferencePath(value, allowEmpty) {
@@ -129,12 +133,12 @@
     return false;
   }
 
-  function kvValidateSourceField(value, typeSelector, literalValidator, fallbackType) {
-    const type = kvGetCurrentType(typeSelector, fallbackType);
-    if (!type || type === "str") {
+  function kvValidateSourceField(value, typeSelector, literalValidator, savedType, node) {
+    const type = kvGetCurrentType(typeSelector, savedType, node);
+    if (type === "str") {
       return literalValidator(value);
     }
-    return kvValidateReferencePath(value, false);
+    return ["msg", "flow", "global", "env"].includes(type) && kvValidateReferencePath(value, false);
   }
 
   function setupKvSourceField(sourceId, typeId, literalId, hiddenId) {
@@ -174,7 +178,7 @@
       addresses: {
         value: "",
         validate: function (value) {
-          return kvValidateSourceField(value, "#node-input-addressesType", kvValidateAddressLiteral, this && this.addressesType);
+          return kvValidateSourceField(value, "#node-input-addressesType", kvValidateAddressLiteral, this && this.addressesType, this);
         }
       },
       addressesType: { value: "str", required: true },
@@ -194,7 +198,7 @@
       const literalField = $("#node-input-addressesLiteral");
       literalField.val(this.addresses || "");
       sourceField.val(this.addresses || "");
-      $("#node-input-addressesType").val(this.addressesType || "str");
+      $("#node-input-addressesType").val(this.addressesType);
       const refreshAddresses = setupKvSourceField(
         "#node-input-addressesSource",
         "#node-input-addressesType",
@@ -260,12 +264,13 @@
 
 <script type="text/html" data-help-name="kvhostlink-read">
   <p>Reads one or more KEYENCE KV Host Link addresses and writes the result to <code>msg.payload</code>.</p>
+  <p><b>Name</b> is an optional display-only label. It is not a node ID, connection reference, route, request field, or metadata field, and duplicate labels are allowed.</p>
   <p>Supported forms include <code>DM100:U</code>, <code>DM110:S</code>, <code>DM120:D</code>, <code>DM130:L</code>, <code>DM140:F</code>, <code>DM145:COMMENT</code>, <code>DM150.3</code>, <code>DM160:U,4</code>, <code>R200:BIT,4</code>, <code>T10:D</code>, and <code>C10:D</code>.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>Output can be an object keyed by address, an array in address order, or a single scalar when exactly one address is requested.</p>
   <p>Comment addresses such as <code>DM145:COMMENT</code> return strings via the Host Link <code>RDC</code> command.</p>
   <p>Metadata can emit full <code>msg.kvhostlink</code>, a minimal object with item count only, or leave <code>msg.kvhostlink</code> unchanged.</p>
-  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, <code>msg.addresses</code> takes priority over the configured source.</p>
+  <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, a present <code>msg.addresses</code> must be a valid non-empty string or array of non-empty strings. Invalid input is an error and never falls back to the configured source.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>
   <p>The node keeps the caller-visible logical request shape. It does not silently retry one logical read as a different fallback split request.</p>
 </script>

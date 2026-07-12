@@ -1,19 +1,20 @@
 "use strict";
 
-const { normalizeAddressList, readNamed } = require("../lib/hostlink");
+const { normalizeAddress, normalizeAddressList, readNamed } = require("../lib/hostlink");
+const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
 
 module.exports = function registerKvHostLinkRead(RED) {
   function KvHostLinkReadNode(config) {
     RED.nodes.createNode(this, config);
 
-    this.name = config.name;
+    this.name = normalizeDisplayName(config.name);
     this.connection = RED.nodes.getNode(config.connection);
     this.addresses = config.addresses || "";
-    this.addressesType = config.addressesType || "str";
-    this.outputMode = config.outputMode || "object";
-    this.errorHandling = config.errorHandling || "throw";
-    this.metadataMode = normalizeMetadataMode(config.metadataMode);
-    this.outputs = this.errorHandling === "output2" ? 2 : 1;
+    this.addressesType = requireSourceType(config, "addressesType");
+    this.outputMode = requireEnum(config, "outputMode", ["object", "array", "value"]);
+    this.errorHandling = requireEnum(config, "errorHandling", ["throw", "msg", "output2"]);
+    this.metadataMode = requireEnum(config, "metadataMode", ["full", "minimal", "off"]);
+    this.outputs = validateOutputs(config, this.errorHandling);
 
     this.on("input", async (msg, send, done) => {
       send = send || ((message) => this.send(message));
@@ -38,7 +39,11 @@ module.exports = function registerKvHostLinkRead(RED) {
         if (addresses.length === 0) {
           throw new Error("No KV Host Link addresses were provided");
         }
+        if (this.outputMode === "value" && addresses.length !== 1) {
+          throw new Error("outputMode=value requires exactly one address");
+        }
 
+        await this.connection.connect();
         const client = this.connection.getClient();
         const snapshot = await readNamed(client, addresses);
         const profile = this.connection.getProfile();
@@ -61,16 +66,34 @@ module.exports = function registerKvHostLinkRead(RED) {
 };
 
 async function resolveAddresses(RED, node, msg) {
-  if (Array.isArray(msg.addresses) || typeof msg.addresses === "string") {
-    return normalizeAddressList(msg.addresses);
+  if (hasOwn(msg, "addresses")) {
+    if (!Array.isArray(msg.addresses) && typeof msg.addresses !== "string") {
+      throw new Error("msg.addresses must be a non-empty string or array");
+    }
+    if ((typeof msg.addresses === "string" && !msg.addresses.trim())
+        || (Array.isArray(msg.addresses) && msg.addresses.length === 0)) {
+      throw new Error("msg.addresses must not be empty");
+    }
+    if (Array.isArray(msg.addresses)
+        && msg.addresses.some((address) => typeof address !== "string" || !address.trim())) {
+      throw new Error("msg.addresses must contain only non-empty address strings");
+    }
+    const addresses = normalizeAddressList(msg.addresses);
+    if (addresses.length === 0) {
+      throw new Error("msg.addresses must not be empty");
+    }
+    return addresses.map((address) => normalizeAddress(address));
   }
   const configured = await evaluateConfiguredValue(RED, node, msg, node.addresses, node.addressesType, "addresses");
-  return normalizeAddressList(configured);
+  return normalizeAddressList(configured).map((address) => normalizeAddress(address));
 }
 
 function evaluateConfiguredValue(RED, node, msg, value, type, label) {
-  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function" || !type || type === "str") {
+  if (type === "str") {
     return Promise.resolve(value);
+  }
+  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function") {
+    return Promise.reject(new Error(`Unable to evaluate ${label}: Node-RED property evaluator is unavailable`));
   }
   return new Promise((resolve, reject) => {
     RED.util.evaluateNodeProperty(value, type, node, msg, (error, resolved) => {
@@ -113,42 +136,45 @@ function getControlAction(msg) {
   return null;
 }
 
-function normalizeMetadataMode(value) {
-  const normalized = String(value || "full").trim().toLowerCase();
-  return normalized === "minimal" || normalized === "off" ? normalized : "full";
-}
-
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function applyMetadata(msg, mode, metadata) {
-  const normalizedMode = normalizeMetadataMode(mode);
-  if (normalizedMode === "off") {
+  if (mode === "off") {
     return;
   }
-  if (normalizedMode === "minimal") {
-    const next = isPlainObject(msg.kvhostlink) ? { ...msg.kvhostlink } : {};
-    delete next.addresses;
-    delete next.updates;
-    delete next.connection;
+  if (mode === "minimal") {
+    const next = clearOwnedMetadata(msg.kvhostlink);
+    next.operation = "read";
     next.itemCount = metadata.itemCount;
     next.metadataMode = "minimal";
     msg.kvhostlink = next;
     return;
   }
   msg.kvhostlink = {
-    ...(isPlainObject(msg.kvhostlink) ? msg.kvhostlink : {}),
+    ...clearOwnedMetadata(msg.kvhostlink),
+    operation: "read",
+    metadataMode: "full",
+    itemCount: metadata.itemCount,
     addresses: metadata.addresses,
     connection: metadata.connection,
   };
+}
+
+function clearOwnedMetadata(existing) {
+  const next = isPlainObject(existing) ? { ...existing } : {};
+  for (const key of ["addresses", "updates", "connection", "itemCount", "metadataMode", "operation"]) {
+    delete next[key];
+  }
+  return next;
 }
 
 function formatPayload(snapshot, addresses, outputMode) {
   if (outputMode === "array") {
     return addresses.map((address) => snapshot[address]);
   }
-  if (outputMode === "value" && addresses.length === 1) {
+  if (outputMode === "value") {
     return snapshot[addresses[0]];
   }
   return snapshot;

@@ -107,6 +107,7 @@
 
 <script type="text/html" data-help-name="kvhostlink-connection">
   <p>Reusable KEYENCE KV Host Link connection profile for TCP or UDP access.</p>
+  <p><b>Name</b> is an optional display-only label. Empty, whitespace, or non-string values mean no custom label; duplicate labels are allowed. It never selects the connection, endpoint, profile, route, or request content.</p>
   <p><b>PLC Profile</b> is shown as a model-family label, but saved as a canonical lowercase profile such as <code>keyence:kv-x500</code>. Legacy model labels such as <code>KV-X500</code> are not accepted as profile input.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
   <p>Commands are sent as Host Link command lines terminated with <code>CR</code>.</p>

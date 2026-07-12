@@ -18,6 +18,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING
+- Library: `HostLinkClient` now requires explicit `port`, `transport`, and PLC profile metadata; commands require an explicit successful `connect()` after construction, close, or transport failure.
+- Library: Low-level numeric device APIs now accept a base device and a separate required `dataFormat`; suffix-bearing inputs such as `DM100.D` are rejected. Expansion-unit buffer access also requires an explicit format.
+- Library: `sendRaw` returns undecoded response body bytes, `setTime` requires an explicit value, comment padding options are removed, and public buffer/trace options are removed.
+- Node-RED: Saved source types, output/metadata/error modes, terminal counts, and single-write dtype intent are required and validated without runtime fallback. Single-write dtype must appear exactly once, either in the address or as exact uppercase `BIT/U/S/D/L/F/H`; `COMMENT` remains read-only. Double, missing, invalid, or incomplete selector forms fail before connect/write. A present invalid runtime read/write property never falls back to configured addresses or updates.
+- Node-RED: Connection/read/write `name` is optional display-only state. It is trimmed, non-string/blank input means no custom label, duplicates are allowed, and it never changes node identity, connection selection, request content, or metadata.
+- Node-RED editor: `str` and `object` remain initial values for new nodes only. Missing/invalid
+  source types or output modes are rejected; failed non-literal references never become literal
+  PLC input.
+- Node-RED: Read output shapes are fixed: `object` is always address-keyed, `array` is always an
+  array, and `value` requires exactly one address.
+- Node-RED: Full/minimal metadata removes stale owned fields, preserves custom fields, and identifies
+  only the current read/write operation. Off leaves existing `msg.kvhostlink` unchanged.
+- Node-RED: Throw/msg/output2 now uniquely determine failure routing and terminal count. Coercible
+  string/Boolean terminal counts and conflicting saved counts are rejected.
+
+### Fixed
+- Library: `readTyped(..., "BIT")` now recognizes `ON`/`OFF` and `1`/`0` exactly instead of treating `ON` as false.
+- Library: Bit-in-word updates on one client serialize the complete read-modify-write sequence, preventing concurrent updates from overwriting each other.
+- Library: Numeric writes reject fractional, non-finite, string, and out-of-range values instead of masking or coercing them; typed numeric responses no longer fall back to strings.
+- Library: TCP response state and UDP socket generations are invalidated on timeout/failure, and the internal response cap is not user-adjustable.
+- Library: UDP responses without a CR/LF terminator now fail and invalidate the socket instead of accepting a truncated datagram.
+- Library: Validate RD, RDS, URD, and monitor response token counts from the issued command, including 16/32-point direct-bit numeric reads; malformed response shapes and direct-bit tokens other than documented `0`/`1`/`ON`/`OFF` invalidate the session.
+- Library: Address lists reject unparsed garbage; named read/poll/write operations reject empty work; and named writes validate every update before the first request.
+- Library: JavaScript `Date` clock writes require a valid year from 2000 through 2099, and Float32 writes reject finite values that overflow when encoded.
+- Node-RED editor: Dynamic source-field validation now uses the active editor widget only for the node currently being edited, preventing another editor instance from changing validation results.
+
+### Changed
+- Samples: All saved connection and runtime mode fields are explicit.
+- Docs: Updated the API and usage contracts for explicit lifecycle, data formats, and Node-RED runtime validation.
+
 ## [3.1.0] - 2026-07-10
 
 ### Added

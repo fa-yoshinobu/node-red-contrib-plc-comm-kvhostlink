@@ -79,6 +79,7 @@
         "outputMode":  "value",
         "errorHandling":  "output2",
         "metadataMode":  "minimal",
+        "outputs":  2,
         "x":  400,
         "y":  120,
         "wires":  [
@@ -100,6 +101,7 @@
         "updatesType":  "msg",
         "errorHandling":  "output2",
         "metadataMode":  "minimal",
+        "outputs":  2,
         "x":  390,
         "y":  180,
         "wires":  [

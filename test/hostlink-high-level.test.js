@@ -138,12 +138,12 @@ test("writeTyped parses BIT values explicitly and rejects ambiguous input", asyn
   await writeTyped(fakeClient, "R5", "BIT", 1);
 
   assert.deepEqual(writes, [
-    ["R0", 0],
-    ["R1", 0],
-    ["R2", 0],
-    ["R3", 1],
-    ["R4", 1],
-    ["R5", 1],
+    ["R0", false],
+    ["R1", false],
+    ["R2", false],
+    ["R3", true],
+    ["R4", true],
+    ["R5", true],
   ]);
   await assert.rejects(() => writeTyped(fakeClient, "R6", "BIT", "not-a-bit"), /invalid BIT value/i);
   await assert.rejects(() => writeTyped(fakeClient, "R7", "BIT", 2), /invalid BIT value/i);
@@ -154,9 +154,64 @@ test("writeTyped parses BIT values explicitly and rejects ambiguous input", asyn
   await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": "not-a-bit" }), /invalid BIT value/i);
 });
 
+test("readTyped parses explicit Host Link BIT response tokens", async () => {
+  for (const [token, expected] of [["ON", true], ["1", true], ["OFF", false], ["0", false]]) {
+    const fakeClient = { async read() { return token; } };
+    assert.equal(await readTyped(fakeClient, "R0", "BIT"), expected);
+  }
+  await assert.rejects(
+    () => readTyped({ async read() { return "UNKNOWN"; } }, "R0", "BIT"),
+    /Invalid direct bit response token/
+  );
+});
+
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
+  assert.throws(() => normalizeAddressList("DM100:Ugarbage"), /unsupported dtype/i);
+  assert.throws(() => normalizeAddressList("DM100:U @ DM200:U"), /invalid address list/i);
+});
+
+test("named operations reject empty inputs and compile every write before transport", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async read() { calls += 1; return 0; },
+    async write() { calls += 1; },
+    async writeConsecutive() { calls += 1; },
+  };
+
+  await assert.rejects(() => readNamed(fakeClient, []), /must not be empty/i);
+  await assert.rejects(() => writeNamed(fakeClient, {}), /must be a non-empty object/i);
+  const iterator = poll(fakeClient, [], 0);
+  await assert.rejects(() => iterator.next(), /must not be empty/i);
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "DM50.3": true, "DM100:U": "123" }),
+    /invalid U value/i,
+  );
+  assert.equal(calls, 0);
+});
+
+test("numeric writes reject coercion, fractions, wrapping, and float32 overflow before transport", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async write() { calls += 1; },
+    async writeConsecutive() { calls += 1; },
+    async writeSetValue() { calls += 1; },
+    async writeSetValueConsecutive() { calls += 1; },
+  };
+  const invalid = [
+    ["DM100:U", null], ["DM100:U", false], ["DM100:U", "1"], ["DM100:U", []],
+    ["DM100:U", 1.5], ["DM100:U", -1], ["DM100:U", 0x10000],
+    ["DM100:S", -0x8001], ["DM100:S", 0x8000],
+    ["DM100:D", -1], ["DM100:D", 0x100000000],
+    ["DM100:L", -0x80000001], ["DM100:L", 0x80000000],
+    ["DM100:F", "1.5"], ["DM100:F", false], ["DM100:F", null],
+    ["DM100:F", Number.NaN], ["DM100:F", Number.POSITIVE_INFINITY], ["DM100:F", 1e39],
+  ];
+  for (const [address, value] of invalid) {
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: value }), /invalid|finite|float32|range/i, `${address}=${String(value)}`);
+  }
+  assert.equal(calls, 0);
 });
 
 test("readTyped reads float through two words", async () => {
@@ -173,14 +228,13 @@ test("readTyped reads float through two words", async () => {
 
 test("readComments delegates to the low-level RDC command", async () => {
   const fakeClient = {
-    async readComments(device, options = {}) {
+    async readComments(device) {
       assert.equal(device, "DM250");
-      assert.equal(options.stripPadding, true);
       return "MAIN COMMENT";
     },
   };
 
-  assert.equal(await readComments(fakeClient, "DM250", { stripPadding: true }), "MAIN COMMENT");
+  assert.equal(await readComments(fakeClient, "DM250"), "MAIN COMMENT");
 });
 
 test("readTyped uses preset value from timer and counter composite responses", async () => {
@@ -222,9 +276,9 @@ test("readNamed uses preset value from timer and counter composite responses", a
 
 test("readTimerCounter returns status current and preset", async () => {
   const fakeClient = {
-    async read(device, options = {}) {
+    async read(device, dataFormat) {
       assert.equal(device, "T10");
-      assert.equal(options.dataFormat, ".D");
+      assert.equal(dataFormat, ".D");
       return [1, 10, 20];
     },
   };
@@ -239,12 +293,12 @@ test("readTimerCounter returns status current and preset", async () => {
 test("readNamed reads native 32-bit Z dword through native dword read", async () => {
   const calls = [];
   const fakeClient = {
-    async read(device, options = {}) {
-      calls.push({ device, dataFormat: options.dataFormat || "" });
-      if (device === "Z1" && options.dataFormat === ".D") {
+    async read(device, dataFormat) {
+      calls.push({ device, dataFormat: dataFormat || "" });
+      if (device === "Z1" && dataFormat === ".D") {
         return 70000;
       }
-      throw new Error(`unexpected read ${device} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected read ${device} ${dataFormat || ""}`);
     },
   };
 
@@ -257,9 +311,9 @@ test("readNamed reads native 32-bit Z dword through native dword read", async ()
 test("readNamed batches optimizable contiguous word requests", async () => {
   const calls = [];
   const fakeClient = {
-    async readConsecutive(device, count, options = {}) {
-      calls.push({ device, count, dataFormat: options.dataFormat || "" });
-      if (device === "DM100" && count === 7 && options.dataFormat === ".U") {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat: dataFormat || "" });
+      if (device === "DM100" && count === 7 && dataFormat === ".U") {
         const values = [123, 0xfffb];
         const dword = Buffer.alloc(4);
         dword.writeUInt32LE(0x12345678, 0);
@@ -270,7 +324,7 @@ test("readNamed batches optimizable contiguous word requests", async () => {
         values.push(8);
         return values;
       }
-      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
   };
 
@@ -288,15 +342,15 @@ test("readNamed batches optimizable contiguous word requests", async () => {
 test("readNamed batches direct bit requests", async () => {
   const calls = [];
   const fakeClient = {
-    async readConsecutive(device, count, options = {}) {
-      calls.push({ device, count, dataFormat: options.dataFormat || "" });
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat: dataFormat || "" });
       if (device === "X100" && count === 2) {
         return [1, 0];
       }
       if (device === "R000" && count === 4) {
         return [1, 0, 1, 0];
       }
-      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
   };
 
@@ -319,12 +373,12 @@ test("readNamed batches direct bit requests", async () => {
 test("readNamed batches bit-bank direct bits across display bank boundary", async () => {
   const calls = [];
   const fakeClient = {
-    async readConsecutive(device, count, options = {}) {
-      calls.push({ device, count, dataFormat: options.dataFormat || "" });
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat: dataFormat || "" });
       if (device === "CR3614" && count === 4) {
         return [0, 1, 0, 1];
       }
-      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
   };
 
@@ -341,37 +395,37 @@ test("readNamed batches bit-bank direct bits across display bank boundary", asyn
 
 test("readNamed falls back for mixed scalar, dword, float, bit, and array reads", async () => {
   const fakeClient = {
-    async read(device, options = {}) {
-      if (device === "DM100" && options.dataFormat === ".U") {
+    async read(device, dataFormat) {
+      if (device === "DM100" && dataFormat === ".U") {
         return 123;
       }
-      if (device === "DM101" && options.dataFormat === ".S") {
+      if (device === "DM101" && dataFormat === ".S") {
         return 65531;
       }
-      if (device === "DM200" && options.dataFormat === ".D") {
+      if (device === "DM200" && dataFormat === ".D") {
         return 0x12345678;
       }
       if (device === "R010") {
         return 1;
       }
-      if (device === "DM50" && options.dataFormat === ".U") {
+      if (device === "DM50" && dataFormat === ".U") {
         return 8;
       }
-      throw new Error(`unexpected read ${device} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected read ${device} ${dataFormat || ""}`);
     },
-    async readConsecutive(device, count, options = {}) {
-      if (device === "DM300" && count === 2 && options.dataFormat === ".U") {
+    async readConsecutive(device, count, dataFormat) {
+      if (device === "DM300" && count === 2 && dataFormat === ".U") {
         const buffer = Buffer.alloc(4);
         buffer.writeFloatLE(3.5, 0);
         return [buffer.readUInt16LE(0), buffer.readUInt16LE(2)];
       }
-      if (device === "DM400" && count === 3 && options.dataFormat === ".U") {
+      if (device === "DM400" && count === 3 && dataFormat === ".U") {
         return [1, 2, 3];
       }
       if (device === "R010" && count === 4) {
         return [1, 0, 1, 0];
       }
-      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
     async readComments(device) {
       if (device === "DM250") {
@@ -398,15 +452,15 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
 test("readNamed reads native 32-bit dword arrays as device points", async () => {
   const calls = [];
   const fakeClient = {
-    async readConsecutive(device, count, options = {}) {
-      calls.push({ device, count, dataFormat: options.dataFormat || "" });
-      if (device === "AT0" && count === 2 && options.dataFormat === ".D") {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat: dataFormat || "" });
+      if (device === "AT0" && count === 2 && dataFormat === ".D") {
         return [3533, 5543];
       }
-      if (device === "Z1" && count === 2 && options.dataFormat === ".D") {
+      if (device === "Z1" && count === 2 && dataFormat === ".D") {
         return [70000, 80000];
       }
-      throw new Error(`unexpected readConsecutive ${device} ${count} ${options.dataFormat || ""}`);
+      throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
   };
 
@@ -423,10 +477,10 @@ test("readNamed reads native 32-bit dword arrays as device points", async () => 
 test("poll reuses compiled read plan", async () => {
   let callCount = 0;
   const fakeClient = {
-    async readConsecutive(device, count, options = {}) {
+    async readConsecutive(device, count, dataFormat) {
       assert.equal(device, "DM100");
       assert.equal(count, 2);
-      assert.equal(options.dataFormat, ".U");
+      assert.equal(dataFormat, ".U");
       callCount += 1;
       return [10 + callCount, 20 + callCount];
     },
@@ -458,9 +512,18 @@ test("kvhostlink-connection validates runtime options and exposes PLC profile", 
     const { RED, create } = createMockRed();
     require("../nodes/kvhostlink-connection")(RED);
 
-    const node = create("kvhostlink-connection", {
+    assert.throws(() => create("kvhostlink-connection", {
       id: "conn-missing-port",
       host: "192.168.0.10",
+      plcProfile: "keyence:kv-5000",
+      transport: "tcp",
+    }), /port/);
+
+    const node = create("kvhostlink-connection", {
+      id: "conn-explicit-port",
+      host: "192.168.0.10",
+      port: 8501,
+      transport: "tcp",
       plcProfile: "keyence:kv-5000",
     });
 
@@ -480,6 +543,7 @@ test("kvhostlink-connection validates runtime options and exposes PLC profile", 
           id: "conn-blank-port",
           host: "192.168.0.10",
           port: "",
+          transport: "tcp",
           plcProfile: "keyence:kv-5000",
         }),
       /kvhostlink-connection port is required/
@@ -490,6 +554,7 @@ test("kvhostlink-connection validates runtime options and exposes PLC profile", 
           id: "conn-out-of-range-port",
           host: "192.168.0.10",
           port: "65536",
+          transport: "tcp",
           plcProfile: "keyence:kv-5000",
         }),
       /kvhostlink-connection port out of range/
@@ -499,10 +564,12 @@ test("kvhostlink-connection validates runtime options and exposes PLC profile", 
         create("kvhostlink-connection", {
           id: "conn-invalid-timeout",
           host: "192.168.0.10",
+          port: 8501,
+          transport: "tcp",
           timeout: "0",
           plcProfile: "keyence:kv-5000",
         }),
-      /kvhostlink-connection timeout must be > 0/
+      /kvhostlink-connection timeout/
     );
   });
 });
@@ -513,14 +580,14 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     async read() {
       return 0;
     },
-    async write(device, value, options = {}) {
-      calls.push({ kind: "write", device, value, dataFormat: options.dataFormat || "" });
+    async write(device, value, dataFormat) {
+      calls.push({ kind: "write", device, value, dataFormat: dataFormat || "" });
     },
-    async writeConsecutive(device, values, options = {}) {
-      calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat: options.dataFormat || "" });
+    async writeConsecutive(device, values, dataFormat) {
+      calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat: dataFormat || "" });
     },
-    async writeSetValueConsecutive(device, values, options = {}) {
-      calls.push({ kind: "writeSetValueConsecutive", device, values: Array.from(values), dataFormat: options.dataFormat || "" });
+    async writeSetValueConsecutive(device, values, dataFormat) {
+      calls.push({ kind: "writeSetValueConsecutive", device, values: Array.from(values), dataFormat: dataFormat || "" });
     },
   };
 
