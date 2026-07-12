@@ -13,12 +13,16 @@
   const KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_WRITE_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
-  function kvGetWriteCurrentType(typeSelector, fallback) {
-    const field = $(typeSelector);
-    if (field.length > 0 && field.val()) {
-      return field.val();
+  function kvGetWriteCurrentType(typeSelector, savedType, node) {
+    const activeNode = RED.editor && RED.editor.activeNode;
+    const isActiveNode = Boolean(node && activeNode && (node === activeNode || (node.id && activeNode.id === node.id)));
+    if (isActiveNode) {
+      const field = $(typeSelector);
+      if (field.length > 0 && field.val()) {
+        return field.val();
+      }
     }
-    return fallback || "str";
+    return savedType;
   }
 
   function kvValidateWriteReferencePath(value) {
@@ -109,12 +113,12 @@
     }
   }
 
-  function kvValidateWriteSourceField(value, typeSelector, literalValidator, fallbackType) {
-    const type = kvGetWriteCurrentType(typeSelector, fallbackType);
-    if (!type || type === "str") {
+  function kvValidateWriteSourceField(value, typeSelector, literalValidator, savedType, node) {
+    const type = kvGetWriteCurrentType(typeSelector, savedType, node);
+    if (type === "str") {
       return literalValidator(value);
     }
-    return kvValidateWriteReferencePath(value);
+    return ["msg", "flow", "global", "env"].includes(type) && kvValidateWriteReferencePath(value);
   }
 
   function setupKvWriteSourceField(sourceId, typeId, literalId, hiddenId) {
@@ -154,7 +158,7 @@
       updates: {
         value: "",
         validate: function (value) {
-          return kvValidateWriteSourceField(value, "#node-input-updatesType", kvValidateWriteLiteral, this && this.updatesType);
+          return kvValidateWriteSourceField(value, "#node-input-updatesType", kvValidateWriteLiteral, this && this.updatesType, this);
         }
       },
       updatesType: { value: "str", required: true },

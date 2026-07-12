@@ -106,7 +106,7 @@ Acceptance criteria:
 
 - [x] Implementation completed for NR-KV-OH-001 through NR-KV-OH-005 in this repository.
 - [x] Tests added or updated for the machine-verifiable acceptance criteria.
-- [x] `npm test` passes 64 tests with zero skip, including D-116 all-source/evaluator boundaries,
+- [x] `npm test` passes 69 tests with zero skip, including D-116 all-source/evaluator boundaries,
   D-118 fixed output shapes, D-119 metadata ownership/operation transitions, D-120 exact error
   routing/output counts, D-123 authoritative runtime-property/no-fallback boundaries, and D-125
   exact-one writable dtype/no-send boundaries, and D-126 all-node display-name/identity/request
@@ -114,12 +114,57 @@ Acceptance criteria:
   smoke, all example saved-field checks, `npm pack --dry-run`, and
   `git diff --check` pass.
 - [x] Codex self-review completed for public API, validation order, explicit connection/concurrent-connect state, timeout/TCP/UDP failure, response cap, numeric formats/ranges, compound updates, Node runtime modes, docs, examples, and package contents.
-- [ ] Claude source review completed and findings recorded — pending user authorization; Claude has not been invoked.
-- [ ] Codex resolved or dispositioned every Claude finding and reran affected checks — pending Claude review.
+- [x] Claude source review completed and findings recorded in the workspace review result; the user ran the authorized batch outside Codex.
+- [x] Codex resolved or dispositioned every Node.js/Node-RED finding and reran affected checks.
 - [x] No new live-PLC result is required to distinguish these API, validation, frame-construction, and local transport-state contracts; existing hardware capability evidence is unchanged.
 - [x] Documentation, migration notes, changelog, examples, and API reference agree with the final implementation.
-- [ ] Final acceptance completed — pending Claude review and cross-library consistency review.
+- [x] Repository-level final acceptance completed; HostLink family-level acceptance is recorded separately.
 
 ## Claude review status
 
-Pending user authorization. Before any Claude invocation, present this repository and diff scope, the decisions above, test/package evidence, supplied review material, and expected finding format, then wait for explicit authorization for that batch.
+The user separately ran the authorized HostLink review batch on 2026-07-12.
+Its result is preserved in the workspace review record and is dispositioned
+below. Codex did not invoke Claude.
+
+## NR-KV-CLAUDE-20260712 — Independent-review corrections
+
+Scope: Claude HostLink review findings 1, 2, 9, 10, 14, 15, 16, 20, and 21
+that affect this Node.js/Node-RED repository.
+
+Target contract: numeric writes are strict and never coerce or wrap; a named
+write is compiled completely before transport; UDP requires a response
+terminator and invalidates failed transport; JavaScript `Date` clock values use
+years 2000 through 2099; address parsing consumes the complete input; editor
+validation reads only the active node's DOM state. Cross-implementation vectors
+are owned by the separate cross-verification repository, not copied into this
+library.
+
+Compatibility impact: coercible numeric inputs, unterminated UDP datagrams,
+partially valid named-write objects, address-list garbage, and Date years
+outside 2000 through 2099 are rejected before they can be treated as valid.
+
+Acceptance criteria:
+
+1. Every scalar and array write rejects coercion, fractional integer values,
+   range overflow, and Float32 encoding overflow before the first request.
+2. Empty named operations reject, and an invalid later entry in `writeNamed`
+   proves that zero earlier writes were sent.
+3. An unterminated UDP response fails, closes the socket generation, and a
+   terminated response remains accepted.
+4. Address-list parsing rejects any unconsumed characters, and editor source
+   validation is invariant under another node being open in the editor.
+5. User documentation, changelog, tests, and package contents describe only the
+   corrected contract; no library-local cross-implementation vector remains.
+6. RD, RDS, URD, and monitor responses have exact command-derived token counts;
+   direct-bit responses are only `0`/`1`/`ON`/`OFF`, and malformed shapes discard the
+   session before another request.
+
+- [x] Implementation completed in this repository.
+- [x] Tests added or updated for every acceptance criterion.
+- [x] Full static, unit, editor, example, and package checks passed (`release_check.bat`, 69 tests, zero skip).
+- [x] Codex self-review completed against the approved contract, validation order, transport invalidation, public API, editor state, docs, and package contents.
+- [x] Claude source review completed; findings are recorded in the workspace review result.
+- [x] Codex dispositioned the Node.js/Node-RED findings and reran all affected checks.
+- [x] No additional live-PLC check is required for these local validation and transport-boundary corrections.
+- [x] Documentation and migration notes agree with the implementation.
+- [x] Final acceptance criteria verified for this repository; family-level HostLink acceptance remains separate.

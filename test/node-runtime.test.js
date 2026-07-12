@@ -108,6 +108,10 @@ test("Node-RED HostLink saved-flow contract rejects missing and contradictory mo
   assert.match(readHtml, /outputMode:\s*\{\s*value:\s*"object",\s*required:\s*true\s*\}/);
   assert.doesNotMatch(readHtml, /this\.addressesType\s*\|\|\s*"str"/);
   assert.doesNotMatch(writeHtml, /this\.updatesType\s*\|\|\s*"str"/);
+  assert.match(readHtml, /RED\.editor\s*&&\s*RED\.editor\.activeNode/);
+  assert.match(writeHtml, /RED\.editor\s*&&\s*RED\.editor\.activeNode/);
+  assert.match(readHtml, /this\.addressesType,\s*this\)/);
+  assert.match(writeHtml, /this\.updatesType,\s*this\)/);
   assert.match(readHtml, /metadataMode:\s*\{\s*value:\s*"full",\s*required:\s*true\s*\}/);
   assert.match(writeHtml, /metadataMode:\s*\{\s*value:\s*"full",\s*required:\s*true\s*\}/);
   assert.doesNotMatch(readHtml, /metadataMode\s*\|\|\s*"full"/);

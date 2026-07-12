@@ -23,6 +23,14 @@ every first command and again after `close()`, timeout, or transport failure.
 Commands never reconnect themselves. `openAndConnect` is the explicitly named
 convenience path that returns a connected client.
 
+`setTime(date)` accepts a valid JavaScript `Date` whose local calendar year is
+2000 through 2099. A full year is never folded into a two-digit wire year.
+
+Semantic reads validate the exact response token count derived from the issued
+command. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`; numeric reads of direct
+bit devices require the corresponding 16- or 32-point response. A malformed
+response shape invalidates the connection rather than being reused.
+
 ## Device Operations
 
 | Operation | Public API |
@@ -40,7 +48,8 @@ Low-level numeric operations take a base device and a separate data format. For
 example, use `read("DM100", ".D")`, not `read("DM100.D")`. The format is
 required for numeric devices and expansion-unit buffer access. Bare direct-bit
 devices do not require a numeric format. Numeric writes are range checked and
-are not truncated or converted from strings.
+are not truncated, wrapped, or converted from strings. `F` writes require an
+actual finite JavaScript number that is also representable as finite Float32.
 
 `writeBitInWord` serializes its read and write as one client-side critical
 section. This protects concurrent updates made through the same client; it does
@@ -57,6 +66,12 @@ not make the operation atomic against another connection or PLC program logic.
 | Named snapshots and polling | `readNamed`, `writeNamed`, `poll` |
 | Word/dword reads | `readWords`, `readDWords` |
 | Bit-in-word write | `writeBitInWord` |
+
+Address-list text must consist entirely of valid comma/whitespace-separated
+addresses; trailing or embedded garbage is rejected. `readNamed`, `writeNamed`,
+and `poll` reject empty work. `writeNamed` validates the complete update object
+before it sends the first request, so a later invalid update cannot cause a
+partial write batch.
 
 ## Protocol, Profile, And Diagnostics
 

@@ -102,6 +102,11 @@ Runtime write fields are authoritative when present. `msg.updates` and
 with `msg.address`. Invalid, empty, conflicting, or isolated runtime fields fail;
 the node does not execute configured updates as a fallback.
 
+Every update is validated before the first PLC request. Numeric values must be
+finite JavaScript numbers in the selected format's exact range; strings,
+Booleans, fractional integers, wraparound values, and Float32 overflow are
+rejected. An empty update object performs no write and is rejected.
+
 | Output msg field | Description |
 | --- | --- |
 | `msg.payload` | Original payload is passed through. |
@@ -133,6 +138,8 @@ match the selected mode exactly; conflicting old flows are rejected for review.
 Use `:` for data types and `.0` through `.F` for bit-in-word access.
 `DM100.D` means bit `D` inside `DM100`; use `DM100:D` for a 32-bit value.
 High-level read/write addresses must specify the data type explicitly, such as `:U`, `:D`, or `:BIT`.
+The complete address-list input is parsed. Extra text before, between, or after
+addresses is an error rather than being ignored.
 
 ## Timer and counter
 

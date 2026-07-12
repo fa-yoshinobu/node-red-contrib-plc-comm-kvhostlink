@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { EventEmitter } = require("node:events");
 const canonicalKvProfiles = require("./fixtures/kv_device_ranges.json");
 
 const {
@@ -221,7 +222,43 @@ test("setTime requires a value and rejects invalid calendar/weekday combinations
   await assert.rejects(() => client.setTime([24, 1, 1, 1, 2, 3, 2]), /does not match/);
   await assert.rejects(() => client.setTime(["24", 1, 1, 1, 2, 3, 1]), /must be integers/);
   await assert.rejects(() => client.setTime([24, 1, 1, 1, 2, 3, false]), /must be integers/);
+  await assert.rejects(() => client.setTime("2026-03-15T01:02:03"), /must be a Date/);
+  await assert.rejects(() => client.setTime(0), /must be a Date/);
+  await assert.rejects(() => client.setTime(new Date(1999, 0, 1)), /2000\.\.2099/);
+  await assert.rejects(() => client.setTime(new Date(2100, 0, 1)), /2000\.\.2099/);
+  await assert.rejects(() => client.setTime(new Date(Number.NaN)), /invalid time value/);
   assert.deepEqual(frames, []);
+});
+
+test("UDP response requires a CR/LF terminator and invalidates the socket", async () => {
+  class FakeUdpSocket extends EventEmitter {
+    constructor(response) {
+      super();
+      this.response = response;
+      this.closed = false;
+    }
+    send(_payload, callback) {
+      callback(null);
+      setImmediate(() => this.emit("message", Buffer.from(this.response, "ascii")));
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+
+  const invalid = createTestClient({ transport: "udp", timeout: 100 });
+  const invalidSocket = new FakeUdpSocket("OK");
+  invalid._socket = invalidSocket;
+  await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r")), /missing.*terminator/i);
+  assert.equal(invalid._socket, null);
+  assert.equal(invalidSocket.closed, true);
+
+  const valid = createTestClient({ transport: "udp", timeout: 100 });
+  const validSocket = new FakeUdpSocket("OK\r");
+  valid._socket = validSocket;
+  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("OK\r"));
+  assert.equal(valid._socket, validSocket);
+  assert.equal(validSocket.closed, false);
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
@@ -362,6 +399,67 @@ test("read and write command helpers preserve exact CR-terminated frames", async
   ]);
 });
 
+test("semantic reads require exact command-derived token counts and invalidate the session", async () => {
+  const cases = [
+    {
+      invoke: (client) => client.read("DM0", ".U"),
+      response: "1 2\r",
+      expected: /RD response token count mismatch: expected 1, received 2/,
+    },
+    {
+      invoke: (client) => client.readConsecutive("DM0", 2, ".U"),
+      response: "1\r",
+      expected: /RDS response token count mismatch: expected 2, received 1/,
+    },
+    {
+      invoke: (client) => client.readExpansionUnitBuffer(1, 0, 2, ".U"),
+      response: "1\r",
+      expected: /URD response token count mismatch: expected 2, received 1/,
+    },
+  ];
+
+  for (const item of cases) {
+    const client = createTestClient();
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    client._exchange = async () => Buffer.from(item.response, "ascii");
+    await assert.rejects(() => item.invoke(client), item.expected);
+    assert.equal(client._socket, null);
+    assert.equal(socket.destroyed, true);
+  }
+
+  const monitor = createFrameRecorder((command) => command.startsWith("MBS ") ? "OK\r" : "1\r");
+  const monitorSocket = { destroyed: false, destroy() { this.destroyed = true; } };
+  monitor.client._socket = monitorSocket;
+  await monitor.client.registerMonitorBits("R0", "R1");
+  await assert.rejects(
+    () => monitor.client.readMonitorBits(),
+    /MBR response token count mismatch: expected 2, received 1/,
+  );
+  assert.equal(monitor.client._socket, null);
+  assert.equal(monitorSocket.destroyed, true);
+
+  const unregistered = createFrameRecorder();
+  await assert.rejects(() => unregistered.client.readMonitorBits(), /must be registered/);
+  await assert.rejects(() => unregistered.client.readMonitorWords(), /must be registered/);
+  assert.deepEqual(unregistered.frames, []);
+});
+
+test("non-format commands reject suffix-bearing devices before transport", async () => {
+  const { client, frames } = createFrameRecorder();
+  for (const invoke of [
+    () => client.forcedSet("R0.U"),
+    () => client.forcedReset("R0.U"),
+    () => client.forcedSetConsecutive("R0.U", 2),
+    () => client.forcedResetConsecutive("R0.U", 2),
+    () => client.registerMonitorBits("R0.U"),
+    () => client.readComments("DM0.U"),
+  ]) {
+    await assert.rejects(invoke, /must not contain.*suffix/i);
+  }
+  assert.deepEqual(frames, []);
+});
+
 test("numeric writes reject overflow, truncation, and ambiguous values before send", async () => {
   const { client, frames } = createFrameRecorder();
 
@@ -400,6 +498,10 @@ test("typed numeric reads reject response tokens that contradict dataFormat", as
   await assert.rejects(() => negativeUnsigned.read("DM0", ".U"), /outside the range/);
   const { client: wideHex } = createFrameRecorder(() => "10000\r");
   await assert.rejects(() => wideHex.read("DM0", ".H"), /Invalid hexadecimal response token/);
+  for (const token of ["TRUE", "FALSE", "2", "GARBAGE"]) {
+    const { client: invalidBit } = createFrameRecorder(() => `${token}\r`);
+    await assert.rejects(() => invalidBit.read("R0"), /Invalid direct bit response token/);
+  }
 });
 
 test("set-value and monitor read helpers preserve exact CR-terminated frames", async () => {
@@ -411,11 +513,24 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
 
   await client.writeSetValue("T10", 123, ".D");
   await client.writeSetValueConsecutive("C20", [111, 222], ".D");
+  await client.registerMonitorBits("R0", "R1", "R2");
+  await client.registerMonitorWords([
+    { device: "DM0", dataFormat: ".U" },
+    { device: "DM1", dataFormat: ".H" },
+    { device: "DM2", dataFormat: ".U" },
+  ]);
   assert.deepEqual(await client.readMonitorBits(), [1, 0, 1]);
   assert.deepEqual(await client.readMonitorWords(), ["10", "ABC", "30"]);
   await assert.rejects(() => client.writeSetValueConsecutive("T0", Array(121).fill(0), ".D"), /count out of range/);
 
-  assert.deepEqual(frames, ["WS T10.D 123\r", "WSS C20.D 2 111 222\r", "MBR\r", "MWR\r"]);
+  assert.deepEqual(frames, [
+    "WS T10.D 123\r",
+    "WSS C20.D 2 111 222\r",
+    "MBS R000 R001 R002\r",
+    "MWS DM0.U DM1.H DM2.U\r",
+    "MBR\r",
+    "MWR\r",
+  ]);
 });
 
 test("readComments accepts XYM alias device types", async () => {
@@ -463,8 +578,10 @@ test("client rejects device spans crossing range before send", async () => {
   const commands = [];
 
   client._exchange = async (payload) => {
-    commands.push(payload.toString("ascii").trim());
-    return Buffer.from("0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\r", "ascii");
+    const command = payload.toString("ascii").trim();
+    commands.push(command);
+    const count = command === "RD R199800.D" ? 32 : 16;
+    return Buffer.from(`${Array(count).fill("0").join(" ")}\r`, "ascii");
   };
 
   await assert.rejects(() => client.read("DM65534", ".D"), /Device span out of range/);
@@ -478,7 +595,7 @@ test("client rejects device spans crossing range before send", async () => {
 
   assert.equal((await client.readConsecutive("CR7900", 16)).length, 16);
   assert.equal((await client.read("R199900", ".U")).length, 16);
-  assert.equal((await client.read("R199800", ".D")).length, 16);
+  assert.equal((await client.read("R199800", ".D")).length, 32);
   await assert.rejects(() => client.readConsecutive("CR7900", 17), /Device span out of range/);
   assert.deepEqual(commands, ["RDS CR7900 16", "RD R199900.U", "RD R199800.D"]);
 });
@@ -488,8 +605,10 @@ test("AT 32-bit values span by AT device point", async () => {
   const commands = [];
 
   client._exchange = async (payload) => {
-    commands.push(payload.toString("ascii").trim());
-    return Buffer.from("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000\r", "ascii");
+    const command = payload.toString("ascii").trim();
+    commands.push(command);
+    const count = command === "RD AT7.D" ? 1 : 8;
+    return Buffer.from(`${Array(count).fill("0000000000").join(" ")}\r`, "ascii");
   };
 
   await client.read("AT7", ".D");
@@ -597,14 +716,12 @@ test("setTime sends WRT with Sunday-based weekday", async () => {
   await client.setTime(new Date(2026, 2, 15, 1, 2, 3));
   await client.setTime(new Date(2026, 2, 16, 1, 2, 3));
   await client.setTime(new Date(2026, 2, 21, 1, 2, 3));
-  await client.setTime(new Date(1999, 0, 1, 1, 2, 3));
   await assert.rejects(() => client.setTime([26, 3, 15, 1, 2, 3, 7]), /week out of range/);
 
   assert.deepEqual(commands, [
     "WRT 26 03 15 01 02 03 0",
     "WRT 26 03 16 01 02 03 1",
     "WRT 26 03 21 01 02 03 6",
-    "WRT 99 01 01 01 02 03 5",
   ]);
 });
 

@@ -168,6 +168,50 @@ test("readTyped parses explicit Host Link BIT response tokens", async () => {
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
+  assert.throws(() => normalizeAddressList("DM100:Ugarbage"), /unsupported dtype/i);
+  assert.throws(() => normalizeAddressList("DM100:U @ DM200:U"), /invalid address list/i);
+});
+
+test("named operations reject empty inputs and compile every write before transport", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async read() { calls += 1; return 0; },
+    async write() { calls += 1; },
+    async writeConsecutive() { calls += 1; },
+  };
+
+  await assert.rejects(() => readNamed(fakeClient, []), /must not be empty/i);
+  await assert.rejects(() => writeNamed(fakeClient, {}), /must be a non-empty object/i);
+  const iterator = poll(fakeClient, [], 0);
+  await assert.rejects(() => iterator.next(), /must not be empty/i);
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "DM50.3": true, "DM100:U": "123" }),
+    /invalid U value/i,
+  );
+  assert.equal(calls, 0);
+});
+
+test("numeric writes reject coercion, fractions, wrapping, and float32 overflow before transport", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async write() { calls += 1; },
+    async writeConsecutive() { calls += 1; },
+    async writeSetValue() { calls += 1; },
+    async writeSetValueConsecutive() { calls += 1; },
+  };
+  const invalid = [
+    ["DM100:U", null], ["DM100:U", false], ["DM100:U", "1"], ["DM100:U", []],
+    ["DM100:U", 1.5], ["DM100:U", -1], ["DM100:U", 0x10000],
+    ["DM100:S", -0x8001], ["DM100:S", 0x8000],
+    ["DM100:D", -1], ["DM100:D", 0x100000000],
+    ["DM100:L", -0x80000001], ["DM100:L", 0x80000000],
+    ["DM100:F", "1.5"], ["DM100:F", false], ["DM100:F", null],
+    ["DM100:F", Number.NaN], ["DM100:F", Number.POSITIVE_INFINITY], ["DM100:F", 1e39],
+  ];
+  for (const [address, value] of invalid) {
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: value }), /invalid|finite|float32|range/i, `${address}=${String(value)}`);
+  }
+  assert.equal(calls, 0);
 });
 
 test("readTyped reads float through two words", async () => {

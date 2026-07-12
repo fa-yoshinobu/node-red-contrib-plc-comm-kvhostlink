@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Library: Bit-in-word updates on one client serialize the complete read-modify-write sequence, preventing concurrent updates from overwriting each other.
 - Library: Numeric writes reject fractional, non-finite, string, and out-of-range values instead of masking or coercing them; typed numeric responses no longer fall back to strings.
 - Library: TCP response state and UDP socket generations are invalidated on timeout/failure, and the internal response cap is not user-adjustable.
+- Library: UDP responses without a CR/LF terminator now fail and invalidate the socket instead of accepting a truncated datagram.
+- Library: Validate RD, RDS, URD, and monitor response token counts from the issued command, including 16/32-point direct-bit numeric reads; malformed response shapes and direct-bit tokens other than documented `0`/`1`/`ON`/`OFF` invalidate the session.
+- Library: Address lists reject unparsed garbage; named read/poll/write operations reject empty work; and named writes validate every update before the first request.
+- Library: JavaScript `Date` clock writes require a valid year from 2000 through 2099, and Float32 writes reject finite values that overflow when encoded.
+- Node-RED editor: Dynamic source-field validation now uses the active editor widget only for the node currently being edited, preventing another editor instance from changing validation results.
 
 ### Changed
 - Samples: All saved connection and runtime mode fields are explicit.

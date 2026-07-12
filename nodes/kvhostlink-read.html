@@ -13,12 +13,16 @@
   const KVHOSTLINK_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_XY_DEVICE_TYPES = new Set(["X", "Y"]);
 
-  function kvGetCurrentType(typeSelector, fallback) {
-    const field = $(typeSelector);
-    if (field.length > 0 && field.val()) {
-      return field.val();
+  function kvGetCurrentType(typeSelector, savedType, node) {
+    const activeNode = RED.editor && RED.editor.activeNode;
+    const isActiveNode = Boolean(node && activeNode && (node === activeNode || (node.id && activeNode.id === node.id)));
+    if (isActiveNode) {
+      const field = $(typeSelector);
+      if (field.length > 0 && field.val()) {
+        return field.val();
+      }
     }
-    return fallback || "str";
+    return savedType;
   }
 
   function kvValidateReferencePath(value, allowEmpty) {
@@ -129,12 +133,12 @@
     return false;
   }
 
-  function kvValidateSourceField(value, typeSelector, literalValidator, fallbackType) {
-    const type = kvGetCurrentType(typeSelector, fallbackType);
-    if (!type || type === "str") {
+  function kvValidateSourceField(value, typeSelector, literalValidator, savedType, node) {
+    const type = kvGetCurrentType(typeSelector, savedType, node);
+    if (type === "str") {
       return literalValidator(value);
     }
-    return kvValidateReferencePath(value, false);
+    return ["msg", "flow", "global", "env"].includes(type) && kvValidateReferencePath(value, false);
   }
 
   function setupKvSourceField(sourceId, typeId, literalId, hiddenId) {
@@ -174,7 +178,7 @@
       addresses: {
         value: "",
         validate: function (value) {
-          return kvValidateSourceField(value, "#node-input-addressesType", kvValidateAddressLiteral, this && this.addressesType);
+          return kvValidateSourceField(value, "#node-input-addressesType", kvValidateAddressLiteral, this && this.addressesType, this);
         }
       },
       addressesType: { value: "str", required: true },
