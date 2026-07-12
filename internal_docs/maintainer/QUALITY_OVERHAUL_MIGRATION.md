@@ -168,3 +168,9 @@ Acceptance criteria:
 - [x] No additional live-PLC check is required for these local validation and transport-boundary corrections.
 - [x] Documentation and migration notes agree with the implementation.
 - [x] Final acceptance criteria verified for this repository; family-level HostLink acceptance remains separate.
+
+## 2026-07-12 KV-X500 live smoke evidence
+
+- [x] The package public HostLink client and typed-read helper connected to `keyence:kv-x500` at `192.168.250.100:8501` over TCP and read `DM0:U` once; the result was `5878`.
+- [x] No write, retry, or profile／transport fallback was performed.
+- [x] This evidence is limited to that endpoint, profile, device, transport, and operation; it does not verify other device families, Node-RED editor/runtime wiring, or the complete profile.
