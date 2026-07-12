@@ -2,7 +2,7 @@
 
 const { writeNamed } = require("../lib/hostlink");
 const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
-const SINGLE_WRITE_DTYPES = new Set(["BIT", "U", "S", "D", "L", "F", "H", "COMMENT"]);
+const SINGLE_WRITE_DTYPES = new Set(["BIT", "U", "S", "D", "L", "F", "H"]);
 
 module.exports = function registerKvHostLinkWrite(RED) {
   function KvHostLinkWriteNode(config) {
@@ -88,7 +88,7 @@ async function resolveUpdates(RED, node, msg) {
       throw new Error("msg.value is required when msg.address is used");
     }
     return {
-      [withDtype(msg.address, msg.dtype)]: msg.value,
+      [withDtype(msg.address, msg.dtype, hasDtype)]: msg.value,
     };
   }
   if (hasValue || hasDtype) {
@@ -98,17 +98,22 @@ async function resolveUpdates(RED, node, msg) {
   return normalizeUpdatesSource(configured);
 }
 
-function withDtype(address, dtype) {
+function withDtype(address, dtype, dtypePresent) {
   const trimmed = String(address).trim();
-  const embedded = trimmed.includes(":") || trimmed.includes(".");
-  const hasDtype = dtype !== undefined;
-  if (embedded && hasDtype) {
+  const colonCount = (trimmed.match(/:/g) || []).length;
+  const dotCount = (trimmed.match(/\./g) || []).length;
+  const embedded = (colonCount === 1 && dotCount === 0 && /:[A-Z]+(?:\s*,\s*\d+)?$/i.test(trimmed))
+    || (colonCount === 0 && dotCount === 1 && /\.[0-9A-F]+$/i.test(trimmed));
+  if ((colonCount > 0 || dotCount > 0) && !embedded) {
+    throw new Error("msg.address contains an incomplete or conflicting dtype/bit selector");
+  }
+  if (embedded && dtypePresent) {
     throw new Error("dtype must be specified exactly once: either in msg.address or msg.dtype");
   }
   if (embedded) {
     return trimmed;
   }
-  if (!hasDtype || typeof dtype !== "string" || !SINGLE_WRITE_DTYPES.has(dtype)) {
+  if (!dtypePresent || typeof dtype !== "string" || !SINGLE_WRITE_DTYPES.has(dtype)) {
     throw new Error("msg.dtype is required for a bare address and must be an exact supported uppercase dtype");
   }
   const normalizedDtype = dtype;
@@ -120,8 +125,11 @@ function withDtype(address, dtype) {
 }
 
 function evaluateConfiguredValue(RED, node, msg, value, type, label) {
-  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function" || !type || type === "str") {
+  if (type === "str") {
     return Promise.resolve(value);
+  }
+  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function") {
+    return Promise.reject(new Error(`Unable to evaluate ${label}: Node-RED property evaluator is unavailable`));
   }
   return new Promise((resolve, reject) => {
     RED.util.evaluateNodeProperty(value, type, node, msg, (error, resolved) => {

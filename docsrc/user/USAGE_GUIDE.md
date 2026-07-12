@@ -12,7 +12,7 @@
 
 | Field | Required | Default | Description |
 | --- | --- | --- | --- |
-| Name | No | Empty | Display name. |
+| Name | No | Empty | Display-only label. Empty/whitespace/non-string values mean no custom label; duplicates are allowed and never identify a connection or PLC route. |
 | Host | Yes | Empty | PLC host name or IP address. |
 | Port | Yes | `8501` | TCP or UDP port. |
 | Transport | Yes | `tcp` | `tcp` or `udp`. |
@@ -49,17 +49,17 @@ when you intentionally want separate PLC sessions.
 
 | Config field | Description |
 | --- | --- |
-| Name | Display name. |
+| Name | Optional display-only label; it is not sent, emitted as metadata, or used as the connection identity. |
 | Connection | `kvhostlink-connection` config node. |
 | Source | Literal text, `msg`, `flow`, `global`, or `env`. |
 | Addresses | Literal address list when Source is `str`. |
-| Output | `object`, `array`, or single `value` when one address is requested. |
+| Output | `object` always returns an address-keyed object, `array` always returns an array, and `value` requires exactly one address. |
 | Metadata | `full`, `minimal`, or `off`. |
 | Errors | `throw`, `msg.error`, or second output. |
 
 | Input msg field | Description |
 | --- | --- |
-| `msg.addresses` | String or array of addresses. Takes priority over the configured source. |
+| `msg.addresses` | When present, a non-empty string or an array containing only non-empty address strings. Invalid input fails and never falls back to the configured source. |
 | `msg.topic` | `connect`, `disconnect`, or `reinitialize` for connection control. |
 | `msg.connect` | Set to `true` to connect. |
 | `msg.disconnect` | Set to `true` to disconnect. |
@@ -71,11 +71,15 @@ when you intentionally want separate PLC sessions.
 | `msg.kvhostlink` | Metadata when enabled. |
 | `msg.error` | Error object when Errors is `msg.error`. |
 
+The configured Source type is required. If a `msg`, `flow`, `global`, or `env`
+reference cannot be evaluated, the operation fails before connecting; the
+reference name is never treated as a literal PLC address or update.
+
 ## kvhostlink-write node
 
 | Config field | Description |
 | --- | --- |
-| Name | Display name. |
+| Name | Optional display-only label; it is not sent, emitted as metadata, or used as the connection identity. |
 | Connection | `kvhostlink-connection` config node. |
 | Source | Literal text, `msg`, `flow`, `global`, or `env`. |
 | Static updates | JSON object when Source is `str`. |
@@ -86,12 +90,17 @@ when you intentionally want separate PLC sessions.
 | --- | --- |
 | `msg.updates` | Object or JSON string updates. |
 | `msg.address` | Single address for one write. |
-| `msg.dtype` | Explicit uppercase data type for an unsuffixed `msg.address`. Specify the type in exactly one place: the address suffix or this field. |
+| `msg.dtype` | Required for a bare single-write address. Use exactly `BIT`, `U`, `S`, `D`, `L`, `F`, or `H`. Omit it when the address already contains a dtype or word-bit selector; specifying both is an error. `COMMENT` is read-only. |
 | `msg.value` | Single write value. Required when `msg.address` is used. |
 | `msg.topic` | `connect`, `disconnect`, or `reinitialize` for connection control. |
 | `msg.connect` | Set to `true` to connect. |
 | `msg.disconnect` | Set to `true` to disconnect. |
 | `msg.reinitialize` | Set to `true` to close and reconnect. |
+
+Runtime write fields are authoritative when present. `msg.updates` and
+`msg.address` are mutually exclusive, and `msg.value`/`msg.dtype` are valid only
+with `msg.address`. Invalid, empty, conflicting, or isolated runtime fields fail;
+the node does not execute configured updates as a fallback.
 
 | Output msg field | Description |
 | --- | --- |
@@ -99,7 +108,10 @@ when you intentionally want separate PLC sessions.
 | `msg.kvhostlink` | Metadata when enabled. |
 | `msg.error` | Error object when Errors is `msg.error`. |
 
-The second output receives a copy of the message with `error` when Errors is `Second output`.
+Success is always sent through output 1. `throw` reports failure through
+`done(error)` without a message, `msg.error` sends the failed message on output
+1, and `Second output` sends it only on output 2. The saved terminal count must
+match the selected mode exactly; conflicting old flows are rejected for review.
 
 ## Address syntax
 
@@ -159,6 +171,9 @@ To persist CSV-equivalent rows, route the long-form row messages through a CSV n
 | `full` | Adds current `operation`, `itemCount`, `metadataMode`, connection, and current read `addresses` or write `updates`. |
 | `minimal` | Adds current `operation`, `itemCount`, and `metadataMode`; owned full-mode fields are removed. |
 | `off` | Leaves `msg.kvhostlink` unchanged. |
+
+With `off`, a pre-existing `msg.kvhostlink` value is not guaranteed to describe
+the current operation or result.
 
 The connection metadata contains `host`, `port`, `transport`, and `timeout`.
 

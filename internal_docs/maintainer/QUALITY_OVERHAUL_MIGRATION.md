@@ -64,19 +64,55 @@ Scope: connection/read/write editor fields, runtime overrides, output shape, met
 
 Target contract: saved source types and output/metadata/error modes are required exact values. Invalid present runtime overrides never fall back. Scalar output requires one address. Single-write dtype is specified exactly once. Owned metadata is replaced for the current operation.
 
+Approved decision mapping: D-116 applies the exact `str`/`msg`/`flow`/`global`/`env` source-type
+contract to HostLink read/write nodes, D-118 fixes read `object`/`array`/`value` payload shapes, and
+D-119 fixes metadata ownership and current-operation identity. D-120 fixes error routing and its
+derived terminal count. D-123 makes every present runtime property authoritative and rejects
+invalid, conflicting, or isolated fields instead of executing configured operations. D-125 requires
+single-write dtype to come from exactly one complete source and excludes read-only `COMMENT`.
+D-126 separates optional display names from every runtime identity and communication field. Editor defaults
+initialize new nodes only and do not repair missing fields in old flows.
+
 Compatibility impact: missing-field defaults, invalid-override fallback, dtype double specification, and stale owned metadata are removed.
 
 Acceptance criteria:
 
 1. Missing/unknown saved mode fields and output-terminal conflicts fail during node construction.
-2. Present null/empty/wrong-type runtime inputs fail without executing configured fallback.
-3. Editor smoke, all example JSON validation, and package inspection pass.
+2. Present null/empty/wrong-type runtime inputs, conflicting `msg.updates`/`msg.address`, and isolated
+   `msg.value`/`msg.dtype` fail before connect/read/write without executing configured fallback.
+3. Every non-literal source is evaluated through Node-RED. Missing references, evaluation errors,
+   and an unavailable evaluator fail before connect/read/write and never become literal addresses or
+   updates.
+4. Object mode is always address-keyed, array mode is always an array, and value mode accepts
+   exactly one address. Zero/multiple addresses fail before connect/read without sending output.
+5. Full/minimal metadata removes all stale owned fields, preserves custom fields, and identifies the
+   current read/write operation. Full alone includes connection plus current addresses or updates;
+   off preserves the existing metadata object unchanged and does not assert it is current.
+6. Error mode is exactly throw/msg/output2 with success on output 1 and failures routed only to
+   done(error)/output 1/output 2 respectively. Terminal count is derived as 1/1/2; a present saved
+   value must be the exact integer and may not be a coercible string/Boolean or conflicting count.
+7. Editor smoke, all example JSON validation, and package inspection pass.
+8. Single-write dtype is specified exactly once. A complete address dtype/count or word-bit selector
+   permits `msg.dtype` omission; a bare address requires exact uppercase `BIT/U/S/D/L/F/H`.
+   `COMMENT`, double specification, missing dtype, explicit undefined/null/empty/non-string,
+   lowercase/alias/unknown values, and incomplete/conflicting colon or period selectors fail before
+   connect/write with no fallback or complementary parsing.
+9. Connection/read/write `name` is optional display-only state. Missing/null/blank/non-string values
+   normalize to empty, normal strings are trimmed, and duplicates are allowed. Changing a name does
+   not change the runtime node ID, connection reference, profile, request arguments, request content,
+   output metadata, or editor fallback label behavior.
 
 ## Verification checklist
 
 - [x] Implementation completed for NR-KV-OH-001 through NR-KV-OH-005 in this repository.
 - [x] Tests added or updated for the machine-verifiable acceptance criteria.
-- [x] `npm test` passes 58 tests with zero skip; editor smoke, all example saved-field checks, `npm pack --dry-run`, and `git diff --check` pass.
+- [x] `npm test` passes 64 tests with zero skip, including D-116 all-source/evaluator boundaries,
+  D-118 fixed output shapes, D-119 metadata ownership/operation transitions, D-120 exact error
+  routing/output counts, D-123 authoritative runtime-property/no-fallback boundaries, and D-125
+  exact-one writable dtype/no-send boundaries, and D-126 all-node display-name/identity/request
+  invariance; editor
+  smoke, all example saved-field checks, `npm pack --dry-run`, and
+  `git diff --check` pass.
 - [x] Codex self-review completed for public API, validation order, explicit connection/concurrent-connect state, timeout/TCP/UDP failure, response cap, numeric formats/ranges, compound updates, Node runtime modes, docs, examples, and package contents.
 - [ ] Claude source review completed and findings recorded — pending user authorization; Claude has not been invoked.
 - [ ] Codex resolved or dispositioned every Claude finding and reran affected checks — pending Claude review.

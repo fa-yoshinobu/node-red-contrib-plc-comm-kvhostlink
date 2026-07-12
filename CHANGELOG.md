@@ -22,7 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Library: `HostLinkClient` now requires explicit `port`, `transport`, and PLC profile metadata; commands require an explicit successful `connect()` after construction, close, or transport failure.
 - Library: Low-level numeric device APIs now accept a base device and a separate required `dataFormat`; suffix-bearing inputs such as `DM100.D` are rejected. Expansion-unit buffer access also requires an explicit format.
 - Library: `sendRaw` returns undecoded response body bytes, `setTime` requires an explicit value, comment padding options are removed, and public buffer/trace options are removed.
-- Node-RED: Saved source types, output/metadata/error modes, terminal counts, and single-write dtype intent are required and validated without runtime fallback.
+- Node-RED: Saved source types, output/metadata/error modes, terminal counts, and single-write dtype intent are required and validated without runtime fallback. Single-write dtype must appear exactly once, either in the address or as exact uppercase `BIT/U/S/D/L/F/H`; `COMMENT` remains read-only. Double, missing, invalid, or incomplete selector forms fail before connect/write. A present invalid runtime read/write property never falls back to configured addresses or updates.
+- Node-RED: Connection/read/write `name` is optional display-only state. It is trimmed, non-string/blank input means no custom label, duplicates are allowed, and it never changes node identity, connection selection, request content, or metadata.
+- Node-RED editor: `str` and `object` remain initial values for new nodes only. Missing/invalid
+  source types or output modes are rejected; failed non-literal references never become literal
+  PLC input.
+- Node-RED: Read output shapes are fixed: `object` is always address-keyed, `array` is always an
+  array, and `value` requires exactly one address.
+- Node-RED: Full/minimal metadata removes stale owned fields, preserves custom fields, and identifies
+  only the current read/write operation. Off leaves existing `msg.kvhostlink` unchanged.
+- Node-RED: Throw/msg/output2 now uniquely determine failure routing and terminal count. Coercible
+  string/Boolean terminal counts and conflicting saved counts are rejected.
 
 ### Fixed
 - Library: `readTyped(..., "BIT")` now recognizes `ON`/`OFF` and `1`/`0` exactly instead of treating `ON` as false.

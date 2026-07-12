@@ -20,7 +20,7 @@ function requireSourceType(config, key) {
 
 function validateOutputs(config, errorHandling) {
   const expected = errorHandling === "output2" ? 2 : 1;
-  if (hasOwn(config, "outputs") && Number(config.outputs) !== expected) {
+  if (hasOwn(config, "outputs") && config.outputs !== expected) {
     throw new Error(`outputs=${config.outputs} conflicts with errorHandling=${errorHandling}; review the node wiring and save it again`);
   }
   return expected;

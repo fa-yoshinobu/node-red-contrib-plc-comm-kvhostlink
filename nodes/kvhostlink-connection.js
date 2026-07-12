@@ -5,6 +5,7 @@ const {
   normalizePlcProfile,
   profileDescriptors,
 } = require("../lib/hostlink");
+const { normalizeDisplayName } = require("./runtime-validation");
 
 const DEFAULT_TIMEOUT = 3000;
 
@@ -48,7 +49,7 @@ module.exports = function registerKvHostLinkConnection(RED) {
   function KvHostLinkConnectionNode(config) {
     RED.nodes.createNode(this, config);
 
-    this.name = typeof config.name === "string" ? config.name.trim() : "";
+    this.name = normalizeDisplayName(config.name);
     if (typeof config.host !== "string" || !config.host.trim()) {
       throw new Error("kvhostlink-connection host is required and must be a non-empty string");
     }

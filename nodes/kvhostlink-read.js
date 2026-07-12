@@ -1,6 +1,6 @@
 "use strict";
 
-const { normalizeAddressList, readNamed } = require("../lib/hostlink");
+const { normalizeAddress, normalizeAddressList, readNamed } = require("../lib/hostlink");
 const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
 
 module.exports = function registerKvHostLinkRead(RED) {
@@ -70,19 +70,30 @@ async function resolveAddresses(RED, node, msg) {
     if (!Array.isArray(msg.addresses) && typeof msg.addresses !== "string") {
       throw new Error("msg.addresses must be a non-empty string or array");
     }
+    if ((typeof msg.addresses === "string" && !msg.addresses.trim())
+        || (Array.isArray(msg.addresses) && msg.addresses.length === 0)) {
+      throw new Error("msg.addresses must not be empty");
+    }
+    if (Array.isArray(msg.addresses)
+        && msg.addresses.some((address) => typeof address !== "string" || !address.trim())) {
+      throw new Error("msg.addresses must contain only non-empty address strings");
+    }
     const addresses = normalizeAddressList(msg.addresses);
     if (addresses.length === 0) {
       throw new Error("msg.addresses must not be empty");
     }
-    return addresses;
+    return addresses.map((address) => normalizeAddress(address));
   }
   const configured = await evaluateConfiguredValue(RED, node, msg, node.addresses, node.addressesType, "addresses");
-  return normalizeAddressList(configured);
+  return normalizeAddressList(configured).map((address) => normalizeAddress(address));
 }
 
 function evaluateConfiguredValue(RED, node, msg, value, type, label) {
-  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function" || !type || type === "str") {
+  if (type === "str") {
     return Promise.resolve(value);
+  }
+  if (!RED.util || typeof RED.util.evaluateNodeProperty !== "function") {
+    return Promise.reject(new Error(`Unable to evaluate ${label}: Node-RED property evaluator is unavailable`));
   }
   return new Promise((resolve, reject) => {
     RED.util.evaluateNodeProperty(value, type, node, msg, (error, resolved) => {
