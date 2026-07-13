@@ -160,7 +160,9 @@ test("HostLinkClient removes public buffer/trace overrides and requires an expli
   assert.throws(() => createTestClient({ bufferSize: 1024 }), /no longer a public option/);
   assert.throws(() => createTestClient({ traceHook: () => undefined }), /not a public runtime option/);
   const client = createTestClient();
+  assert.deepEqual(client.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
   await assert.rejects(() => client.checkErrorNo(), /not connected.*connect/i);
+  assert.deepEqual(client.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
   assert.equal(client._socket, null);
   const events = [];
   const traced = createTestClient({ _maintainerTraceHook: (event) => events.push(event) });
@@ -239,10 +241,13 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
     }
     send(_payload, callback) {
       callback(null);
-      setImmediate(() => this.emit("message", Buffer.from(this.response, "ascii")));
+      if (this.response !== null) {
+        setImmediate(() => this.emit("message", Buffer.from(this.response, "ascii")));
+      }
     }
-    close() {
+    close(callback) {
       this.closed = true;
+      if (callback) callback();
     }
   }
 
@@ -250,15 +255,26 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
   const invalidSocket = new FakeUdpSocket("OK");
   invalid._socket = invalidSocket;
   await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r")), /missing.*terminator/i);
+  assert.deepEqual(invalid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(invalid._socket, null);
   assert.equal(invalidSocket.closed, true);
 
   const valid = createTestClient({ transport: "udp", timeout: 100 });
-  const validSocket = new FakeUdpSocket("OK\r");
+  const validSocket = new FakeUdpSocket("E1\r");
   valid._socket = validSocket;
-  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("OK\r"));
+  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("E1\r"));
+  assert.deepEqual(valid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 3 });
   assert.equal(valid._socket, validSocket);
   assert.equal(validSocket.closed, false);
+  await valid.close();
+  assert.deepEqual(valid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 3 });
+
+  const timedOut = createTestClient({ transport: "udp", timeout: 10 });
+  const timeoutSocket = new FakeUdpSocket(null);
+  timedOut._socket = timeoutSocket;
+  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r")), /timeout/i);
+  assert.deepEqual(timedOut.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
+  assert.equal(timeoutSocket.closed, true);
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {

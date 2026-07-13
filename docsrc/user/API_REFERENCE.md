@@ -97,3 +97,7 @@ The low-level library module exports these public names:
 `readComments`, `readCounter`, `readDWords`, `readNamed`, `readTimer`,
 `readTimerCounter`, `readTyped`, `readWords`,
 `splitDataTokens`, `writeBitInWord`, `writeNamed`, `writeTyped`.
+
+## Traffic statistics
+
+`HostLinkClient.trafficStats()` returns a frozen `{ requestCount, txBytes, rxBytes }` lifetime snapshot.

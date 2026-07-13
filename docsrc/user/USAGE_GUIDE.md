@@ -191,3 +191,7 @@ The connection metadata contains `host`, `port`, `transport`, and `timeout`.
 | `Throw` | Calls Node-RED `done(error)`. |
 | `msg.error` | Adds the error object to `msg.error` and sends the message on output 1. |
 | `Second output` | Sends normal messages on output 1 and error messages on output 2. |
+
+## Traffic statistics
+
+Call `client.trafficStats()` to inspect completed framed sends and responses. Close/reconnect does not reset it.

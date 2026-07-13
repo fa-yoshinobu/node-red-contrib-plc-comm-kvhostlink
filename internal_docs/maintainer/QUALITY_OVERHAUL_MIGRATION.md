@@ -174,3 +174,16 @@ Acceptance criteria:
 - [x] The package public HostLink client and typed-read helper connected to `keyence:kv-x500` at `192.168.250.100:8501` over TCP and read `DM0:U` once; the result was `5878`.
 - [x] No write, retry, or profile／transport fallback was performed.
 - [x] This evidence is limited to that endpoint, profile, device, transport, and operation; it does not verify other device families, Node-RED editor/runtime wiring, or the complete profile.
+
+## NR-007: Lifetime traffic statistics
+
+Approved next-release contract: `trafficStats()` returns frozen lifetime counters; only complete
+sends and complete response lines/datagrams count, pre-send and partial failures do not, and
+close/reconnect does not reset. Implementation and deterministic tests are required; live PLC
+verification is unnecessary. Claude review and final packaging remain pending explicit authorization.
+
+- [x] Public API and transport-boundary implementation completed.
+- [x] Deterministic tests, documentation, changelog, and package gate completed.
+- [x] Codex final self-review completed.
+- [ ] Claude review completed and findings dispositioned.
+- [ ] Next-release package acceptance completed.
