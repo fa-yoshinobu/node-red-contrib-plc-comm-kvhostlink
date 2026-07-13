@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-13
+
 ### BREAKING
 - Library: `HostLinkClient` now requires explicit `port`, `transport`, and PLC profile metadata; commands require an explicit successful `connect()` after construction, close, or transport failure.
 - Library: Low-level numeric device APIs now accept a base device and a separate required `dataFormat`; suffix-bearing inputs such as `DM100.D` are rejected. Expansion-unit buffer access also requires an explicit format.
@@ -34,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node-RED: Throw/msg/output2 now uniquely determine failure routing and terminal count. Coercible
   string/Boolean terminal counts and conflicting saved counts are rejected.
 
+### Added
+- Library: Added `profileDescriptors()` for canonical Host Link profile metadata.
+
+### Changed
+- Samples: All saved connection and runtime mode fields are explicit.
+- Docs: Updated the API and usage contracts for explicit lifecycle, data formats, and Node-RED runtime validation.
+
 ### Fixed
 - Library: `readTyped(..., "BIT")` now recognizes `ON`/`OFF` and `1`/`0` exactly instead of treating `ON` as false.
 - Library: Bit-in-word updates on one client serialize the complete read-modify-write sequence, preventing concurrent updates from overwriting each other.
@@ -45,16 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Library: JavaScript `Date` clock writes require a valid year from 2000 through 2099, and Float32 writes reject finite values that overflow when encoded.
 - Node-RED editor: Dynamic source-field validation now uses the active editor widget only for the node currently being edited, preventing another editor instance from changing validation results.
 
-### Changed
-- Samples: All saved connection and runtime mode fields are explicit.
-- Docs: Updated the API and usage contracts for explicit lifecycle, data formats, and Node-RED runtime validation.
-
-## [3.1.0] - 2026-07-10
-
-### Added
-- Library: Added `profileDescriptors()` for canonical Host Link profile metadata.
-
-### Fixed
 - Library: Corrected ten KV device range cells against live PLC hardware and the KEYENCE simulator, and pinned the canonical profile source to `plc-comm-hostlink-profiles` `v1.2.0`. `VM` widens to `VM0-9999` on KV-NANO and `VM0-59999` on KV-3000/KV-5000; `Z` widens to `Z1-23` on KV-8000. `CTH` narrows to `CTH0-1` on the KV-3000 and KV-5000 XYM profiles, matching their base profiles.
 - Library: Parse scalar and batched `BIT` writes strictly so `"false"` and `"0"` write OFF, while ambiguous values fail before transport.
 - Docs: Removed the hand-maintained Getting Started navigation block in favor of site navigation.
