@@ -160,7 +160,9 @@ test("HostLinkClient removes public buffer/trace overrides and requires an expli
   assert.throws(() => createTestClient({ bufferSize: 1024 }), /no longer a public option/);
   assert.throws(() => createTestClient({ traceHook: () => undefined }), /not a public runtime option/);
   const client = createTestClient();
+  assert.deepEqual(client.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
   await assert.rejects(() => client.checkErrorNo(), /not connected.*connect/i);
+  assert.deepEqual(client.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
   assert.equal(client._socket, null);
   const events = [];
   const traced = createTestClient({ _maintainerTraceHook: (event) => events.push(event) });
@@ -210,9 +212,52 @@ test("TCP response cap accepts the boundary and discards one-byte overflow state
   const rejected = overflow._readTcpLine();
   overflow._handleTcpData(Buffer.alloc(65537, 0x41));
   await assert.rejects(() => rejected, /Response line exceeds 65536 bytes/);
+  assert.equal(overflow.trafficStats().rxBytes, 0);
   assert.equal(overflow._socket, null);
   assert.equal(overflow._receiveBuffer.length, 0);
   assert.equal(fakeSocket.destroyed, true);
+});
+
+test("TCP failure paths count only complete response lines", async () => {
+  const completeError = createTestClient({ timeout: 100 });
+  const errorLine = completeError._readTcpLine();
+  completeError._handleTcpData(Buffer.from("E1\r", "ascii"));
+  assert.deepEqual(await errorLine, Buffer.from("E1", "ascii"));
+  assert.equal(completeError.trafficStats().rxBytes, 3);
+
+  const eof = createTestClient({ timeout: 100 });
+  eof._socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  const eofLine = eof._readTcpLine();
+  eof._handleTcpData(Buffer.from("PARTIAL", "ascii"));
+  eof._failTcpConnection(new Error("Connection closed"));
+  await assert.rejects(() => eofLine, /Connection closed/);
+  assert.equal(eof.trafficStats().rxBytes, 0);
+
+  const timedOut = createTestClient({ timeout: 10 });
+  timedOut._socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  await assert.rejects(() => timedOut._readTcpLine(), /Timeout/);
+  assert.equal(timedOut.trafficStats().rxBytes, 0);
+});
+
+test("TCP traffic stats are independent of CRLF segmentation", async () => {
+  const coalesced = createTestClient({ timeout: 100 });
+  const coalescedFirst = coalesced._readTcpLine();
+  coalesced._handleTcpData(Buffer.from("FIRST\r\n", "ascii"));
+  assert.deepEqual(await coalescedFirst, Buffer.from("FIRST", "ascii"));
+  const coalescedSecond = coalesced._readTcpLine();
+  coalesced._handleTcpData(Buffer.from("SECOND\n\r", "ascii"));
+  assert.deepEqual(await coalescedSecond, Buffer.from("SECOND", "ascii"));
+  assert.equal(coalesced.trafficStats().rxBytes, 13);
+
+  const split = createTestClient({ timeout: 100 });
+  const splitFirst = split._readTcpLine();
+  split._handleTcpData(Buffer.from("FIRST\r", "ascii"));
+  assert.deepEqual(await splitFirst, Buffer.from("FIRST", "ascii"));
+  split._handleTcpData(Buffer.from("\n", "ascii"));
+  const splitSecond = split._readTcpLine();
+  split._handleTcpData(Buffer.from("SECOND\n\r", "ascii"));
+  assert.deepEqual(await splitSecond, Buffer.from("SECOND", "ascii"));
+  assert.equal(split.trafficStats().rxBytes, 13);
 });
 
 test("setTime requires a value and rejects invalid calendar/weekday combinations before send", async () => {
@@ -239,10 +284,13 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
     }
     send(_payload, callback) {
       callback(null);
-      setImmediate(() => this.emit("message", Buffer.from(this.response, "ascii")));
+      if (this.response !== null) {
+        setImmediate(() => this.emit("message", Buffer.from(this.response, "ascii")));
+      }
     }
-    close() {
+    close(callback) {
       this.closed = true;
+      if (callback) callback();
     }
   }
 
@@ -250,15 +298,26 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
   const invalidSocket = new FakeUdpSocket("OK");
   invalid._socket = invalidSocket;
   await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r")), /missing.*terminator/i);
+  assert.deepEqual(invalid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(invalid._socket, null);
   assert.equal(invalidSocket.closed, true);
 
   const valid = createTestClient({ transport: "udp", timeout: 100 });
-  const validSocket = new FakeUdpSocket("OK\r");
+  const validSocket = new FakeUdpSocket("E1\r");
   valid._socket = validSocket;
-  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("OK\r"));
+  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("E1\r"));
+  assert.deepEqual(valid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 3 });
   assert.equal(valid._socket, validSocket);
   assert.equal(validSocket.closed, false);
+  await valid.close();
+  assert.deepEqual(valid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 3 });
+
+  const timedOut = createTestClient({ transport: "udp", timeout: 10 });
+  const timeoutSocket = new FakeUdpSocket(null);
+  timedOut._socket = timeoutSocket;
+  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r")), /timeout/i);
+  assert.deepEqual(timedOut.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
+  assert.equal(timeoutSocket.closed, true);
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {

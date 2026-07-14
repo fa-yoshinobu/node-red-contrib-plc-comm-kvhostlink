@@ -174,3 +174,44 @@ Acceptance criteria:
 - [x] The package public HostLink client and typed-read helper connected to `keyence:kv-x500` at `192.168.250.100:8501` over TCP and read `DM0:U` once; the result was `5878`.
 - [x] No write, retry, or profile／transport fallback was performed.
 - [x] This evidence is limited to that endpoint, profile, device, transport, and operation; it does not verify other device families, Node-RED editor/runtime wiring, or the complete profile.
+
+## NR-007: Lifetime traffic statistics
+
+Approved next-release contract: `trafficStats()` returns frozen lifetime counters; only complete
+sends and complete response lines/datagrams count, pre-send and partial failures do not, and
+close/reconnect does not reset. Implementation and deterministic tests are required; live PLC
+verification is unnecessary. Final packaging remains pending explicit authorization.
+
+- [x] Public API and transport-boundary implementation completed.
+- [x] Deterministic tests, documentation, changelog, and package gate completed.
+- [x] Codex final self-review completed.
+- [ ] Next-release package acceptance completed.
+
+## QREV-20260714-004: Segmentation-independent TCP receive accounting
+
+Scope: runtime TCP receive framing and `trafficStats().rxBytes`.
+
+Family equivalence: all four HostLink implementations count TCP `OK\r`, `OK\n`, coalesced `OK\r\n`, and either split CR/LF ordering as 3 bytes; UDP `OK\r\n` remains 4 bytes. Incomplete oversize/EOF/timeout/cancellation data contributes zero, while a complete PLC error line is counted before semantic decoding. The family comparison record is `D:\APP\communication_library_quality_review_20260714.md`.
+
+Target contract: one completed TCP response counts its body through the first CR or LF. Additional
+CR/LF separator bytes are consumed without changing the counter, whether they arrive together or
+in a later TCP data event. UDP continues to count the complete accepted response datagram.
+
+Compatibility impact: a coalesced CRLF response previously could count both terminators and now
+counts only the first; split CRLF already counted one. The corrected value is independent of TCP chunking.
+
+Acceptance criteria:
+
+1. Equivalent CRLF responses produce the same `rxBytes` when CR and LF are coalesced or split.
+2. The separator left after a completed line cannot become an empty or misassociated next response.
+3. Complete PLC errors are counted; incomplete oversize, EOF, and timeout paths are not counted. Complete UDP datagram accounting is unchanged.
+
+- [x] Implementation completed in this repository.
+- [x] Tests added or updated for every acceptance criterion.
+- [x] Profile drift, 71 unit/editor tests, examples, documentation, and package dry-run checks passed.
+- [x] Codex self-review completed against the approved contract and cross-language consistency requirements.
+- [x] Claude source review completed; findings are recorded in `D:\APP\claude_review_findings_20260714.md`.
+- [x] Codex resolved or dispositioned every applicable Claude finding and reran affected checks.
+- [x] Live PLC verification is not required for this deterministic local framing and counter contract.
+- [x] Documentation, migration notes, changelog, and API reference agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
