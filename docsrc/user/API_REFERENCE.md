@@ -101,3 +101,5 @@ The low-level library module exports these public names:
 ## Traffic statistics
 
 `HostLinkClient.trafficStats()` returns a frozen `{ requestCount, txBytes, rxBytes }` lifetime snapshot.
+TCP receive bytes count the body plus the first CR/LF terminator, independent of separator
+segmentation; UDP receive bytes count the complete datagram.

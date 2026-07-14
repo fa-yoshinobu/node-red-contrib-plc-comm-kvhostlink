@@ -212,9 +212,52 @@ test("TCP response cap accepts the boundary and discards one-byte overflow state
   const rejected = overflow._readTcpLine();
   overflow._handleTcpData(Buffer.alloc(65537, 0x41));
   await assert.rejects(() => rejected, /Response line exceeds 65536 bytes/);
+  assert.equal(overflow.trafficStats().rxBytes, 0);
   assert.equal(overflow._socket, null);
   assert.equal(overflow._receiveBuffer.length, 0);
   assert.equal(fakeSocket.destroyed, true);
+});
+
+test("TCP failure paths count only complete response lines", async () => {
+  const completeError = createTestClient({ timeout: 100 });
+  const errorLine = completeError._readTcpLine();
+  completeError._handleTcpData(Buffer.from("E1\r", "ascii"));
+  assert.deepEqual(await errorLine, Buffer.from("E1", "ascii"));
+  assert.equal(completeError.trafficStats().rxBytes, 3);
+
+  const eof = createTestClient({ timeout: 100 });
+  eof._socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  const eofLine = eof._readTcpLine();
+  eof._handleTcpData(Buffer.from("PARTIAL", "ascii"));
+  eof._failTcpConnection(new Error("Connection closed"));
+  await assert.rejects(() => eofLine, /Connection closed/);
+  assert.equal(eof.trafficStats().rxBytes, 0);
+
+  const timedOut = createTestClient({ timeout: 10 });
+  timedOut._socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  await assert.rejects(() => timedOut._readTcpLine(), /Timeout/);
+  assert.equal(timedOut.trafficStats().rxBytes, 0);
+});
+
+test("TCP traffic stats are independent of CRLF segmentation", async () => {
+  const coalesced = createTestClient({ timeout: 100 });
+  const coalescedFirst = coalesced._readTcpLine();
+  coalesced._handleTcpData(Buffer.from("FIRST\r\n", "ascii"));
+  assert.deepEqual(await coalescedFirst, Buffer.from("FIRST", "ascii"));
+  const coalescedSecond = coalesced._readTcpLine();
+  coalesced._handleTcpData(Buffer.from("SECOND\n\r", "ascii"));
+  assert.deepEqual(await coalescedSecond, Buffer.from("SECOND", "ascii"));
+  assert.equal(coalesced.trafficStats().rxBytes, 13);
+
+  const split = createTestClient({ timeout: 100 });
+  const splitFirst = split._readTcpLine();
+  split._handleTcpData(Buffer.from("FIRST\r", "ascii"));
+  assert.deepEqual(await splitFirst, Buffer.from("FIRST", "ascii"));
+  split._handleTcpData(Buffer.from("\n", "ascii"));
+  const splitSecond = split._readTcpLine();
+  split._handleTcpData(Buffer.from("SECOND\n\r", "ascii"));
+  assert.deepEqual(await splitSecond, Buffer.from("SECOND", "ascii"));
+  assert.equal(split.trafficStats().rxBytes, 13);
 });
 
 test("setTime requires a value and rejects invalid calendar/weekday combinations before send", async () => {

@@ -195,3 +195,5 @@ The connection metadata contains `host`, `port`, `transport`, and `timeout`.
 ## Traffic statistics
 
 Call `client.trafficStats()` to inspect completed framed sends and responses. Close/reconnect does not reset it.
+For TCP, a received line counts its body plus the first CR/LF terminator; extra CR/LF separators
+are consumed but not counted. For UDP, the complete response datagram is counted.

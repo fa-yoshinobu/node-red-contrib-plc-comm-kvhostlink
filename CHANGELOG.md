@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Library: Added immutable client-lifetime traffic snapshots through `trafficStats()`.
+- Library: Made TCP receive-byte accounting independent of CR/LF segmentation by counting the response body and first terminator only; UDP datagram accounting is unchanged.
 
 ## [3.1.0] - 2026-07-13
 
