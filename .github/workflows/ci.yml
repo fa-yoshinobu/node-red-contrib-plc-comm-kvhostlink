@@ -35,6 +35,11 @@ jobs:
       - name: Check release workflows do not auto-publish
         shell: pwsh
         run: ./scripts/check_no_auto_publish.ps1
+
+      - name: Check GitHub source archive contents
+        shell: pwsh
+        run: ./scripts/check_source_archive.ps1
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

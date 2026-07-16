@@ -42,6 +42,10 @@ jobs:
         with:
           ref: refs/tags/${{ steps.version.outputs.tag }}
 
+      - name: Check GitHub source archive contents
+        shell: pwsh
+        run: ./scripts/check_source_archive.ps1
+
       - name: Check canonical HostLink profile JSONs
         shell: pwsh
         run: ./scripts/update_hostlink_profile_jsons.ps1 -FailIfChanged
