@@ -180,12 +180,15 @@ Acceptance criteria:
 Approved next-release contract: `trafficStats()` returns frozen lifetime counters; only complete
 sends and complete response lines/datagrams count, pre-send and partial failures do not, and
 close/reconnect does not reset. Implementation and deterministic tests are required; live PLC
-verification is unnecessary. Final packaging remains pending explicit authorization.
+verification is unnecessary. Final packaging and publication acceptance completed with `v3.2.0`.
 
 - [x] Public API and transport-boundary implementation completed.
 - [x] Deterministic tests, documentation, changelog, and package gate completed.
 - [x] Codex final self-review completed.
-- [ ] Next-release package acceptance completed.
+- [x] Next-release package acceptance completed. Evidence: the `v3.2.0` tag equals repository HEAD,
+  the GitHub Release and npm `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` `3.2.0` package are
+  public, tag-commit checks passed, and the final six-runtime family source/API comparison was
+  completed on 2026-07-18.
 
 ## QREV-20260714-004: Segmentation-independent TCP receive accounting
 
