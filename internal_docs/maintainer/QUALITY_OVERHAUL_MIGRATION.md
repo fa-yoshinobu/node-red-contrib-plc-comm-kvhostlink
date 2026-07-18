@@ -180,18 +180,21 @@ Acceptance criteria:
 Approved next-release contract: `trafficStats()` returns frozen lifetime counters; only complete
 sends and complete response lines/datagrams count, pre-send and partial failures do not, and
 close/reconnect does not reset. Implementation and deterministic tests are required; live PLC
-verification is unnecessary. Final packaging remains pending explicit authorization.
+verification is unnecessary. Final packaging and publication acceptance completed with `v3.2.0`.
 
 - [x] Public API and transport-boundary implementation completed.
 - [x] Deterministic tests, documentation, changelog, and package gate completed.
 - [x] Codex final self-review completed.
-- [ ] Next-release package acceptance completed.
+- [x] Next-release package acceptance completed. Evidence: the `v3.2.0` tag equals repository HEAD,
+  the GitHub Release and npm `@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink` `3.2.0` package are
+  public, tag-commit checks passed, and the final six-runtime family source/API comparison was
+  completed on 2026-07-18.
 
 ## QREV-20260714-004: Segmentation-independent TCP receive accounting
 
 Scope: runtime TCP receive framing and `trafficStats().rxBytes`.
 
-Family equivalence: all four HostLink implementations count TCP `OK\r`, `OK\n`, coalesced `OK\r\n`, and either split CR/LF ordering as 3 bytes; UDP `OK\r\n` remains 4 bytes. Incomplete oversize/EOF/timeout/cancellation data contributes zero, while a complete PLC error line is counted before semantic decoding. The family comparison record is `D:\APP\communication_library_quality_review_20260714.md`.
+Family equivalence: all four HostLink implementations count TCP `OK\r`, `OK\n`, coalesced `OK\r\n`, and either split CR/LF ordering as 3 bytes; UDP `OK\r\n` remains 4 bytes. Incomplete oversize/EOF/timeout/cancellation data contributes zero, while a complete PLC error line is counted before semantic decoding. The family comparison is preserved in the archived workspace record `communication_library_quality_review_20260714.md`.
 
 Target contract: one completed TCP response counts its body through the first CR or LF. Additional
 CR/LF separator bytes are consumed without changing the counter, whether they arrive together or
@@ -210,7 +213,7 @@ Acceptance criteria:
 - [x] Tests added or updated for every acceptance criterion.
 - [x] Profile drift, 71 unit/editor tests, examples, documentation, and package dry-run checks passed.
 - [x] Codex self-review completed against the approved contract and cross-language consistency requirements.
-- [x] Claude source review completed; findings are recorded in `D:\APP\claude_review_findings_20260714.md`.
+- [x] Claude source review completed; findings are preserved in the archived workspace record `claude_review_findings_20260714.md`.
 - [x] Codex resolved or dispositioned every applicable Claude finding and reran affected checks.
 - [x] Live PLC verification is not required for this deterministic local framing and counter contract.
 - [x] Documentation, migration notes, changelog, and API reference agree with the implementation.
