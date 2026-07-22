@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING
+- Library: Removed the undocumented deep-import-only `FORCE_DEVICE_TYPES` alias. Internal command validation continues to use the distinct `FORCE_SINGLE_DEVICE_TYPES` and `FORCE_CONSECUTIVE_DEVICE_TYPES` sets.
+
 ## [3.2.0] - 2026-07-17
 
 - Release: Bumped npm package and lockfile metadata to `3.2.0`.
