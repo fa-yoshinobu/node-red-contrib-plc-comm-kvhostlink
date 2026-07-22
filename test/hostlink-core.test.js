@@ -190,6 +190,59 @@ test("concurrent connect calls share one transport creation", async () => {
   assert.equal(client._socket, socket);
 });
 
+test("an old TCP write callback cannot destroy or feed a replacement connection", async () => {
+  class FakeSocket extends EventEmitter {
+    constructor() {
+      super();
+      this.destroyed = false;
+      this.writeCallback = null;
+    }
+
+    write(_payload, callback) {
+      this.writeCallback = callback;
+    }
+
+    destroy() {
+      if (this.destroyed) return;
+      this.destroyed = true;
+      setImmediate(() => this.emit("close"));
+    }
+  }
+
+  const client = createTestClient();
+  const oldSocket = new FakeSocket();
+  client._socket = oldSocket;
+  const request = client.sendRaw("?K");
+  await Promise.resolve();
+  assert.equal(typeof oldSocket.writeCallback, "function");
+
+  const closing = client.close();
+  const newSocket = new FakeSocket();
+  client._socket = newSocket;
+  client._handleTcpData(Buffer.from("STALE\r", "ascii"), oldSocket);
+  oldSocket.writeCallback(new Error("old write failed"));
+
+  await assert.rejects(() => request, /old write failed/);
+  await closing;
+  assert.equal(newSocket.destroyed, false);
+  assert.equal(client._socket, newSocket);
+  assert.equal(client._receiveBuffer.length, 0);
+
+  const successClient = createTestClient();
+  const supersededSocket = new FakeSocket();
+  const currentSocket = new FakeSocket();
+  successClient._socket = supersededSocket;
+  const supersededRequest = successClient.sendRaw("?K");
+  await Promise.resolve();
+  successClient._socket = currentSocket;
+  supersededSocket.writeCallback(null);
+
+  await assert.rejects(() => supersededRequest, /connection changed/);
+  assert.equal(successClient._socket, currentSocket);
+  assert.equal(currentSocket.destroyed, false);
+  assert.deepEqual(successClient.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
+});
+
 test("sendRaw returns undecoded response bytes without terminators", async () => {
   const client = createTestClient();
   client._exchange = async () => Buffer.from("E1\r\n", "ascii");
