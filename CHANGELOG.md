@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### BREAKING
 - Library: Removed the undocumented deep-import-only `FORCE_DEVICE_TYPES` alias. Internal command validation continues to use the distinct `FORCE_SINGLE_DEVICE_TYPES` and `FORCE_CONSECUTIVE_DEVICE_TYPES` sets.
 
+### Fixed
+- Library: Bound TCP data, error, close, and write-completion handling to the socket generation that created each callback. A delayed callback from a closed connection can no longer destroy a replacement connection or modify its receive buffer, pending request, or traffic counters.
+
+### Tests
+- Tests: Added deterministic close/reconnect coverage for stale TCP write success, write failure, and data callbacks.
+
 ## [3.2.0] - 2026-07-17
 
 - Release: Bumped npm package and lockfile metadata to `3.2.0`.
