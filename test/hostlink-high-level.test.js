@@ -165,6 +165,47 @@ test("readTyped parses explicit Host Link BIT response tokens", async () => {
   );
 });
 
+test("direct-bit typed and bit-in-word reads pack all sixteen response tokens", async () => {
+  const calls = [];
+  const fakeClient = {
+    async read(device, dataFormat) {
+      calls.push({ kind: "read", device, dataFormat });
+      const setBits = device === "M100" ? [0, 3, 15] : [3, 8];
+      return Array.from({ length: 16 }, (_, bit) => setBits.includes(bit) ? 1 : 0);
+    },
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ kind: "readConsecutive", device, count, dataFormat });
+      return [0x8009, 0x0108];
+    },
+  };
+
+  assert.equal(await readTyped(fakeClient, "M100", "U"), 0x8009);
+  assert.deepEqual(await readNamed(fakeClient, ["M100:U", "R010.3"]), {
+    "M100:U": 0x8009,
+    "R010.3": true,
+  });
+  assert.deepEqual(await readNamed(fakeClient, ["M100:U,2"]), {
+    "M100:U,2": [0x8009, 0x0108],
+  });
+  assert.equal(calls.some((call) => call.kind === "readConsecutive"), true);
+});
+
+test("BIT dtype rejects timer and counter devices before client execution", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async read() { calls += 1; },
+    async write() { calls += 1; },
+  };
+  for (const address of ["T0:BIT", "C0:BIT", "TC0:BIT", "CC0:BIT"]) {
+    assert.throws(() => parseAddress(address), /only for direct bit device/i);
+    await assert.rejects(() => readNamed(fakeClient, [address]), /only for direct bit device/i);
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: true }), /only for direct bit device/i);
+  }
+  await assert.rejects(() => readTyped(fakeClient, "T0", "BIT"), /only for direct bit device/i);
+  await assert.rejects(() => writeTyped(fakeClient, "C0", "BIT", true), /only for direct bit device/i);
+  assert.equal(calls, 0);
+});
+
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
@@ -337,6 +378,27 @@ test("readNamed batches optimizable contiguous word requests", async () => {
     "DM106.3": true,
   });
   assert.deepEqual(calls, [{ device: "DM100", count: 7, dataFormat: ".U" }]);
+});
+
+test("readNamed splits contiguous plans at the RDS point limit", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat });
+      return Array(count).fill(7);
+    },
+  };
+  const addresses = Array.from({ length: 2001 }, (_, index) => `DM${index}:U`);
+
+  const snapshot = await readNamed(fakeClient, addresses);
+
+  assert.equal(Object.keys(snapshot).length, 2001);
+  assert.equal(addresses.every((address) => snapshot[address] === 7), true);
+  assert.deepEqual(calls, [
+    { device: "DM0", count: 1000, dataFormat: ".U" },
+    { device: "DM1000", count: 1000, dataFormat: ".U" },
+    { device: "DM2000", count: 1, dataFormat: ".U" },
+  ]);
 });
 
 test("readNamed batches direct bit requests", async () => {
