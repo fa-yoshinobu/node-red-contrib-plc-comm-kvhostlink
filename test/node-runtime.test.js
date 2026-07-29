@@ -118,6 +118,92 @@ test("Node-RED HostLink saved-flow contract rejects missing and contradictory mo
   assert.doesNotMatch(writeHtml, /metadataMode\s*\|\|\s*"full"/);
 });
 
+test("connection node close prevents an in-flight connect from leaking a replacement socket", async () => {
+  const runtime = createRuntime();
+  const connection = runtime.create("kvhostlink-connection", {
+    id: "closing-connection",
+    name: "",
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    timeout: 3000,
+    plcProfile: "keyence:kv-8000",
+  });
+  let releaseConnect;
+  let open = false;
+  let connectCalls = 0;
+  let closeCalls = 0;
+  connection.client = {
+    async connect() {
+      connectCalls += 1;
+      await new Promise((resolve) => { releaseConnect = resolve; });
+      open = true;
+    },
+    async close() {
+      closeCalls += 1;
+      open = false;
+    },
+  };
+
+  const connecting = connection.connect();
+  while (!releaseConnect) {
+    await Promise.resolve();
+  }
+  const closed = new Promise((resolve) => connection.emit("close", false, resolve));
+  await closed;
+  releaseConnect();
+  await assert.rejects(connecting, /closed while connecting/);
+
+  assert.equal(connectCalls, 1);
+  assert.equal(closeCalls, 2);
+  assert.equal(open, false);
+  await assert.rejects(() => connection.connect(), /is closing/);
+  assert.equal(connectCalls, 1);
+});
+
+test("connection node close prevents an in-flight reinitialize from leaking a replacement socket", async () => {
+  const runtime = createRuntime();
+  const connection = runtime.create("kvhostlink-connection", {
+    id: "reinitializing-connection",
+    name: "",
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    timeout: 3000,
+    plcProfile: "keyence:kv-8000",
+  });
+  let releaseConnect;
+  let open = false;
+  let connectCalls = 0;
+  let closeCalls = 0;
+  connection.client = {
+    async connect() {
+      connectCalls += 1;
+      await new Promise((resolve) => { releaseConnect = resolve; });
+      open = true;
+    },
+    async close() {
+      closeCalls += 1;
+      open = false;
+    },
+  };
+
+  const reinitializing = connection.reinitialize();
+  while (!releaseConnect) {
+    await Promise.resolve();
+  }
+  const closed = new Promise((resolve) => connection.emit("close", false, resolve));
+  await closed;
+  releaseConnect();
+  await assert.rejects(reinitializing, /closed while reinitializing/);
+
+  assert.equal(connectCalls, 1);
+  assert.equal(closeCalls, 3);
+  assert.equal(open, false);
+  await assert.rejects(() => connection.reinitialize(), /is closing/);
+  assert.equal(connectCalls, 1);
+});
+
 test("Node-RED HostLink evaluates every explicit source type without literal fallback", async () => {
   const runtime = createRuntime();
   let readCalls = 0;

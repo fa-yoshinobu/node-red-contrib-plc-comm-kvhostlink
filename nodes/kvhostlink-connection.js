@@ -69,6 +69,7 @@ module.exports = function registerKvHostLinkConnection(RED) {
       timeout: this.timeout,
       plcProfile: this.plcProfile,
     });
+    this._closing = false;
 
     this._setState = (fill, shape, text) => this.status({ fill, shape, text });
     this.getClient = () => this.client;
@@ -80,8 +81,15 @@ module.exports = function registerKvHostLinkConnection(RED) {
       plcProfile: this.plcProfile,
     });
     this.connect = async () => {
+      if (this._closing) {
+        throw new Error("KV Host Link connection node is closing");
+      }
       this._setState("yellow", "ring", "connecting");
       await this.client.connect();
+      if (this._closing) {
+        await this.client.close();
+        throw new Error("KV Host Link connection node closed while connecting");
+      }
       this._setState("green", "dot", "connected");
     };
     this.disconnect = async () => {
@@ -90,15 +98,26 @@ module.exports = function registerKvHostLinkConnection(RED) {
       this._setState("red", "ring", "disconnected");
     };
     this.reinitialize = async () => {
+      if (this._closing) {
+        throw new Error("KV Host Link connection node is closing");
+      }
       this._setState("yellow", "ring", "reinitializing");
       await this.client.close();
+      if (this._closing) {
+        throw new Error("KV Host Link connection node closed while reinitializing");
+      }
       await this.client.connect();
+      if (this._closing) {
+        await this.client.close();
+        throw new Error("KV Host Link connection node closed while reinitializing");
+      }
       this._setState("green", "dot", "connected");
     };
 
     this._setState("grey", "ring", "ready");
 
     this.on("close", (_removed, done) => {
+      this._closing = true;
       this.client
         .close()
         .catch(() => undefined)

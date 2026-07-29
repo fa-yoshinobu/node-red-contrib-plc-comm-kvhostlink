@@ -165,6 +165,47 @@ test("readTyped parses explicit Host Link BIT response tokens", async () => {
   );
 });
 
+test("direct-bit typed and bit-in-word reads pack all sixteen response tokens", async () => {
+  const calls = [];
+  const fakeClient = {
+    async read(device, dataFormat) {
+      calls.push({ kind: "read", device, dataFormat });
+      const setBits = device === "M100" ? [0, 3, 15] : [3, 8];
+      return Array.from({ length: 16 }, (_, bit) => setBits.includes(bit) ? 1 : 0);
+    },
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ kind: "readConsecutive", device, count, dataFormat });
+      return [0x8009, 0x0108];
+    },
+  };
+
+  assert.equal(await readTyped(fakeClient, "M100", "U"), 0x8009);
+  assert.deepEqual(await readNamed(fakeClient, ["M100:U", "R010.3"]), {
+    "M100:U": 0x8009,
+    "R010.3": true,
+  });
+  assert.deepEqual(await readNamed(fakeClient, ["M100:U,2"]), {
+    "M100:U,2": [0x8009, 0x0108],
+  });
+  assert.equal(calls.some((call) => call.kind === "readConsecutive"), true);
+});
+
+test("BIT dtype rejects timer and counter devices before client execution", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async read() { calls += 1; },
+    async write() { calls += 1; },
+  };
+  for (const address of ["T0:BIT", "C0:BIT", "TC0:BIT", "CC0:BIT"]) {
+    assert.throws(() => parseAddress(address), /only for direct bit device/i);
+    await assert.rejects(() => readNamed(fakeClient, [address]), /only for direct bit device/i);
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: true }), /only for direct bit device/i);
+  }
+  await assert.rejects(() => readTyped(fakeClient, "T0", "BIT"), /only for direct bit device/i);
+  await assert.rejects(() => writeTyped(fakeClient, "C0", "BIT", true), /only for direct bit device/i);
+  assert.equal(calls, 0);
+});
+
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
@@ -337,6 +378,27 @@ test("readNamed batches optimizable contiguous word requests", async () => {
     "DM106.3": true,
   });
   assert.deepEqual(calls, [{ device: "DM100", count: 7, dataFormat: ".U" }]);
+});
+
+test("readNamed splits contiguous plans at the RDS point limit", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat });
+      return Array(count).fill(7);
+    },
+  };
+  const addresses = Array.from({ length: 2001 }, (_, index) => `DM${index}:U`);
+
+  const snapshot = await readNamed(fakeClient, addresses);
+
+  assert.equal(Object.keys(snapshot).length, 2001);
+  assert.equal(addresses.every((address) => snapshot[address] === 7), true);
+  assert.deepEqual(calls, [
+    { device: "DM0", count: 1000, dataFormat: ".U" },
+    { device: "DM1000", count: 1000, dataFormat: ".U" },
+    { device: "DM2000", count: 1, dataFormat: ".U" },
+  ]);
 });
 
 test("readNamed batches direct bit requests", async () => {
@@ -627,6 +689,53 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     { kind: "writeConsecutive", device: "Z1", values: [70000, 80000], dataFormat: ".D" },
     { kind: "writeConsecutive", device: "TC0", values: [90000, 100000], dataFormat: ".D" },
     { kind: "writeSetValueConsecutive", device: "T20", values: [555, 666], dataFormat: ".D" },
+  ]);
+});
+
+test("writeNamed does not merge typed word values on direct-bit device families", async () => {
+  const calls = [];
+  const fakeClient = {
+    async write(device, value, dataFormat) {
+      calls.push({ kind: "write", device, value, dataFormat });
+    },
+    async writeConsecutive(device, values, dataFormat) {
+      calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat });
+    },
+  };
+
+  await writeNamed(fakeClient, {
+    "M100:U": 1,
+    "M101:U": 2,
+    "M102:S": -1,
+    "M103:S": -2,
+    "M104:H": 0x1234,
+    "M105:H": 0x5678,
+    "M200:D": 0x12345678,
+    "M202:D": 0x23456789,
+    "M300:L": -2,
+    "M302:L": -3,
+    "M400:F": 1.5,
+    "M402:F": 2.5,
+    "M500:BIT": true,
+    "M501:BIT": false,
+  });
+
+  assert.deepEqual(calls.slice(0, 10).map(({ kind, device, dataFormat }) => ({ kind, device, dataFormat })), [
+    { kind: "write", device: "M100", dataFormat: ".U" },
+    { kind: "write", device: "M101", dataFormat: ".U" },
+    { kind: "write", device: "M102", dataFormat: ".S" },
+    { kind: "write", device: "M103", dataFormat: ".S" },
+    { kind: "write", device: "M104", dataFormat: ".H" },
+    { kind: "write", device: "M105", dataFormat: ".H" },
+    { kind: "write", device: "M200", dataFormat: ".D" },
+    { kind: "write", device: "M202", dataFormat: ".D" },
+    { kind: "write", device: "M300", dataFormat: ".L" },
+    { kind: "write", device: "M302", dataFormat: ".L" },
+  ]);
+  assert.deepEqual(calls.slice(10), [
+    { kind: "writeConsecutive", device: "M400", values: [0, 16320], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "M402", values: [0, 16416], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "M500", values: [1, 0], dataFormat: undefined },
   ]);
 });
 

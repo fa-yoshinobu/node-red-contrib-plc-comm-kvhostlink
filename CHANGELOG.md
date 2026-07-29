@@ -20,12 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING
 - Library: Removed the undocumented deep-import-only `FORCE_DEVICE_TYPES` alias. Internal command validation continues to use the distinct `FORCE_SINGLE_DEVICE_TYPES` and `FORCE_CONSECUTIVE_DEVICE_TYPES` sets.
+- Library: Timer/counter devices now reject the unsupported `BIT` dtype before transport, and change-detection mode options require their documented exact types instead of coercing values.
 
 ### Fixed
 - Library: Bound TCP data, error, close, and write-completion handling to the socket generation that created each callback. A delayed callback from a closed connection can no longer destroy a replacement connection or modify its receive buffer, pending request, or traffic counters.
+- Library: Direct-bit and bit-in-word operations now pack or preserve complete 16-/32-bit values, closing during connection setup cannot leak a connected socket, and RDS requests split at command limits.
+- Library: Profile/device catalog upper bounds no longer reject sends.
+- Library: Named writes no longer merge adjacent typed word values on direct-bit device families, preserving each value's 16-/32-bit address span.
+- Node-RED: Closing a connection node during reinitialization now closes any newly opened socket and prevents the closed node from returning to connected state.
 
 ### Tests
-- Tests: Added deterministic close/reconnect coverage for stale TCP write success, write failure, and data callbacks.
+- Tests: Added deterministic close/reconnect coverage for stale TCP callbacks and reinitialize races, plus direct-bit typed-write batching regressions.
 
 ## [3.2.0] - 2026-07-17
 
