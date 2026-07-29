@@ -98,9 +98,19 @@ module.exports = function registerKvHostLinkConnection(RED) {
       this._setState("red", "ring", "disconnected");
     };
     this.reinitialize = async () => {
+      if (this._closing) {
+        throw new Error("KV Host Link connection node is closing");
+      }
       this._setState("yellow", "ring", "reinitializing");
       await this.client.close();
+      if (this._closing) {
+        throw new Error("KV Host Link connection node closed while reinitializing");
+      }
       await this.client.connect();
+      if (this._closing) {
+        await this.client.close();
+        throw new Error("KV Host Link connection node closed while reinitializing");
+      }
       this._setState("green", "dot", "connected");
     };
 

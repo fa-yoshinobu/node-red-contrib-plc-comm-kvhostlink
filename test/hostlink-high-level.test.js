@@ -692,6 +692,53 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
   ]);
 });
 
+test("writeNamed does not merge typed word values on direct-bit device families", async () => {
+  const calls = [];
+  const fakeClient = {
+    async write(device, value, dataFormat) {
+      calls.push({ kind: "write", device, value, dataFormat });
+    },
+    async writeConsecutive(device, values, dataFormat) {
+      calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat });
+    },
+  };
+
+  await writeNamed(fakeClient, {
+    "M100:U": 1,
+    "M101:U": 2,
+    "M102:S": -1,
+    "M103:S": -2,
+    "M104:H": 0x1234,
+    "M105:H": 0x5678,
+    "M200:D": 0x12345678,
+    "M202:D": 0x23456789,
+    "M300:L": -2,
+    "M302:L": -3,
+    "M400:F": 1.5,
+    "M402:F": 2.5,
+    "M500:BIT": true,
+    "M501:BIT": false,
+  });
+
+  assert.deepEqual(calls.slice(0, 10).map(({ kind, device, dataFormat }) => ({ kind, device, dataFormat })), [
+    { kind: "write", device: "M100", dataFormat: ".U" },
+    { kind: "write", device: "M101", dataFormat: ".U" },
+    { kind: "write", device: "M102", dataFormat: ".S" },
+    { kind: "write", device: "M103", dataFormat: ".S" },
+    { kind: "write", device: "M104", dataFormat: ".H" },
+    { kind: "write", device: "M105", dataFormat: ".H" },
+    { kind: "write", device: "M200", dataFormat: ".D" },
+    { kind: "write", device: "M202", dataFormat: ".D" },
+    { kind: "write", device: "M300", dataFormat: ".L" },
+    { kind: "write", device: "M302", dataFormat: ".L" },
+  ]);
+  assert.deepEqual(calls.slice(10), [
+    { kind: "writeConsecutive", device: "M400", values: [0, 16320], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "M402", values: [0, 16416], dataFormat: ".U" },
+    { kind: "writeConsecutive", device: "M500", values: [1, 0], dataFormat: undefined },
+  ]);
+});
+
 function createMockRed() {
   const registeredTypes = new Map();
   const nodes = new Map();
