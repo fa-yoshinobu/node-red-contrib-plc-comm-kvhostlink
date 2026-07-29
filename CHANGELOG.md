@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-07-29
+
+- Release: Bumped npm package and lockfile metadata to `3.2.1`.
+- Release: GitHub Release drafts now prepend this version's changelog section to generated notes and repair a missing section on workflow reruns.
+
 ### BREAKING
 - Library: Removed the undocumented deep-import-only `FORCE_DEVICE_TYPES` alias. Internal command validation continues to use the distinct `FORCE_SINGLE_DEVICE_TYPES` and `FORCE_CONSECUTIVE_DEVICE_TYPES` sets.
 - Library: Timer/counter devices now reject the unsupported `BIT` dtype before transport, and change-detection mode options require their documented exact types instead of coercing values.
