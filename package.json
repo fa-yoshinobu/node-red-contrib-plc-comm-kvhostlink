@@ -24,7 +24,8 @@
     "kv-hostlink",
     "hostlink",
     "upper-link",
-    "plc"
+    "plc",
+    "industrial-automation"
   ],
   "repository": {
     "type": "git",
@@ -33,7 +34,7 @@
   "bugs": {
     "url": "https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/issues"
   },
-  "homepage": "https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink#readme",
+  "homepage": "https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/GETTING_STARTED/",
   "publishConfig": {
     "access": "public"
   },
