@@ -8,6 +8,7 @@ Use this page for your first KEYENCE KV Host Link read and write from Node-RED. 
 
 | Requirement | Value |
 | --- | --- |
+| Node.js | 18 or newer |
 | Node-RED | 3.0 or newer |
 | PLC endpoint | `192.168.250.100:8501` |
 | Transport | TCP unless your PLC setup requires UDP |

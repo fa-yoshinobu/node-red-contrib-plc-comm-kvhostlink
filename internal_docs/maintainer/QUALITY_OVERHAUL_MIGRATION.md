@@ -48,15 +48,16 @@ Acceptance criteria:
 
 Scope: typed BIT reads/writes, bit-in-word updates, and comment normalization.
 
-Target contract: BIT reads recognize only explicit ON/OFF or 1/0 response tokens. BIT writes accept only documented Boolean tokens. One-client bit-in-word read-modify-write is one serialized critical section. Comments remove only trailing ASCII spaces.
+Target contract: BIT reads recognize only explicit ON/OFF or 1/0 response tokens. Direct-bit writes accept only JavaScript Booleans. The public bit-in-word read-modify-write helper is removed because it cannot be atomic against PLC logic or another connection. Comments remove only trailing ASCII spaces.
 
 Compatibility impact: ambiguous BIT coercion and comment padding options are removed.
 
 Acceptance criteria:
 
-1. ON/1 return true, OFF/0 return false, and unknown tokens fail.
-2. Concurrent bit 0/bit 1 updates on one client produce final word value 3 with request order read/write/read/write.
-3. Comment padding removes ASCII space only and leaves other trailing characters intact.
+1. ON/1 return true, OFF/0 return false, and unknown response tokens fail.
+2. Direct-bit writes accept only `true`/`false`; numbers and strings fail before send.
+3. `writeBitInWord` is absent from the public API and bit-in-word named writes fail before transport.
+4. Comment padding removes ASCII space only and leaves other trailing characters intact.
 
 ## NR-KV-OH-005 — Explicit Node-RED saved-flow contract
 
@@ -235,10 +236,185 @@ required caller migration without duplicating their acceptance history.
 | `HL-EVAL-020` | Reconnect after malformed decoded response bytes. PLC `E0` through `E9` errors remain command results and do not alone require reconnect. |
 | `HL-EVAL-021` | Accept operating mode only from exact `0` or `1`; remove consumers that relied on numeric-prefix parsing. |
 | `HL-EVAL-022` | Pass actual safe JavaScript integers to direct APIs. Node-RED form text is the only boundary that validates and converts decimal strings. |
-| `HL-EVAL-023` | Keep one `writeNamed` call within 1000 word, 500 dword/Float32, and 120 timer/counter points per compiled group. Split into multiple calls only when the application explicitly accepts partial-success ordering. |
+| `HL-EVAL-023` | Keep one `writeNamed` call representable as exactly one request within 1000 word, 500 dword/Float32, or 120 timer/counter points. Submit separate calls only when the application explicitly owns partial-success and outcome-unknown handling. |
 | `HL-EVAL-024` | Treat the GitHub source archive as a testable source distribution. Keep the npm package-content contract separate and minimal. |
 
 The basic, typed, and array flows now make the optional write path explicit,
 random, and best-effort restoring. The device-matrix and multi-PLC monitor flows
 are read-only. No comment-decoder encoding behavior changes under this migration;
 `HL-EVAL-TODO-006` remains a separate evidence-dependent decision.
+
+## GOAL-SERIAL-DEFER-001 — Complete single-request capacity
+
+Implementation scope: every public request builder and `HostLinkClient` send
+path in this repository.
+
+Target contract: one framed request, including its CR terminator, is at most
+65,536 bytes. The exact maximum is accepted. Maximum plus one fails before
+traffic counters, connection generation, request state, trace, or transport can
+change. No single-request API splits or retries.
+
+Compatibility impact: oversized raw/custom requests that could previously be
+constructed are rejected deterministically before transport.
+
+Machine-verifiable acceptance criteria:
+
+1. An exact 65,536-byte complete frame is built and sent as one request.
+2. A 65,537-byte complete frame fails before request count, bytes, connection,
+   or fake-transport send state changes.
+3. Public API documentation classifies single-request and aggregate operations.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, unit, package, and extracted-source checks pass.
+- [x] Codex diff/API self-review passes.
+- [x] Live PLC verification is not required; the boundary is locally deterministic.
+- [x] Documentation, migration notes, changelog, and API reference agree.
+- [x] Final acceptance criteria verified.
+
+## GOAL-SERIAL-DEFER-002 — One absolute transaction deadline
+
+Implementation scope: TCP/UDP connection and command paths, including send,
+framing/receive, decode, cancellation, close, and generation retirement.
+
+Target contract: immediately before the first transport send attempt, the
+active operation creates one monotonic deadline covering send completion,
+response framing/receive, and decode. Progress cannot restart it. Timeout and
+active cancellation retire the exact transport generation. Reuse requires an
+explicit reconnect; no command is retried.
+
+Compatibility impact: phase-by-phase or trickle-extended waits end at the one
+configured deadline, and a timed-out/canceled active connection is not reusable.
+
+Machine-verifiable acceptance criteria:
+
+1. Stalled/partial send, response trickle, and delayed decode cannot exceed one
+   transaction deadline.
+2. Timeout is `HostLinkTimeoutError`; cancellation is distinct.
+3. Delayed bytes/callbacks from a retired generation cannot satisfy later work.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, unit, package, and extracted-source checks pass.
+- [x] Codex diff/API self-review passes.
+- [x] Live PLC verification is not required; deterministic fake/loopback transport is sufficient.
+- [x] Documentation, migration notes, changelog, and API reference agree.
+- [x] Final acceptance criteria verified.
+
+## GOAL-SERIAL-DEFER-006 — Ordinary-client FIFO admission
+
+Implementation scope: `HostLinkClient`, `openAndConnect`, high-level helpers,
+and Node-RED connection/read/write use of that ordinary client.
+
+Target contract: each client admits concurrent calls into one FIFO and has at
+most one active wire transaction. Complete input and effective endpoint/profile
+state are validated and snapshotted at admission. Waiting cancellation sends
+nothing, its timeout starts only on activation, and close rejects active plus
+waiting work without later-generation leakage. Separate clients are independent.
+There is no public `QueuedKvHostLinkClient` wrapper or compatibility alias.
+
+Compatibility impact: callers use the ordinary client directly and must not
+mutate inputs expecting queued operations to observe later values.
+
+Machine-verifiable acceptance criteria:
+
+1. FIFO order survives success and PLC error with zero overlapping sends.
+2. Admission snapshots cannot be changed through caller mutation.
+3. Waiting cancellation sends nothing; close rejects active/waiting work.
+4. Public exports/docs contain no queued wrapper and separate clients progress independently.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, unit, package, and extracted-source checks pass.
+- [x] Codex diff/API self-review passes.
+- [x] Live PLC verification is not required; FIFO and lifecycle state are locally deterministic.
+- [x] Documentation, migration notes, changelog, and API reference agree.
+- [x] Final acceptance criteria verified.
+
+## GOAL-ERROR-DEFER-001 — Machine-readable timeout and outcome unknown
+
+Implementation scope: validation, connect, TCP/UDP transaction, cancellation,
+close, protocol/PLC response, and state-changing post-send failure paths.
+
+Target contract: timeout, cancellation, close, not-connected, transport,
+protocol, PLC error, and state-changing outcome unknown are distinguishable by
+public type/code. A state-changing request that may have been sent reports
+`HostLinkOperationOutcomeUnknownError` with structured `reason` and `cause`.
+Native failures remain causes. No ambiguous change is auto-retried.
+
+Compatibility impact: code matching generic connection errors or message text
+must use the dedicated public error types and must reconcile outcome-unknown
+state before deciding whether to issue another write.
+
+Machine-verifiable acceptance criteria:
+
+1. Every classification is distinguishable without message matching.
+2. Read timeout remains timeout; post-send write timeout/cancel/close/invalid
+   response is outcome unknown with the originating reason/cause.
+3. The affected generation retires and no request is resent.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, unit, package, and extracted-source checks pass.
+- [x] Codex diff/API self-review passes.
+- [x] Live PLC verification is not required; classification boundaries use deterministic transports.
+- [x] Documentation, migration notes, changelog, and API reference agree.
+- [x] Final acceptance criteria verified.
+
+## GOAL-AGGREGATE-DEFER-001 — Read-only splitting only
+
+Implementation scope: `readNamed`, `poll`, `writeNamed`, Node-RED named reads
+and writes, and their compiled plan/result mapping.
+
+Target contract: a named read validates/snapshots its full plan, preserves input
+order as wire order, occupies one FIFO turn, and may split only between complete
+declared entries. It stops on first failure and returns no partial value. A
+multi-request read is explicitly non-atomic. A named write is accepted only if
+the complete validated plan fits one request; every multi-request or
+read-modify-write state change fails before transport.
+
+Compatibility impact: run-order sorting is removed. Multi-request writes and
+bit-in-word writes must become explicit application operations with deliberate
+partial-success and outcome-unknown handling.
+
+Machine-verifiable acceptance criteria:
+
+1. Invalid later entries cause zero sends; caller mutation cannot change an admitted plan.
+2. Descending/discontiguous input retains declared wire order with no sort.
+3. Splits occur only before a complete input entry; dword/float/array/coherence units are not torn.
+4. Later operations cannot interleave; first failure exposes no partial return.
+5. A write requiring two requests fails before connect/send; one-request writes emit exactly one request.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, unit, package, and extracted-source checks pass.
+- [x] Codex diff/API self-review passes.
+- [x] Live PLC verification is not required; planning/order/send boundaries are locally deterministic.
+- [x] Documentation, migration notes, changelog, and API reference agree.
+- [x] Final acceptance criteria verified.
+
+Verification evidence for these five records: `run_ci.bat`, the independent npm
+package-content guard, and the current-worktree extracted source-archive gate
+passed; the source archive contained 56 files, 6 sample files, and 6 test files.
+The normal runtime and explicit Node.js 18 run each passed 104 tests with zero
+skip. `git diff --check` passed. The public export list was compared with
+`API_REFERENCE.md`, and source review covered API/input snapshots, validation
+order, FIFO/lifecycle state, TCP/UDP/DNS generation retirement, error causes,
+aggregate ordering/boundaries, Node-RED pre-connect validation, docs, npm
+contents, and source contents. No live PLC communication is required for these
+locally deterministic contracts.
+
+## Accepted self-review finding — packed npm consumer boundary
+
+The earlier package-content guard inspected `npm pack --dry-run` output but then
+imported the checkout and parsed checkout example files. That did not prove the
+generated tarball was consumable. The guard now creates the real tarball,
+installs it into an isolated consumer directory, imports the scoped package from
+that installation, and parses the example flows installed from the tarball.
+
+The first final archive rerun also exposed that the worktree-attribute mode still
+archived the `HEAD` tree, so uncommitted changes and new validation files were
+not actually under test. This finding was accepted. That mode now builds a
+synthetic archive from the complete non-ignored current worktree and handles
+deletions before extracting and running the checks. The corrected archive gate
+passed with 104 tests and the package consumer gate passed from its tarball.

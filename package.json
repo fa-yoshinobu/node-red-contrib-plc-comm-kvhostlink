@@ -9,7 +9,6 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
-    "docsrc/user/",
     "examples/",
     "lib/",
     "nodes/"
@@ -42,10 +41,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "node test/run-tests.js",
-    "check": "node test/run-tests.js",
-    "pack:dry-run": "npm pack --dry-run",
-    "smoke:editor": "node test/run-editor-smoke.js"
+    "pack:dry-run": "npm pack --dry-run"
   },
   "dependencies": {
     "iconv-lite": "^0.7.2"

@@ -18,16 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Docs: Documented Node.js 18 as the package's minimum supported runtime so the getting-started requirements agree with package metadata and CI.
+- Release: Made the npm artifact consumer-only while retaining Node-RED example flows, removed the packaged `test`, `check`, and `smoke:editor` developer commands whose runners are excluded, and made the GitHub source archive retain tracked tests, CI, and maintainer validation inputs.
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
 
 ### BREAKING
 
+- Library: The ordinary `HostLinkClient` now provides the sole strict-FIFO contract; no queued-client wrapper is exported. Each admitted call snapshots its effective inputs, a waiting call starts its timeout only on activation, and `close()` rejects active and queued calls so none can leak into a later connection.
+- Library: IPv6 is explicitly unsupported. Endpoints must be IPv4 literals or host names with an IPv4 result, and PLC profile identifiers must match one canonical identifier exactly without trimming/coercion.
+- Library: Direct-bit writes now accept JavaScript Booleans only. Numeric/string bit aliases are rejected, the public `writeBitInWord` helper is removed, and high-level bit-in-word writes fail before transport.
+- Library: `writeNamed` accepts only a plan that compiles to one state-changing wire request. Any multi-request write plan fails before connection/transport and is never automatically split or retried.
 - Library: High-level addresses now use one complete grammar across JavaScript helpers, Node-RED runtime input, and editor validation. Extra selectors or trailing text, incompatible `BIT`/`F`/`COMMENT` selectors, selector counts where they have no meaning, and counts outside the safe-integer range fail before transport.
 - Library: Integer-only client arguments, polling intervals, and endpoint options no longer coerce strings, Booleans, fractions, non-finite values, or unsafe integers. Node-RED form text is converted explicitly at the editor/runtime configuration boundary.
 - Library: Float32 writes to every direct-bit device family now fail before any read or write. `writeNamed` validates the complete update set and its command-size limits before the first request instead of allowing a partial write.
 
 ### Fixed
 
+- Library: One monotonic transaction deadline now spans request sending, complete response framing/receive, and decoding. Partial writes or trickled response bytes cannot restart it; timeout or active cancellation retires the exact transport generation.
+- Library: Added distinct cancellation, close, timeout, not-connected, transport/protocol/PLC, and state-changing outcome-unknown errors. Outcome-unknown errors retain a structured `reason` and underlying `cause` so applications can avoid unsafe automatic retries.
+- Library: `readNamed` now validates and snapshots the complete plan, preserves declared input order as wire order without sorting, and splits only between complete declared entries. It holds one FIFO turn, stops on first failure, and exposes no partial result; multi-request reads remain explicitly non-atomic.
+- Library: Framed requests accept at most 65,536 bytes including the terminator. Maximum plus one fails before traffic or transport state changes.
 - Library: UDP requests are bound to their socket generation. Closing a client promptly rejects the active request and all queued requests from that generation; none can be sent on a replacement socket.
 - Library: A TCP response line belongs to exactly one pending request. Stale partial data, unsolicited lines, and additional non-empty lines invalidate the owning connection and cannot be consumed by a later request.
 - Library: Decoder-originated malformed-response errors now invalidate only the socket generation that supplied the bytes. PLC `E0` through `E9` command errors remain reusable.
@@ -35,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Tests: Added deterministic FIFO/cancellation/close, absolute-deadline send/trickle/decode, IPv4-only resolution, exact request-capacity, Boolean-only writes, removed-helper, input snapshot, input-order aggregate, entry-boundary split, complete preflight, and outcome-unknown coverage.
 - Tests: Added deterministic address-vector, no-send validation, TCP response-ownership, UDP generation/close, exact-mode, decoder invalidation, safe-integer, Float32 direct-bit, and named-write limit coverage.
 
 ### Samples
@@ -44,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### CI
 
 - CI: GitHub source archives now include the complete test suite and fixtures and run the documented syntax, sample JSON, test, and package checks after extraction. The npm registry package remains limited to runtime, editor, documentation, license, and example-flow files.
+- CI: The package-content gate now installs the actual generated npm tarball into an isolated consumer, imports the public entry point from that installation, and validates the packaged example flows instead of importing files from the checkout.
+- CI: Source-archive validation can now synthesize the complete current worktree, including intended new files and deletions, so pre-commit evidence cannot accidentally validate stale `HEAD` contents.
 
 ## [3.2.1] - 2026-07-29
 

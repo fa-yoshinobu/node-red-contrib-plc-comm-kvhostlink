@@ -54,10 +54,11 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: node test/run-tests.js
 
       - name: Validate package contents
-        run: npm pack --dry-run
+        shell: pwsh
+        run: ./scripts/check_package_contents.ps1
 
   windows-smoke:
     name: windows-latest / Node 20
@@ -84,8 +85,8 @@ jobs:
 
       - name: Run tests
         shell: pwsh
-        run: npm test
+        run: node test/run-tests.js
 
       - name: Validate package contents
         shell: pwsh
-        run: npm pack --dry-run
+        run: ./scripts/check_package_contents.ps1

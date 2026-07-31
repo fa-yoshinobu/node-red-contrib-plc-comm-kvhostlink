@@ -1,124 +1,118 @@
 # KV Host Link Node-RED API Reference
 
-This page is a user-facing index of the JavaScript KV Host Link client surface
-used by the Node-RED nodes. Use the usage guide for flow examples, and this
-page when you need to find the low-level operation name for a specific Host
-Link workflow.
+The public JavaScript entry point is `lib/hostlink`. `HostLinkClient` is the
+ordinary low-level client; there is no separate queued-client wrapper.
 
-The main low-level client type is `HostLinkClient` from
-`lib/hostlink/client.js`.
+## Connection contract
 
-## Connection And PLC Control
+`new HostLinkClient({ host, port, transport, timeout, plcProfile })` performs no
+network I/O. `host` is an IPv4 literal or a hostname with an IPv4 DNS result;
+IPv6 literals and IPv6-only names are unsupported. `port` and `timeout` are
+safe integers, `transport` is `tcp` or `udp`, and `plcProfile` must be one exact
+canonical value from `PLC_PROFILES`. Endpoint, timeout, transport, and profile
+are immutable snapshots for the lifetime of the client.
 
-| Operation | Public API |
+Call `connect()` before commands and again after `close()`, timeout, cancellation
+of active I/O, protocol/framing failure, or transport failure. Commands do not
+reconnect or retry. `openAndConnect(options[, { signal }])` is the convenience
+constructor. `close()` immediately rejects active and waiting work and prevents
+that work from appearing on a later connection.
+
+The ordinary client admits concurrent calls into one strict FIFO per client.
+Arguments are validated and copied at admission. A waiting call's timeout begins
+only when it becomes active. Most asynchronous operations accept a final
+`{ signal }` option with an `AbortSignal`; canceling a waiting operation removes
+only that operation without a send. Different client instances are independent.
+
+Once a request becomes active, one monotonic deadline covers the complete send,
+response framing/receive, and decode. Progress or partial bytes do not restart
+that deadline. One TCP request owns exactly one non-empty response line.
+
+## Client operations
+
+| Area | Operations |
 | --- | --- |
-| Open a ready-to-use connection | `openAndConnect` |
-| Low-level client | `HostLinkClient`, `constructor` |
-| PLC mode and error control | `changeMode`, `clearError`, `checkErrorNo`, `confirmOperatingMode` |
-| PLC model and clock | `queryModel`, `setTime`, `MODEL_CODES` |
-| Connection lifecycle | `connect`, `close` |
+| Lifecycle | `connect`, `close`, `trafficStats` |
+| Raw/control | `sendRaw`, `changeMode`, `clearError`, `checkErrorNo`, `confirmOperatingMode`, `queryModel`, `setTime` |
+| Device access | `read`, `readConsecutive`, `write`, `writeConsecutive` |
+| Force/set values | `forcedSet`, `forcedReset`, `forcedSetConsecutive`, `forcedResetConsecutive`, `writeSetValue`, `writeSetValueConsecutive` |
+| Monitor | `registerMonitorBits`, `registerMonitorWords`, `readMonitorBits`, `readMonitorWords` |
+| Other | `readComments`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
 
-Constructing `HostLinkClient` does not open a socket. Call `connect()` before
-every first command and again after `close()`, timeout, or transport failure.
-Commands never reconnect themselves. `openAndConnect` is the explicitly named
-convenience path that returns a connected client.
+Every framed request is at most 65,536 bytes including its terminator. The exact
+limit is accepted; a one-byte-larger request fails before traffic counters or
+transport state change.
 
-Direct construction requires `port` and `timeout` to be actual safe JavaScript
-integers in range; numeric strings, Booleans, fractions, NaN, infinities, and
-unsafe integers are not converted. Node-RED form text is validated and converted
-once by the connection node before client construction.
+Low-level numeric operations take a base device plus `.U`, `.S`, `.D`, `.L`, or
+`.H`. Suffix-bearing low-level devices are rejected. Bare direct-bit operations
+use bit semantics. Numeric writes accept only exact finite JavaScript numbers in
+range. Direct-bit writes accept only JavaScript `true` or `false`; numbers and
+strings such as `1`, `0`, `ON`, and `OFF` are invalid write values. Response
+decoding may still recognize the documented PLC bit tokens.
 
-`setTime(date)` accepts a valid JavaScript `Date` whose local calendar year is
-2000 through 2099. A full year is never folded into a two-digit wire year.
+The former public `writeBitInWord` read-modify-write helper is removed. It could
+not provide an atomic PLC update. Read a word and write a word explicitly only
+when the application owns the required concurrency and partial-failure policy.
 
-Semantic reads validate the exact response token count derived from the issued
-command. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`; numeric reads of direct
-bit devices require the corresponding 16- or 32-point response. A malformed
-response shape invalidates the connection rather than being reused.
-`confirmOperatingMode()` accepts only the exact complete response `0` or `1`.
-Decoder-originated malformed responses invalidate the exact socket generation
-that supplied them, while PLC `E0` through `E9` errors do not by themselves
-discard a reusable connection. TCP assigns one response line to one request;
-UDP close/cancellation never replays old queued work on a replacement socket.
+## High-level helpers
 
-## Device Operations
-
-| Operation | Public API |
+| Area | Public API |
 | --- | --- |
-| Single device read/write | `read`, `write` |
-| Consecutive device read/write | `readConsecutive`, `writeConsecutive` |
-| Forced bit/device control | `forcedSet`, `forcedReset`, `forcedSetConsecutive`, `forcedResetConsecutive` |
-| Timer/counter set-value writes | `writeSetValue`, `writeSetValueConsecutive` |
-| Monitor registration/cycle | `registerMonitorBits`, `registerMonitorWords`, `readMonitorBits`, `readMonitorWords` |
-| Comment reads | `readComments` |
-| Data bank switching | `switchBank` |
-| Expansion unit buffer access | `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
+| Address syntax | `parseAddress`, `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList` |
+| Device syntax | `parseDevice`, `deviceToString`, `parseDeviceText`, `normalizeSuffix` |
+| Typed access | `readTyped`, `writeTyped`, `readWords`, `readDWords` |
+| Timer/counter | `readTimerCounter`, `readTimer`, `readCounter` |
+| Named access | `readNamed`, `writeNamed`, `poll` |
+| Comments | `readComments` |
 
-Low-level numeric operations take a base device and a separate data format. For
-example, use `read("DM100", ".D")`, not `read("DM100.D")`. The format is
-required for numeric devices and expansion-unit buffer access. Bare direct-bit
-devices do not require a numeric format. Numeric writes are range checked and
-are not truncated, wrapped, or converted from strings. `F` writes require an
-actual finite JavaScript number that is also representable as finite Float32.
-Integer-only arguments such as bank, expansion unit, buffer address/count, and
-bit index require safe JavaScript integers before their existing range checks.
+`readNamed` validates and snapshots the whole input before transport, preserves
+declared input order as wire order, and occupies one FIFO turn. It may combine or
+split read-only requests only between declared input entries; it never tears a
+scalar, dword, float, array, or other declared entry. It stops at the first
+failure and returns no partial result. Multiple requests are not a coherent PLC
+snapshot because the PLC may change between them. Use one protocol request or a
+PLC-side consistency handshake when coherence matters.
 
-`writeBitInWord` serializes its read and write as one client-side critical
-section. This protects concurrent updates made through the same client; it does
-not make the operation atomic against another connection or PLC program logic.
+`writeNamed` validates and snapshots the complete update set. It is accepted only
+when the plan is one wire request. Any state-changing plan that would require two
+or more requests, including a bit-in-word read-modify-write, fails before
+connection or transport. The library never auto-splits or retries writes.
 
-## High-Level Helpers
+## Error contract
 
-| Operation | Public API |
+| Error | Meaning |
 | --- | --- |
-| Address parsing and formatting | `parseAddress`, `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList` |
-| Device parsing and formatting | `parseDevice`, `deviceToString`, `parseDeviceText`, `normalizeSuffix` |
-| Typed values | `readTyped`, `writeTyped` |
-| Timer/counter composite reads | `readTimerCounter`, `readTimer`, `readCounter` |
-| Named snapshots and polling | `readNamed`, `writeNamed`, `poll` |
-| Word/dword reads | `readWords`, `readDWords` |
-| Bit-in-word write | `writeBitInWord` |
+| `ValueError` | Invalid local value/configuration; no request is sent. |
+| `HostLinkNotConnectedError` | Explicit `connect()` is required. |
+| `HostLinkCanceledError` | Caller cancellation; active I/O retires that connection generation. |
+| `HostLinkTimeoutError` | The absolute connection/transaction deadline expired. |
+| `HostLinkClosedError` | Explicit close rejected active or waiting work. |
+| `HostLinkConnectionError` | DNS, socket, or transport failure. |
+| `HostLinkProtocolError` | Invalid framing, decoding, or semantic response shape. |
+| `HostLinkError` | A complete PLC `E0` through `E9` response; `code` is the PLC code. |
+| `HostLinkOperationOutcomeUnknownError` | A state-changing request may have reached the PLC. Inspect `reason` and `cause`. |
 
-Address-list text must consist entirely of valid comma/whitespace-separated
-addresses, and each address must match one complete selector grammar. Extra
-selectors or trailing/embedded garbage, incompatible `BIT`/`F`/`COMMENT`
-selectors, invalid count placement, and non-safe counts are rejected.
-`readNamed`, `writeNamed`, and `poll` reject empty work. Float32 writes on every
-direct-bit family fail before transport. `writeNamed` validates the complete
-update object and compiled plan before it sends the first request, so a later
-invalid update or an oversized group cannot cause a partial write batch. The
-limits are 1000 word points, 500 dword/Float32 points, and 120 timer/counter
-points; oversized calls are not split automatically.
-`poll` requires `intervalMs` to be a non-negative safe JavaScript integer; it
-does not coerce numeric strings, fractions, NaN, or infinities.
+Read-only calls can be retried by application policy after an explicit reconnect.
+Do not automatically retry `HostLinkOperationOutcomeUnknownError`: first
+reconcile PLC/application state because repeating a change can duplicate it.
 
-## Protocol, Profile, And Diagnostics
+## Public symbol index
 
-| Operation | Public API |
-| --- | --- |
-| Frame helpers | `buildFrame`, `decodeResponse`, `decodeCommentResponse`, `ensureSuccess` |
-| Response token helpers | `splitDataTokens`, `parseScalarToken`, `parseDataTokens` |
-| Profile lookup | `PLC_PROFILES`, `availablePlcProfiles`, `profileDescriptors`, `normalizePlcProfile`, `profileFromName`, `displayName` |
-| Errors | `ValueError`, `HostLinkBaseError`, `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError` |
-
-## Public Symbol Index
-
-The low-level library module exports these public names:
-
-`CR`, `HostLinkBaseError`, `HostLinkClient`, `HostLinkConnectionError`,
-`HostLinkError`, `HostLinkProtocolError`, `MODEL_CODES`, `PLC_PROFILES`,
-`availablePlcProfiles`,
-`ValueError`, `buildFrame`, `decodeCommentResponse`, `decodeResponse`,
-`deviceToString`, `displayName`, `ensureSuccess`, `formatParsedAddress`,
-`normalizeAddress`, `normalizeAddressList`, `normalizePlcProfile`, `profileDescriptors`, `profileFromName`,
-`normalizeSuffix`, `openAndConnect`, `parseAddress`, `parseDataTokens`,
-`parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
-`readComments`, `readCounter`, `readDWords`, `readNamed`, `readTimer`,
-`readTimerCounter`, `readTyped`, `readWords`,
-`splitDataTokens`, `writeBitInWord`, `writeNamed`, `writeTyped`.
+`CR`, `HostLinkBaseError`, `HostLinkCanceledError`, `HostLinkClient`,
+`HostLinkClosedError`, `HostLinkConnectionError`, `HostLinkError`,
+`HostLinkNotConnectedError`, `HostLinkOperationOutcomeUnknownError`,
+`HostLinkProtocolError`, `HostLinkTimeoutError`, `MODEL_CODES`, `PLC_PROFILES`,
+`ValueError`, `availablePlcProfiles`, `buildFrame`, `decodeCommentResponse`,
+`decodeResponse`, `deviceToString`, `displayName`, `ensureSuccess`,
+`formatParsedAddress`, `normalizeAddress`, `normalizeAddressList`,
+`normalizePlcProfile`, `normalizeSuffix`, `openAndConnect`, `parseAddress`,
+`parseDataTokens`, `parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
+`profileDescriptors`, `profileFromName`, `readComments`, `readCounter`,
+`readDWords`, `readNamed`, `readTimer`, `readTimerCounter`, `readTyped`,
+`readWords`, `splitDataTokens`, `writeNamed`, `writeTyped`.
 
 ## Traffic statistics
 
-`HostLinkClient.trafficStats()` returns a frozen `{ requestCount, txBytes, rxBytes }` lifetime snapshot.
-TCP receive bytes count the body plus the first CR/LF terminator, independent of separator
-segmentation; UDP receive bytes count the complete datagram.
+`trafficStats()` returns a frozen lifetime `{ requestCount, txBytes, rxBytes }`
+snapshot. TCP receive bytes include the body and first terminator; UDP counts the
+accepted datagram. Close/reconnect does not reset the counters.

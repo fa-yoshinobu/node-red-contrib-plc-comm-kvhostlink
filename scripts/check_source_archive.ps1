@@ -12,32 +12,22 @@ $workspaceRoot = [System.IO.Directory]::GetParent($repositoryRoot).FullName
 $runId = [guid]::NewGuid().ToString("N")
 $archivePath = Join-Path $workspaceRoot ("plc-source-archive-$runId.zip")
 $extractPath = Join-Path $workspaceRoot ("plc-source-archive-$runId")
+$stagePath = Join-Path $workspaceRoot ("plc-source-archive-$runId-stage")
 
 $forbiddenFileNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 @(
     ".gitattributes",
-    ".gitignore",
-    ".pre-commit-config.yaml",
-    "AGENTS.md",
-    "release_check.bat",
-    "run_ci.bat",
-    "run-local-node-red.bat",
-    "TODO.md"
+    ".gitignore"
 ) | ForEach-Object { [void]$forbiddenFileNames.Add($_) }
 
 $forbiddenPrefixes = @(
     ".codex",
-    ".github",
     ".pio",
     ".tools",
     "build",
     "build_win",
-    "docsrc/maintainer",
-    "internal_docs",
     "local_folder",
-    "release-artifacts",
-    "scripts",
-    "tools"
+    "release-artifacts"
 )
 
 try {
@@ -46,17 +36,35 @@ try {
         throw "Cannot resolve treeish '$Treeish'."
     }
 
-    $archiveArguments = @("archive", "--format=zip", "--output=$archivePath")
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $worktreeFiles = @()
     if ($UseWorktreeAttributes) {
-        $archiveArguments += "--worktree-attributes"
+        $worktreeFiles = @(& git -C $repositoryRoot ls-files --cached --others --exclude-standard |
+            ForEach-Object { $_.Replace("\", "/") } |
+            Where-Object {
+                $sourcePath = Join-Path $repositoryRoot $_
+                (Test-Path -LiteralPath $sourcePath -PathType Leaf) -and
+                $_ -notin @(".gitattributes", ".gitignore") -and
+                $_ -notmatch '^(build|build_win|release-artifacts)/'
+            } |
+            Sort-Object -Unique)
+        if ($LASTEXITCODE -ne 0) { throw "Cannot enumerate current worktree files." }
+        [void](New-Item -ItemType Directory -Path $stagePath)
+        foreach ($path in $worktreeFiles) {
+            $destination = Join-Path $stagePath $path
+            [void](New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force)
+            Copy-Item -LiteralPath (Join-Path $repositoryRoot $path) -Destination $destination -Force
+        }
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($stagePath, $archivePath)
     }
-    $archiveArguments += $Treeish
-    & git -C $repositoryRoot @archiveArguments
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $archivePath)) {
-        throw "git archive failed for '$Treeish'."
+    else {
+        & git -C $repositoryRoot archive --format=zip --output=$archivePath $Treeish
+        if ($LASTEXITCODE -ne 0) { throw "git archive failed for '$Treeish'." }
+    }
+    if (-not (Test-Path -LiteralPath $archivePath)) {
+        throw "Source archive was not created for '$Treeish'."
     }
 
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
     try {
         $archiveFiles = @(
@@ -69,6 +77,29 @@ try {
     finally {
         $archive.Dispose()
     }
+    $trackedFiles = if ($UseWorktreeAttributes) { $worktreeFiles } else {
+        @(& git -C $repositoryRoot ls-tree -r --name-only $Treeish |
+            ForEach-Object { $_.Replace("\", "/") } |
+            Sort-Object -Unique)
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Cannot enumerate source files for '$Treeish'." }
+
+    $requiredTracked = @($trackedFiles | Where-Object {
+        $_ -match '^(test|tests|\.github|docsrc/maintainer|internal_docs|scripts|tools)/' -or
+        $_ -in @("AGENTS.md", "TODO.md", "release_check.bat", "run_ci.bat")
+    })
+    $missingTracked = @($requiredTracked | Where-Object { $_ -notin $archiveFiles })
+    if ($missingTracked.Count -ne 0) {
+        throw "Source archive omits tracked validation or maintainer material: $($missingTracked -join ', ')"
+    }
+
+    foreach ($guide in @("GETTING_STARTED.md", "USAGE_GUIDE.md", "PROFILES.md", "GOTCHAS.md", "API_REFERENCE.md")) {
+        $guideCandidates = @("docsrc/user/$guide", "docs/$guide")
+        if (@($guideCandidates | Where-Object { $_ -in $archiveFiles }).Count -eq 0) {
+            throw "Source archive is missing standard user guide '$guide'."
+        }
+    }
+
 
     $forbidden = @(
         foreach ($path in $archiveFiles) {
@@ -88,7 +119,7 @@ try {
         }
     )
     if ($forbidden.Count -ne 0) {
-        throw "Source archive contains maintainer-only files: $($forbidden -join ', ')"
+        throw "Source archive contains forbidden generated or release-output files: $($forbidden -join ', ')"
     }
 
     $requiredRootFiles = @("CHANGELOG.md", "LICENSE", "README.md")
@@ -97,14 +128,9 @@ try {
         throw "Source archive is missing required root files: $($missingRootFiles -join ', ')"
     }
 
-    $expectedSamples = @(
-        & git -C $repositoryRoot ls-tree -r --name-only $Treeish -- examples samples |
-            ForEach-Object { $_.Replace("\", "/") } |
-            Sort-Object -Unique
-    )
-    if ($LASTEXITCODE -ne 0) {
-        throw "Cannot enumerate samples for '$Treeish'."
-    }
+    $expectedSamples = @($trackedFiles |
+        Where-Object { $_.StartsWith("examples/") -or $_.StartsWith("samples/") } |
+        Sort-Object -Unique)
     if ($expectedSamples.Count -eq 0) {
         throw "No tracked files were found under examples/ or samples/."
     }
@@ -120,12 +146,10 @@ try {
         throw "Source archive sample set differs from the tracked sample set: $differenceText"
     }
 
-    $expectedTests = @(
-        & git -C $repositoryRoot ls-tree -r --name-only $Treeish -- test tests |
-            ForEach-Object { $_.Replace("\", "/") } |
-            Sort-Object -Unique
-    )
-    if ($LASTEXITCODE -ne 0 -or $expectedTests.Count -eq 0) {
+    $expectedTests = @($trackedFiles |
+        Where-Object { $_.StartsWith("test/") -or $_.StartsWith("tests/") } |
+        Sort-Object -Unique)
+    if ($expectedTests.Count -eq 0) {
         throw "Cannot enumerate a nonempty test set for '$Treeish'."
     }
     $actualTests = @(
@@ -154,8 +178,8 @@ try {
         foreach ($file in $sampleJsonFiles) {
             Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json *> $null
         }
-        & npm test
-        if ($LASTEXITCODE -ne 0) { throw "npm test failed from the extracted source archive." }
+        & node test/run-tests.js
+        if ($LASTEXITCODE -ne 0) { throw "node test/run-tests.js failed from the extracted source archive." }
         & npm pack --dry-run --json | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "npm pack --dry-run failed from the extracted source archive." }
     }
@@ -168,4 +192,5 @@ try {
 finally {
     Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $stagePath -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -50,6 +50,10 @@ complete supported form; extra selectors or trailing text and incompatible
 `BIT`, `F`, or `COMMENT` selectors fail before connection or transport. Direct
 client integer arguments must be safe JavaScript integers. Configuration-node
 port and timeout text is converted explicitly at the Node-RED boundary.
+Connections are IPv4-only. The ordinary client serializes admitted operations
+in strict FIFO order, uses one absolute active transaction deadline, and never
+automatically reconnects or retries. Direct-bit writes require JavaScript
+Booleans; bit-in-word writes are intentionally unsupported.
 
 Malformed response bytes, an unknown operating-mode response, stale or extra
 TCP response lines, and failed UDP socket generations invalidate only the

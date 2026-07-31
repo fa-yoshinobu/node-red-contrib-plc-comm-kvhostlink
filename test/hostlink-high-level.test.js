@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  HostLinkClient,
   formatParsedAddress,
   normalizeAddress,
   normalizeAddressList,
@@ -230,7 +231,7 @@ test("readNamed and writeNamed reject unknown dtype suffixes", async () => {
   await assert.rejects(() => writeTyped(fakeClient, "DM100", "BOGUS", 7), /unsupported dtype/i);
 });
 
-test("writeTyped parses BIT values explicitly and rejects ambiguous input", async () => {
+test("writeTyped and writeNamed accept Boolean-only BIT values", async () => {
   const writes = [];
   const fakeClient = {
     async write(device, value) {
@@ -239,27 +240,17 @@ test("writeTyped parses BIT values explicitly and rejects ambiguous input", asyn
   };
 
   await writeTyped(fakeClient, "R0", "BIT", false);
-  await writeTyped(fakeClient, "R1", "BIT", "false");
-  await writeTyped(fakeClient, "R2", "BIT", "0");
-  await writeTyped(fakeClient, "R3", "BIT", true);
-  await writeTyped(fakeClient, "R4", "BIT", "ON");
-  await writeTyped(fakeClient, "R5", "BIT", 1);
+  await writeTyped(fakeClient, "R1", "BIT", true);
 
   assert.deepEqual(writes, [
     ["R0", false],
-    ["R1", false],
-    ["R2", false],
-    ["R3", true],
-    ["R4", true],
-    ["R5", true],
+    ["R1", true],
   ]);
-  await assert.rejects(() => writeTyped(fakeClient, "R6", "BIT", "not-a-bit"), /invalid BIT value/i);
-  await assert.rejects(() => writeTyped(fakeClient, "R7", "BIT", 2), /invalid BIT value/i);
-  await assert.rejects(
-    () => writeNamed(fakeClient, { "R10:BIT,2": ["false", "not-a-bit"] }),
-    /invalid BIT value/i,
-  );
-  await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": "not-a-bit" }), /invalid BIT value/i);
+  for (const value of [0, 1, "0", "1", "ON", "OFF", "true", "false", null]) {
+    await assert.rejects(() => writeTyped(fakeClient, "R2", "BIT", value), /invalid BIT value/i);
+  }
+  await assert.rejects(() => writeNamed(fakeClient, { "R10:BIT,2": [true, 0] }), /invalid BIT value/i);
+  await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": true }), /multi-request/i);
 });
 
 test("Float32 writes reject every direct bit family before client send", async () => {
@@ -347,7 +338,7 @@ test("named operations reject empty inputs and compile every write before transp
   const iterator = poll(fakeClient, [], 0);
   await assert.rejects(() => iterator.next(), /must not be empty/i);
   await assert.rejects(
-    () => writeNamed(fakeClient, { "DM50.3": true, "DM100:U": "123" }),
+    () => writeNamed(fakeClient, { "DM100:U": 123, "DM101:U": "123" }),
     /invalid U value/i,
   );
   assert.equal(calls, 0);
@@ -520,6 +511,115 @@ test("readNamed splits contiguous plans at the RDS point limit", async () => {
     { device: "DM1000", count: 1000, dataFormat: ".U" },
     { device: "DM2000", count: 1, dataFormat: ".U" },
   ]);
+});
+
+test("readNamed preserves declared wire order and never sorts descending entries", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat });
+      return Array(count).fill(device === "DM10" ? 10 : device === "DM2" ? 2 : 7);
+    },
+  };
+  const result = await readNamed(fakeClient, ["DM10:U", "DM2:U", "DM3:U"]);
+  assert.deepEqual(result, { "DM10:U": 10, "DM2:U": 2, "DM3:U": 2 });
+  assert.deepEqual(calls, [
+    { device: "DM10", count: 1, dataFormat: ".U" },
+    { device: "DM2", count: 2, dataFormat: ".U" },
+  ]);
+});
+
+test("readNamed splits only before an input entry and keeps a dword whole", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat });
+      return Array(count).fill(0);
+    },
+  };
+  const addresses = [
+    ...Array.from({ length: 999 }, (_, index) => `DM${index}:U`),
+    "DM999:D",
+  ];
+  await readNamed(fakeClient, addresses);
+  assert.deepEqual(calls, [
+    { device: "DM0", count: 999, dataFormat: ".U" },
+    { device: "DM999", count: 2, dataFormat: ".U" },
+  ]);
+});
+
+test("readNamed preflights the complete aggregate and rejects duplicate or oversized units without send", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async read() { calls += 1; return 1; },
+    async readConsecutive() { calls += 1; return []; },
+  };
+  await assert.rejects(() => readNamed(fakeClient, ["DM0:U", "DM1:U,1001"]), /out of range/i);
+  await assert.rejects(() => readNamed(fakeClient, ["DM0:U", "DM0:U"]), /duplicate address/i);
+  assert.equal(calls, 0);
+});
+
+test("readNamed snapshots the admitted address list before FIFO waiting", async () => {
+  const client = new HostLinkClient({
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    plcProfile: "keyence:kv-x500",
+  });
+  client._socket = {};
+  client._generation = 1;
+  let release;
+  const blocker = client._runExclusive(() => new Promise((resolve) => { release = resolve; }));
+  const calls = [];
+  client._exchange = async (payload) => {
+    calls.push(payload.toString("ascii").trim());
+    return Buffer.from("1 2", "ascii");
+  };
+  const addresses = ["DM0:U", "DM1:U"];
+  const pending = readNamed(client, addresses);
+  addresses[0] = "DM100:U";
+  addresses.push("DM200:U");
+  await new Promise((resolve) => setImmediate(resolve));
+  release();
+  await blocker;
+  assert.deepEqual(await pending, { "DM0:U": 1, "DM1:U": 2 });
+  assert.deepEqual(calls, ["RDS DM0.U 2"]);
+});
+
+test("multi-request readNamed keeps one exclusive FIFO turn", async () => {
+  const client = new HostLinkClient({
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    plcProfile: "keyence:kv-x500",
+  });
+  client._socket = {};
+  client._generation = 1;
+  const commands = [];
+  let releaseFirst;
+  let firstStartedResolve;
+  const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+  const firstBlocked = new Promise((resolve) => { releaseFirst = resolve; });
+  client._exchange = async (payload) => {
+    const command = payload.toString("ascii").replace(/\r$/, "");
+    commands.push(command);
+    if (commands.length === 1) {
+      firstStartedResolve();
+      await firstBlocked;
+    }
+    return Buffer.from(command === "?K" ? "63" : "7", "ascii");
+  };
+
+  const aggregate = readNamed(client, ["DM0:U", "DM1000:U"]);
+  await firstStarted;
+  const later = client.queryModel();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(commands.length, 1);
+  releaseFirst();
+
+  assert.deepEqual(await aggregate, { "DM0:U": 7, "DM1000:U": 7 });
+  assert.equal((await later).code, "63");
+  assert.deepEqual(commands, ["RDS DM0.U 1", "RDS DM1000.U 1", "?K"]);
 });
 
 test("readNamed batches direct bit requests", async () => {
@@ -774,37 +874,28 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     },
   };
 
-  await writeNamed(fakeClient, {
-    "DM100:U": 123,
-    "DM101:U": 456,
-    "DM102:S": -5,
-    "DM103:S": -6,
-    "DM200:F": 2.5,
-    "DM202:F": 3.5,
-    "DM50.3": true,
-    "DM300:U,3": [1, 2, 3],
-    "R010:BIT": "true",
-    "R011:BIT": "false",
-    "R100:BIT,4": ["ON", "OFF", 1, 0],
-    "T10:D": 111,
-    "T11:D": 222,
-    "C10:D": 333,
-    "C11:D": 444,
-    "Z1:D": 70000,
-    "Z2:D": 80000,
-    "TC0:D": 90000,
-    "TC1:D": 100000,
-    "T20:D,2": [555, 666],
-  });
+  const explicitWrites = [
+    { "DM100:U": 123, "DM101:U": 456 },
+    { "DM102:S": -5, "DM103:S": -6 },
+    { "DM200:F": 2.5, "DM202:F": 3.5 },
+    { "DM300:U,3": [1, 2, 3] },
+    { "R010:BIT": true, "R011:BIT": false },
+    { "R100:BIT,4": [true, false, true, false] },
+    { "T10:D": 111, "T11:D": 222 },
+    { "C10:D": 333, "C11:D": 444 },
+    { "Z1:D": 70000, "Z2:D": 80000 },
+    { "TC0:D": 90000, "TC1:D": 100000 },
+    { "T20:D,2": [555, 666] },
+  ];
+  for (const updates of explicitWrites) await writeNamed(fakeClient, updates);
 
   assert.deepEqual(calls, [
     { kind: "writeConsecutive", device: "DM100", values: [123, 456], dataFormat: ".U" },
     { kind: "writeConsecutive", device: "DM102", values: [-5, -6], dataFormat: ".S" },
     { kind: "writeConsecutive", device: "DM200", values: [0, 16416, 0, 16480], dataFormat: ".U" },
-    { kind: "write", device: "DM50", value: 8, dataFormat: ".U" },
     { kind: "writeConsecutive", device: "DM300", values: [1, 2, 3], dataFormat: ".U" },
-    { kind: "writeConsecutive", device: "R010", values: [1, 0], dataFormat: "" },
-    { kind: "writeConsecutive", device: "R100", values: [1, 0, 1, 0], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R010", values: [true, false], dataFormat: "" },
+    { kind: "writeConsecutive", device: "R100", values: [true, false, true, false], dataFormat: "" },
     { kind: "writeSetValueConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
     { kind: "writeSetValueConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
     { kind: "writeConsecutive", device: "Z1", values: [70000, 80000], dataFormat: ".D" },
@@ -829,6 +920,10 @@ test("writeNamed preflights complete word dword and timer groups before any send
     () => writeNamed(fakeClient, { "DM0:U": 1, "AT0:D": 2 }),
     /read-only device family 'AT'/i,
   );
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "DM0:U": 1, "DM2:S": -1 }),
+    /must fit one Host Link request/i,
+  );
   assert.equal(calls, 0);
 
   await writeNamed(fakeClient, Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`DM${index}:U`, index & 0xffff])));
@@ -848,20 +943,20 @@ test("writeNamed does not merge typed word values on direct-bit device families"
     },
   };
 
-  await writeNamed(fakeClient, {
-    "M100:U": 1,
-    "M101:U": 2,
-    "M102:S": -1,
-    "M103:S": -2,
-    "M104:H": 0x1234,
-    "M105:H": 0x5678,
-    "M200:D": 0x12345678,
-    "M202:D": 0x23456789,
-    "M300:L": -2,
-    "M302:L": -3,
-    "M500:BIT": true,
-    "M501:BIT": false,
-  });
+  const explicitWrites = [
+    { "M100:U": 1 },
+    { "M101:U": 2 },
+    { "M102:S": -1 },
+    { "M103:S": -2 },
+    { "M104:H": 0x1234 },
+    { "M105:H": 0x5678 },
+    { "M200:D": 0x12345678 },
+    { "M202:D": 0x23456789 },
+    { "M300:L": -2 },
+    { "M302:L": -3 },
+    { "M500:BIT": true, "M501:BIT": false },
+  ];
+  for (const updates of explicitWrites) await writeNamed(fakeClient, updates);
 
   assert.deepEqual(calls.slice(0, 10).map(({ kind, device, dataFormat }) => ({ kind, device, dataFormat })), [
     { kind: "write", device: "M100", dataFormat: ".U" },
@@ -876,7 +971,7 @@ test("writeNamed does not merge typed word values on direct-bit device families"
     { kind: "write", device: "M302", dataFormat: ".L" },
   ]);
   assert.deepEqual(calls.slice(10), [
-    { kind: "writeConsecutive", device: "M500", values: [1, 0], dataFormat: undefined },
+    { kind: "writeConsecutive", device: "M500", values: [true, false], dataFormat: undefined },
   ]);
   await assert.rejects(
     () => writeNamed(fakeClient, { "M400:F": 1.5, "M402:F": 2.5 }),

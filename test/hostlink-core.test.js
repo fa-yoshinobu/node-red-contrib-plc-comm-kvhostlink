@@ -10,6 +10,10 @@ const canonicalKvProfiles = require("./fixtures/kv_device_ranges.json");
 
 const {
   HostLinkClient,
+  HostLinkCanceledError,
+  HostLinkClosedError,
+  HostLinkOperationOutcomeUnknownError,
+  HostLinkTimeoutError,
   buildFrame,
   decodeCommentResponse,
   decodeResponse,
@@ -77,7 +81,9 @@ test("PLC profile input accepts canonical names only", () => {
     "keyence:kv-x500",
     "keyence:kv-x500-xym",
   ]);
-  assert.equal(normalizePlcProfile(" keyence:kv-x500 "), "keyence:kv-x500");
+  assert.equal(normalizePlcProfile("keyence:kv-x500"), "keyence:kv-x500");
+  assert.throws(() => normalizePlcProfile(" keyence:kv-x500 "), /Unsupported PLC profile/);
+  assert.throws(() => normalizePlcProfile({ toString: () => "keyence:kv-x500" }), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KEYENCE:KV-X500"), /Unsupported PLC profile/);
   assert.throws(() => normalizePlcProfile("KV-X500"), /Unsupported PLC profile/);
 });
@@ -140,10 +146,8 @@ test("HostLinkClient validates timeout and requires PLC profile metadata", () =>
   );
   assert.equal(createTestClient().timeout, 3000);
   assert.equal(createTestClient({ timeout: 2500 }).timeout, 2500);
-  assert.equal(
-    createTestClient({ plcProfile: " keyence:kv-5000 " }).plcProfile,
-    "keyence:kv-5000"
-  );
+  assert.equal(createTestClient({ plcProfile: "keyence:kv-5000" }).plcProfile, "keyence:kv-5000");
+  assert.throws(() => createTestClient({ plcProfile: " keyence:kv-5000 " }), /Unsupported PLC profile/);
 
   for (const timeout of ["", " ", "2500", 0, -1, "abc", Number.POSITIVE_INFINITY, 1.5, true]) {
     assert.throws(
@@ -214,7 +218,7 @@ test("an old TCP write callback cannot destroy or feed a replacement connection"
   const oldSocket = new FakeSocket();
   client._socket = oldSocket;
   const request = client.sendRaw("?K");
-  const requestRejected = assert.rejects(request, /Connection closed|old write failed/);
+  const requestRejected = assert.rejects(request, HostLinkOperationOutcomeUnknownError);
   await Promise.resolve();
   assert.equal(typeof oldSocket.writeCallback, "function");
 
@@ -239,7 +243,7 @@ test("an old TCP write callback cannot destroy or feed a replacement connection"
   successClient._socket = currentSocket;
   supersededSocket.writeCallback(null);
 
-  await assert.rejects(() => supersededRequest, /connection changed/);
+  await assert.rejects(() => supersededRequest, HostLinkOperationOutcomeUnknownError);
   assert.equal(successClient._socket, currentSocket);
   assert.equal(currentSocket.destroyed, false);
   assert.deepEqual(successClient.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
@@ -291,7 +295,7 @@ test("TCP failure paths count only complete response lines", async () => {
 
   const timedOut = createTestClient({ timeout: 10 });
   timedOut._socket = { destroyed: false, destroy() { this.destroyed = true; } };
-  await assert.rejects(() => timedOut._readTcpLine(), /Timeout/);
+  await assert.rejects(() => timedOut._readTcpLine(), HostLinkTimeoutError);
   assert.equal(timedOut.trafficStats().rxBytes, 0);
 });
 
@@ -373,9 +377,18 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
   const timedOut = createTestClient({ transport: "udp", timeout: 10 });
   const timeoutSocket = new FakeUdpSocket(null);
   timedOut._socket = timeoutSocket;
-  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r")), /timeout/i);
+  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r")), HostLinkTimeoutError);
   assert.deepEqual(timedOut.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(timeoutSocket.closed, true);
+
+  const stateChanging = createTestClient({ transport: "udp", timeout: 10 });
+  stateChanging._socket = new FakeUdpSocket(null);
+  await assert.rejects(
+    () => stateChanging.write("DM0", 1, ".U"),
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "timeout"
+      && error.cause instanceof HostLinkTimeoutError,
+  );
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
@@ -412,68 +425,283 @@ test("client serializes queued requests", async () => {
   assert.equal(maxActive, 1);
 });
 
-test("writeBitInWord serializes the complete read-modify-write operation", async () => {
-  const client = createTestClient();
-  const frames = [];
-  let word = 0;
-  client._exchange = async (payload) => {
+test("ordinary client preserves FIFO through a PLC error and separate instances progress independently", async () => {
+  const first = createTestClient();
+  const second = createTestClient();
+  const order = [];
+  first._exchange = async (payload) => {
     const command = payload.toString("ascii").trim();
-    frames.push(command);
-    if (command === "RD DM100.U") {
-      await new Promise((resolve) => setTimeout(resolve, 2));
-      return Buffer.from(`${word}\r`, "ascii");
-    }
-    const match = /^WR DM100\.U (\d+)$/.exec(command);
-    if (match) {
-      word = Number(match[1]);
-      return Buffer.from("OK\r", "ascii");
-    }
-    throw new Error(`unexpected command ${command}`);
+    order.push(command);
+    await new Promise((resolve) => setImmediate(resolve));
+    return Buffer.from(command === "ER" ? "E1\r" : "63\r", "ascii");
+  };
+  let secondFinished = false;
+  second._exchange = async () => {
+    secondFinished = true;
+    return Buffer.from("63\r", "ascii");
   };
 
-  await Promise.all([
-    client.writeBitInWord("DM100", 0, true),
-    client.writeBitInWord("DM100", 1, true),
-  ]);
-
-  assert.equal(word, 3);
-  assert.deepEqual(frames, ["RD DM100.U", "WR DM100.U 1", "RD DM100.U", "WR DM100.U 3"]);
+  const rejected = first.clearError();
+  const later = first.queryModel();
+  await second.queryModel();
+  assert.equal(secondFinished, true);
+  await assert.rejects(rejected, (error) => error.code === "E1");
+  assert.equal((await later).code, "63");
+  assert.deepEqual(order, ["ER", "?K"]);
 });
 
-test("writeBitInWord packs valid direct-bit words and invalidates malformed responses", async () => {
+test("waiting cancellation removes one FIFO entry without send or delaying later work", async () => {
   const client = createTestClient();
   const frames = [];
-  const socketGeneration = {
-    destroyed: false,
-    destroy() {
-      this.destroyed = true;
-    },
-  };
-  client._socket = socketGeneration;
-  client._monitorBitCount = 4;
+  let releaseFirst;
+  const blocker = client._runExclusive(() => new Promise((resolve) => { releaseFirst = resolve; }));
+  const controller = new AbortController();
   client._exchange = async (payload) => {
-    const command = payload.toString("ascii").trim();
-    frames.push(command);
-    if (command === "RD R000.U") {
-      return Buffer.from(Array.from({ length: 16 }, (_, bit) => [0, 3, 15].includes(bit) ? "1" : "0").join(" ") + "\r");
-    }
-    if (command === "WR R000.U 32769") {
-      return Buffer.from("OK\r");
-    }
-    throw new Error(`unexpected command ${command}`);
+    frames.push(payload.toString("ascii").trim());
+    return Buffer.from("63\r", "ascii");
   };
+  const canceled = client.queryModel({ signal: controller.signal });
+  const later = client.queryModel();
+  controller.abort(new Error("caller stopped waiting"));
+  await assert.rejects(canceled, (error) => error instanceof HostLinkCanceledError && error.code === "HOSTLINK_CANCELED");
+  releaseFirst();
+  await blocker;
+  assert.equal((await later).code, "63");
+  assert.deepEqual(frames, ["?K"]);
+});
 
-  await client.writeBitInWord("R0", 3, false);
+test("queued values and immutable endpoint/profile state are snapshots from admission", async () => {
+  const client = createTestClient();
+  const frames = [];
+  let releaseFirst;
+  const blocker = client._runExclusive(() => new Promise((resolve) => { releaseFirst = resolve; }));
+  client._exchange = async (payload) => {
+    frames.push(payload.toString("ascii").trim());
+    return Buffer.from("OK\r", "ascii");
+  };
+  const values = [true, false];
+  const queued = client.writeConsecutive("R0", values);
+  values[0] = false;
+  values.push(true);
+  assert.throws(() => { client.timeout = 1; }, TypeError);
+  assert.throws(() => { client.plcProfile = "keyence:kv-nano"; }, TypeError);
+  await new Promise((resolve) => setImmediate(resolve));
+  releaseFirst();
+  await blocker;
+  await queued;
+  assert.deepEqual(frames, ["WRS R000 2 1 0"]);
+  assert.equal(client.timeout, 3000);
+  assert.equal(client.plcProfile, TEST_PLC_PROFILE);
+});
 
-  assert.deepEqual(frames, ["RD R000.U", "WR R000.U 32769"]);
-  assert.equal(client._socket, socketGeneration);
-  assert.equal(client._monitorBitCount, 4);
+test("TCP partial-send stall and response trickle share one absolute transaction deadline", async () => {
+  const stalled = createTestClient({ timeout: 20 });
+  const stalledSocket = new EventEmitter();
+  stalledSocket.destroyed = false;
+  stalledSocket.write = (_payload, _callback) => {};
+  stalledSocket.destroy = function destroy() { this.destroyed = true; this.emit("close"); };
+  stalled._socket = stalledSocket;
+  stalled._generation = 1;
+  const stalledStart = performance.now();
+  await assert.rejects(() => stalled.queryModel(), HostLinkTimeoutError);
+  assert.ok(performance.now() - stalledStart < 150);
+  assert.equal(stalledSocket.destroyed, true);
 
-  client._exchange = async () => Buffer.from("1 0\r");
-  await assert.rejects(() => client.writeBitInWord("R0", 0, true), /expected 16/i);
-  assert.equal(client._socket, null);
-  assert.equal(client._monitorBitCount, null);
-  assert.equal(socketGeneration.destroyed, true);
+  const trickle = createTestClient({ timeout: 25 });
+  const trickleSocket = new EventEmitter();
+  trickleSocket.destroyed = false;
+  trickleSocket.write = (_payload, callback) => {
+    callback(null);
+    setTimeout(() => trickle._handleTcpData(Buffer.from("6"), trickleSocket), 5);
+    setTimeout(() => trickle._handleTcpData(Buffer.from("3"), trickleSocket), 15);
+  };
+  trickleSocket.destroy = function destroy() { this.destroyed = true; this.emit("close"); };
+  trickle._socket = trickleSocket;
+  trickle._generation = 1;
+  const trickleStart = performance.now();
+  await assert.rejects(() => trickle.queryModel(), HostLinkTimeoutError);
+  assert.ok(performance.now() - trickleStart < 150);
+  assert.equal(trickleSocket.destroyed, true);
+});
+
+test("response decoding remains inside the absolute transaction deadline", async () => {
+  const client = createTestClient({ timeout: 10 });
+  const socket = new EventEmitter();
+  socket.destroyed = false;
+  socket.write = (_payload, callback) => {
+    callback(null);
+    setImmediate(() => client._handleTcpData(Buffer.from("63\r"), socket));
+  };
+  socket.destroy = function destroy() { this.destroyed = true; this.emit("close"); };
+  client._socket = socket;
+  client._generation = 1;
+  const originalProcess = client._processResponse.bind(client);
+  client._processResponse = (...args) => {
+    const until = performance.now() + 20;
+    while (performance.now() < until) {}
+    return originalProcess(...args);
+  };
+  await assert.rejects(() => client.queryModel(), HostLinkTimeoutError);
+  assert.equal(socket.destroyed, true);
+
+  const changing = createTestClient({ timeout: 10 });
+  const changingSocket = new EventEmitter();
+  changingSocket.destroyed = false;
+  changingSocket.write = (_payload, callback) => {
+    callback(null);
+    setImmediate(() => changing._handleTcpData(Buffer.from("E1\r"), changingSocket));
+  };
+  changingSocket.destroy = function destroy() { this.destroyed = true; this.emit("close"); };
+  changing._socket = changingSocket;
+  changing._generation = 1;
+  const changingProcess = changing._processResponse.bind(changing);
+  changing._processResponse = (...args) => {
+    const until = performance.now() + 20;
+    while (performance.now() < until) {}
+    return changingProcess(...args);
+  };
+  await assert.rejects(
+    () => changing.clearError(),
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "timeout"
+      && error.cause instanceof HostLinkTimeoutError,
+  );
+  assert.equal(changingSocket.destroyed, true);
+});
+
+test("active cancellation and close retain distinct read/write outcome classifications", async () => {
+  class NoResponseUdpSocket extends EventEmitter {
+    constructor() { super(); this.closed = false; this.sent = []; }
+    send(payload, callback) { this.sent.push(Buffer.from(payload)); callback(null); }
+    close(callback) { this.closed = true; if (callback) callback(); }
+  }
+
+  const canceledRead = createTestClient({ transport: "udp", timeout: 1000 });
+  canceledRead._socket = new NoResponseUdpSocket();
+  canceledRead._generation = 1;
+  const readController = new AbortController();
+  const read = canceledRead.queryModel({ signal: readController.signal });
+  await new Promise((resolve) => setImmediate(resolve));
+  readController.abort();
+  await assert.rejects(read, HostLinkCanceledError);
+
+  const canceledWrite = createTestClient({ transport: "udp", timeout: 1000 });
+  canceledWrite._socket = new NoResponseUdpSocket();
+  canceledWrite._generation = 1;
+  const writeController = new AbortController();
+  const write = canceledWrite.write("DM0", 1, ".U", { signal: writeController.signal });
+  await new Promise((resolve) => setImmediate(resolve));
+  writeController.abort();
+  await assert.rejects(
+    write,
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "canceled"
+      && error.cause instanceof HostLinkCanceledError,
+  );
+
+  const closedRead = createTestClient({ transport: "udp", timeout: 1000 });
+  closedRead._socket = new NoResponseUdpSocket();
+  closedRead._generation = 1;
+  const activeRead = closedRead.queryModel();
+  const queuedRead = closedRead.queryModel();
+  await new Promise((resolve) => setImmediate(resolve));
+  await closedRead.close();
+  await assert.rejects(activeRead, HostLinkClosedError);
+  await assert.rejects(queuedRead, HostLinkClosedError);
+  assert.equal(closedRead._socket, null);
+
+  const closedWrite = createTestClient({ transport: "udp", timeout: 1000 });
+  closedWrite._socket = new NoResponseUdpSocket();
+  closedWrite._generation = 1;
+  const ambiguousWrite = closedWrite.write("DM0", 1, ".U");
+  await new Promise((resolve) => setImmediate(resolve));
+  await closedWrite.close();
+  await assert.rejects(
+    ambiguousWrite,
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "closed"
+      && error.cause instanceof HostLinkClosedError,
+  );
+});
+
+test("IPv6 literals are rejected and hostname resolution selects the first IPv4 result", async () => {
+  for (const host of ["::1", "[::1]", "::ffff:127.0.0.1", "[::ffff:127.0.0.1]"]) {
+    assert.throws(() => createTestClient({ host }), /IPv6 is unsupported/);
+  }
+  const dns = require("node:dns");
+  const { resolveIpv4 } = require("../lib/hostlink/network");
+  const originalLookup = dns.lookup;
+  try {
+    dns.lookup = (_host, options, callback) => {
+      assert.equal(options.family, 4);
+      assert.equal(options.all, true);
+      callback(null, [
+        { address: "192.0.2.10", family: 4 },
+        { address: "192.0.2.11", family: 4 },
+      ]);
+    };
+    assert.equal(await resolveIpv4("plc.example", performance.now() + 1000), "192.0.2.10");
+  } finally {
+    dns.lookup = originalLookup;
+  }
+});
+
+test("DNS cancellation and close reject connect without creating a later socket", async () => {
+  const dns = require("node:dns");
+  const originalLookup = dns.lookup;
+  const callbacks = [];
+  try {
+    dns.lookup = (_host, _options, callback) => callbacks.push(callback);
+
+    const canceledClient = createTestClient({ host: "cancel.example", timeout: 1000 });
+    const controller = new AbortController();
+    const canceled = canceledClient.connect({ signal: controller.signal });
+    await new Promise((resolve) => setImmediate(resolve));
+    controller.abort(new Error("stop DNS"));
+    await assert.rejects(canceled, HostLinkCanceledError);
+    assert.equal(canceledClient._socket, null);
+
+    const closedClient = createTestClient({ host: "close.example", timeout: 1000 });
+    const closed = closedClient.connect();
+    await new Promise((resolve) => setImmediate(resolve));
+    await closedClient.close();
+    await assert.rejects(closed, HostLinkClosedError);
+    for (const callback of callbacks) callback(null, [{ address: "192.0.2.20", family: 4 }]);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(closedClient._socket, null);
+  } finally {
+    dns.lookup = originalLookup;
+  }
+});
+
+test("monitor registration and its following read obey FIFO state order", async () => {
+  const { client, frames } = createFrameRecorder((command) => command === "MBR" ? "1 0\r" : "OK\r");
+  const registration = client.registerMonitorBits("R0", "R1");
+  const read = client.readMonitorBits();
+  await registration;
+  assert.equal((await read).length, 2);
+  assert.deepEqual(frames, ["MBS R000 R001\r", "MBR\r"]);
+});
+
+test("single request capacity rejects maximum plus one before request state mutation", async () => {
+  const accepted = createFrameRecorder(() => "OK\r");
+  assert.equal((await accepted.client.sendRaw("A".repeat(65535))).toString("ascii"), "OK");
+  assert.equal(accepted.frames.length, 1);
+  assert.equal(Buffer.byteLength(accepted.frames[0], "ascii"), 65536);
+
+  const client = createTestClient();
+  const before = client.trafficStats();
+  assert.equal(buildFrame("A".repeat(65535)).length, 65536);
+  assert.throws(() => buildFrame("A".repeat(65536)), /exceeds 65536 bytes/);
+  await assert.rejects(() => client.sendRaw("A".repeat(65536)), /exceeds 65536 bytes/);
+  assert.deepEqual(client.trafficStats(), before);
+});
+
+test("state-changing multi-request bit-in-word helper is removed", () => {
+  const client = createTestClient();
+  assert.equal(require("../lib/hostlink").QueuedKvHostLinkClient, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(HostLinkClient.prototype, "writeBitInWord"), false);
+  assert.equal(client.writeBitInWord, undefined);
 });
 
 test("low-level command helpers preserve exact CR-terminated frames", async () => {
@@ -610,8 +838,8 @@ test("UDP close invalidates active and queued old-generation work without resend
   client._generation = 1;
   const active = client.sendRaw("FIRST");
   const queued = client.sendRaw("SECOND");
-  const activeRejected = assert.rejects(active, /Connection closed/);
-  const queuedRejected = assert.rejects(queued, /generation changed/);
+  const activeRejected = assert.rejects(active, HostLinkOperationOutcomeUnknownError);
+  const queuedRejected = assert.rejects(queued, HostLinkClosedError);
   await Promise.resolve();
   assert.equal(oldSocket.sent.length, 1);
   await client.close();
@@ -656,8 +884,8 @@ test("UDP loopback close error reinitialize and reconnect isolate request genera
     const firstDatagram = nextDatagram();
     const active = client.sendRaw("FIRST");
     const queued = client.sendRaw("SECOND");
-    const activeRejected = assert.rejects(active, /Connection closed/);
-    const queuedRejected = assert.rejects(queued, /generation changed/);
+    const activeRejected = assert.rejects(active, HostLinkOperationOutcomeUnknownError);
+    const queuedRejected = assert.rejects(queued, HostLinkClosedError);
     const first = await firstDatagram;
     assert.equal(first.command, "FIRST");
     await client.close();
@@ -674,7 +902,7 @@ test("UDP loopback close error reinitialize and reconnect isolate request genera
 
     const fourthDatagram = nextDatagram();
     const interruptedByReinitialize = client.sendRaw("FOURTH");
-    const reinitializeRejected = assert.rejects(interruptedByReinitialize, /Connection closed/);
+    const reinitializeRejected = assert.rejects(interruptedByReinitialize, HostLinkOperationOutcomeUnknownError);
     assert.equal((await fourthDatagram).command, "FOURTH");
     await client.close();
     await reinitializeRejected;
@@ -687,8 +915,8 @@ test("UDP loopback close error reinitialize and reconnect isolate request genera
     const errorDatagram = nextDatagram();
     const interruptedByError = client.sendRaw("ERROR");
     const queuedAfterError = client.sendRaw("NEVER");
-    const errorRejected = assert.rejects(interruptedByError, /injected loopback socket error/);
-    const errorQueuedRejected = assert.rejects(queuedAfterError, /generation changed/);
+    const errorRejected = assert.rejects(interruptedByError, HostLinkOperationOutcomeUnknownError);
+    const errorQueuedRejected = assert.rejects(queuedAfterError, /generation changed|not connected/i);
     assert.equal((await errorDatagram).command, "ERROR");
     client._socket.emit("error", new Error("injected loopback socket error"));
     await Promise.all([errorRejected, errorQueuedRejected]);
@@ -712,7 +940,9 @@ test("integer-only public API arguments reject coercion before send", async () =
     await assert.rejects(() => client.readExpansionUnitBuffer(value, 0, 1, ".U"), (error) => error.name === "ValueError");
     await assert.rejects(() => client.readExpansionUnitBuffer(1, value, 1, ".U"), (error) => error.name === "ValueError");
     await assert.rejects(() => client.readExpansionUnitBuffer(1, 0, value, ".U"), (error) => error.name === "ValueError");
-    await assert.rejects(() => client.writeBitInWord("DM0", value, true), (error) => error.name === "ValueError");
+  }
+  for (const value of [0, 1, "0", "1", "ON", "OFF", null, undefined]) {
+    await assert.rejects(() => client.write("R0", value), /must be a Boolean/i);
   }
   assert.deepEqual(frames, []);
 });

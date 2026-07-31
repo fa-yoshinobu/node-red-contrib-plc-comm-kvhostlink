@@ -73,12 +73,12 @@ jobs:
           test "${actual_version}" = "${EXPECTED_VERSION}"
 
       - name: Run tests
-        run: npm test
+        run: node test/run-tests.js
 
       - name: Run editor smoke test
         env:
           NODE_RED_CMD: ${{ github.workspace }}/node_modules/node-red/red.js
-        run: npm run smoke:editor
+        run: node test/run-editor-smoke.js
 
       - name: Pack npm package
         env:

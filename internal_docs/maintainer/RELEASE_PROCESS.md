@@ -8,7 +8,7 @@ This checklist governs npm and GitHub publication for this repository.
 2. Confirm `package.json`, runtime metadata, CHANGELOG, user docs, examples, and generated API documentation agree.
 3. Enumerate every unchecked repository TODO and maintainer checkbox. Pass it, mark it explicitly not required, or record an item-by-item release disposition in the active release GOAL.
 4. Confirm all intended changes are under the target CHANGELOG version before creating the immutable annotated tag.
-5. Run `scripts/check_source_archive.ps1` from the repository root. The extracted GitHub source archive must contain the complete tests/fixtures and pass JavaScript syntax, example JSON, `npm test`, and package dry-run checks.
+5. Run `scripts/check_source_archive.ps1` from the repository root. The extracted GitHub source archive must contain the complete tests/fixtures and pass JavaScript syntax, example JSON, `node test/run-tests.js`, and package checks.
 6. Run `scripts/check_package_contents.ps1` separately. The npm registry tarball must remain minimal and must not inherit source-archive tests or maintainer/release tooling.
 
 ## Publication Integrity Gate

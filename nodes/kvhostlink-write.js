@@ -1,6 +1,6 @@
 "use strict";
 
-const { writeNamed } = require("../lib/hostlink");
+const { _prepareWriteNamed } = require("../lib/hostlink/high-level");
 const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
 const SINGLE_WRITE_DTYPES = new Set(["BIT", "U", "S", "D", "L", "F", "H"]);
 
@@ -40,13 +40,14 @@ module.exports = function registerKvHostLinkWrite(RED) {
         if (keys.length === 0) {
           throw new Error("No KV Host Link updates were provided");
         }
+        const preparedWrite = _prepareWriteNamed(updates);
 
         await this.connection.connect();
         const client = this.connection.getClient();
-        await writeNamed(client, updates);
+        await preparedWrite.execute(client);
         const profile = this.connection.getProfile();
         applyMetadata(msg, this.metadataMode, {
-          updates,
+          updates: preparedWrite.updates,
           connection: profile,
           itemCount: keys.length,
         });

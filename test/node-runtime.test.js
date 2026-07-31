@@ -491,7 +491,6 @@ test("Node-RED HostLink single write requires one exact writable dtype source", 
     getClient: () => ({
       async write(...args) { writes.push(["write", ...args]); },
       async writeConsecutive(...args) { writes.push(["writeConsecutive", ...args]); },
-      async writeBitInWord(...args) { writes.push(["writeBitInWord", ...args]); },
     }),
     getProfile: () => ({ plcProfile: "keyence:kv-x500" }),
   });
@@ -505,7 +504,6 @@ test("Node-RED HostLink single write requires one exact writable dtype source", 
     { address: "DM106", dtype: "F", value: 1.5 },
     { address: "DM108", dtype: "H", value: "FFFF" },
     { address: "DM110:U", value: 1 },
-    { address: "DM111.3", value: true },
   ];
   for (const item of valid) {
     const msg = { address: item.address, value: item.value };
@@ -516,8 +514,15 @@ test("Node-RED HostLink single write requires one exact writable dtype source", 
   assert.equal(connectCalls, valid.length);
   assert.equal(writes.length, valid.length);
 
+  const removedBitInWord = await invoke(node, { address: "DM111.3", value: true });
+  assert.match(removedBitInWord.error.message, /multi-request/i);
+
   const connectsBeforeInvalid = connectCalls;
   const writesBeforeInvalid = writes.length;
+  for (const value of [0, 1, "0", "1", "ON", "OFF"]) {
+    const result = await invoke(node, { address: "R001", dtype: "BIT", value });
+    assert.match(result.error.message, /Boolean/i);
+  }
   for (const dtype of [undefined, null, "", " ", false, true, 0, "u", "I", "COMMENT", "unknown", {}, []]) {
     const result = await invoke(node, { address: "DM200", value: 1, dtype });
     assert.ok(result.error instanceof Error, `invalid bare dtype ${String(dtype)}`);

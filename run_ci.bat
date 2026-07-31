@@ -10,7 +10,7 @@ call npm ci
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo [2/3] Running tests...
-call npm test
+call node test/run-tests.js
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo [3/3] Validating package contents...

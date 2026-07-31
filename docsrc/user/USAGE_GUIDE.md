@@ -13,10 +13,10 @@
 | Field | Required | Default | Description |
 | --- | --- | --- | --- |
 | Name | No | Empty | Display-only label. Empty/whitespace/non-string values mean no custom label; duplicates are allowed and never identify a connection or PLC route. |
-| Host | Yes | Empty | PLC host name or IP address. |
+| Host | Yes | Empty | IPv4 PLC address, or a host name that resolves to IPv4. IPv6 is unsupported. |
 | Port | Yes | `8501` | TCP or UDP port. |
 | Transport | Yes | `tcp` | `tcp` or `udp`. |
-| Timeout ms | Yes | `3000` | Response timeout in milliseconds. |
+| Timeout ms | Yes | `3000` | One absolute active connection/request deadline in milliseconds. |
 | PLC Profile | Yes | `keyence:kv-x500` | Canonical lowercase profile value. |
 
 Accepted profile values are listed in [PLC profiles](PROFILES.md).
@@ -27,6 +27,10 @@ Port and timeout must be decimal integer text within their documented range.
 The connection node converts that form text once at the Node-RED boundary;
 direct `HostLinkClient` construction requires actual safe JavaScript integers
 and never coerces numeric strings.
+The profile must equal one canonical lowercase identifier exactly; aliases,
+case changes, surrounding whitespace, and object/string coercion are rejected.
+IPv6 literals and host names without an IPv4 result are rejected. When a host
+name has several IPv4 results, the first resolver result is used.
 
 ## Performance notes
 
@@ -36,18 +40,26 @@ retransmission.
 
 Reuse one `kvhostlink-connection` config node for repeated reads and writes.
 Prefer reading one address list or one array address over many separate
-single-address messages when one application snapshot can be read together.
+single-address messages when one application result set can be read together.
 
 ## Connection reuse and concurrent requests
 
 Share one `kvhostlink-connection` config node between read and write nodes that
-talk to the same PLC endpoint. Requests through the shared connection are queued
-so concurrent Node-RED messages do not interleave Host Link frames on one
-connection.
+talk to the same PLC endpoint. The ordinary client places concurrent calls in a
+strict FIFO, snapshots all effective inputs at admission, and holds a compound
+read for one complete queue turn. Different connection clients progress
+independently. A waiting call does not start its timeout until it becomes active.
 
 Use the connection control messages `connect`, `disconnect`, and `reinitialize`
 for deliberate connection control. Create separate connection config nodes only
 when you intentionally want separate PLC sessions.
+
+Once active, one monotonic timeout covers sending, response framing/receive, and
+decoding. Partial writes, trickled response bytes, and phase changes do not
+restart it. Most JavaScript client/helper calls accept a final `{ signal }`
+option. Canceling a waiting call removes it without sending; canceling active
+I/O retires that connection generation. `close()` rejects active and waiting
+work immediately, and callers must explicitly reconnect and submit new work.
 
 Each TCP request exclusively owns one non-empty response line. Stale partial
 data, an unsolicited line, or an additional line invalidates that socket rather
@@ -87,6 +99,15 @@ The configured Source type is required. If a `msg`, `flow`, `global`, or `env`
 reference cannot be evaluated, the operation fails before connecting; the
 reference name is never treated as a literal PLC address or update.
 
+A multi-entry read is prevalidated and runs in declared input order; the
+library never sorts addresses into a different wire order. Read-only work may
+be combined or split at protocol limits, but only between complete input
+entries. A scalar, dword, float, array, or other declared entry is never torn
+between requests. The operation stops on first failure and returns no partial
+object. Multiple requests are not an atomic/coherent PLC snapshot because the
+PLC may change between them. Use one protocol request or a PLC-side sequence/
+handshake when values must describe one instant.
+
 ## kvhostlink-write node
 
 | Config field | Description |
@@ -118,11 +139,17 @@ Every update is validated before the first PLC request. Numeric values must be
 finite JavaScript numbers in the selected format's exact range; strings,
 Booleans, fractional integers, wraparound values, and Float32 overflow are
 rejected. Float32 is valid only for word device families; every direct-bit
-family rejects it before any read or write. An empty update object performs no
-write and is rejected. A complete `writeNamed` update set is also checked
-against Host Link command limits before its first request: at most 1000 word
-points, 500 dword/Float32 points, or 120 timer/counter points per compiled
-operation. Oversized input fails as a whole instead of partially writing.
+family rejects it before any read or write. Direct-bit write values must be
+actual JavaScript Booleans; numeric/string `0`, `1`, `ON`, and `OFF` are not
+coerced. An empty update object performs no write and is rejected.
+
+A complete `writeNamed` update set is snapshotted, compiled, and checked before
+connecting. It is accepted only when it can be sent as one wire request within
+the applicable limit: 1000 word points, 500 dword/Float32 points, or 120
+timer/counter points. A plan requiring multiple requests fails as a whole before
+transport. State-changing operations are never auto-split or auto-retried.
+Bit-in-word writing is unsupported because a client-side read-modify-write is
+not atomic against PLC logic or another connection.
 
 | Output msg field | Description |
 | --- | --- |
@@ -146,7 +173,7 @@ match the selected mode exactly; conflicting old flows are rejected for review.
 | Float32 | `DM130:F` | Interpret two words as a 32-bit float. |
 | Hex word | `DM140:H` | Read or write a word as uppercase hexadecimal text. |
 | Comment read | `DM145:COMMENT` | Read the device comment string. |
-| Bit in word | `DM150.3` | Read or write bit 3 in `DM150`. |
+| Bit in word | `DM150.3` | Read bit 3 in `DM150`; bit-in-word writing is unsupported. |
 | Word array | `DM160:U,4` | Read or write four consecutive unsigned word values. |
 | Bit array | `R200:BIT,4` | Read or write four consecutive relay bits. |
 | Timer preset | `T10:D` | Read timer preset value. |
@@ -219,6 +246,24 @@ The connection metadata contains `host`, `port`, `transport`, and `timeout`.
 | `Throw` | Calls Node-RED `done(error)`. |
 | `msg.error` | Adds the error object to `msg.error` and sends the message on output 1. |
 | `Second output` | Sends normal messages on output 1 and error messages on output 2. |
+
+JavaScript callers can classify failures by exported type/code:
+
+| Error | Caller meaning |
+| --- | --- |
+| `ValueError` | Local input/configuration error; no send. |
+| `HostLinkNotConnectedError` | Call `connect()` explicitly. |
+| `HostLinkCanceledError` | Caller cancellation. |
+| `HostLinkTimeoutError` | The absolute active deadline expired. |
+| `HostLinkClosedError` | Explicit close rejected the operation. |
+| `HostLinkConnectionError` | DNS/socket/transport failure. |
+| `HostLinkProtocolError` | Invalid framing, bytes, tokens, or response shape. |
+| `HostLinkError` | Complete PLC `E0` through `E9`; inspect `code`. |
+| `HostLinkOperationOutcomeUnknownError` | A state change may have reached the PLC; inspect `reason` and `cause`. |
+
+An application may reconnect and retry a read according to its own policy. Do
+not automatically retry an outcome-unknown write: reconcile PLC/application
+state first, because repeating it can duplicate a state change.
 
 ## Traffic statistics
 

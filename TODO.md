@@ -4,30 +4,33 @@ Current active TODOs only.
 
 ## Current Status
 
-The nine approved implementation items are complete in the working tree. The
-evidence-dependent comment-encoding decision remains open, and no
+The nine evaluation items and the five approved cross-library protocol items
+are complete in the working tree. The evidence-dependent comment-encoding decision remains open, and no
 comment-decoder implementation change is authorized until `HL-EVAL-TODO-006`
 is approved.
 
 ### Verification evidence — 2026-08-01
 
-- Current-worktree CI passed 90 tests with zero skips, JavaScript syntax and
+- Current-worktree CI and the explicit Node.js 18 run passed 104 tests with zero skips, JavaScript syntax and
   npm package dry-run checks; the Node-RED editor import/startup smoke passed.
-- The independent npm package-content guard passed with 31 files and excluded
+- The independent npm package-content guard passed with 26 files and excluded
   repository-only tests, scripts, TODOs, and maintainer material.
-- The GitHub source-archive gate passed from `HEAD` with worktree attributes:
-  40 files, all 6 tracked sample files, all 6 tracked test files, 79 tests,
+- The GitHub source-archive gate passed from the current worktree tree with worktree attributes:
+  56 files, all 6 tracked sample files, all 6 tracked test files, 104 tests,
   extracted syntax/sample JSON/test/package checks, and cleanup under `D:\APP`.
   The gate must be rerun normally after these working-tree changes are committed.
 - `git diff --check` passed. All five flows were reviewed: basic/typed/array use
   manual random write plus best-effort restore; device matrix and multi-PLC
   monitor are read-only.
 - Codex self-review inspected the actual diff, public API, validation order,
-  transport generations, response ownership, cancellation/timeout paths,
+  transport generations, FIFO admission/input snapshots, absolute deadline,
+  response ownership, cancellation/timeout/close and outcome-unknown paths,
   tests, examples, documentation, and source/npm packaging. Accepted findings
   were fixed and reverified: missing Editor `Z:F` compatibility, mixed
   read-only `AT` partial-write preflight, insufficient UDP loopback coverage,
-  and npm notice handling in the source-archive gate. There are no rejected,
+  npm notice handling in the source-archive gate, DNS cancellation cleanup,
+  close during DNS resolution, FIFO monitor-state activation, and deadline
+  expiration during error decoding. There are no rejected,
   duplicate, or deferred self-review findings for the nine completed items.
 - Live PLC verification is not required for these deterministic local input,
   planning, parser, socket-state, editor, and packaging contracts. No PLC
@@ -164,6 +167,10 @@ Previously silent response reassignment becomes an explicit connection failure, 
 - [x] Final acceptance criteria verified and the item marked complete.
 
 ## HL-EVAL-TODO-006 — Determine the Host Link device-comment encoding contract
+
+### User disposition
+
+Deferred by the user on 2026-08-01 for evidence investigation followed by implementation in the next Host Link implementation cycle. The current UTF-8-first/Shift_JIS-fallback behavior is not approved as the final contract. Do not change the decoder in the current implementation batch; investigate the exact profile-specific byte contract first, present the resulting target contract one item at a time, and implement only after explicit approval.
 
 ### Implementation scope
 
@@ -344,7 +351,7 @@ Oversized calls now fail atomically at preflight instead of failing later or par
 
 ### Target contract
 
-The GitHub source archive includes the repository tests and all fixtures required by them. From a clean extracted archive, `npm test` and the documented standard checks complete without references to intentionally omitted files. The npm registry package remains minimal and follows its separate package-content contract.
+The GitHub source archive includes the repository tests and all fixtures required by them. From a clean extracted archive, `node test/run-tests.js` and the documented standard checks complete without references to intentionally omitted files. The npm registry package remains minimal and follows its separate package-content contract.
 
 ### Compatibility impact
 
@@ -353,7 +360,7 @@ GitHub source archives become larger because test assets are included; the publi
 ### Acceptance criteria
 
 1. An archive produced from repository HEAD contains `test/run-tests.js` and every fixture or helper it requires.
-2. `npm test`, JavaScript syntax checks, sample-flow JSON validation, and documented package checks run from the extracted archive with the expected nonzero test set.
+2. `node test/run-tests.js`, JavaScript syntax checks, sample-flow JSON validation, and documented package checks run from the extracted archive with the expected nonzero test set.
 3. The release gate creates a fresh archive, extracts it, and verifies those commands without checkout-only files.
 4. `npm pack` content checks independently enforce the approved minimal registry package.
 
