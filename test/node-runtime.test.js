@@ -640,3 +640,40 @@ test("Node-RED HostLink explicitly connects before operations and replaces stale
     connection: { plcProfile: "keyence:kv-x500" },
   });
 });
+
+test("example flows keep monitoring read-only and make manual writes random with restore", () => {
+  const flowDirectory = path.join(__dirname, "..", "examples", "flows");
+  const safeWriteFlows = [
+    "kvhostlink-basic-read-write.json",
+    "kvhostlink-typed-read-write.json",
+    "kvhostlink-array-read-write.json",
+  ];
+
+  for (const fileName of safeWriteFlows) {
+    const nodes = JSON.parse(fs.readFileSync(path.join(flowDirectory, fileName), "utf8"));
+    const writeTrigger = nodes.find((node) => node.type === "inject" && /random \+ restore/i.test(node.name));
+    assert.ok(writeTrigger, fileName);
+    assert.equal(writeTrigger.payloadType, "date", fileName);
+    assert.equal(String(writeTrigger.payload || ""), "", fileName);
+    assert.match(JSON.stringify(writeTrigger.wires), /original/i, fileName);
+
+    const functions = nodes.filter((node) => node.type === "function");
+    assert.ok(functions.some((node) => /Math\.random/.test(node.func)), fileName);
+    assert.ok(functions.some((node) => /kvSampleOriginal/.test(node.func) && /restore/i.test(node.name)), fileName);
+    assert.ok(nodes.some((node) => node.type === "kvhostlink-write" && /restore/i.test(node.name)), fileName);
+    for (const node of functions) {
+      assert.doesNotThrow(() => new Function("msg", "flow", "node", node.func), `${fileName}: ${node.name}`); // eslint-disable-line no-new-func
+    }
+  }
+
+  const matrix = JSON.parse(fs.readFileSync(path.join(flowDirectory, "kvhostlink-device-matrix.json"), "utf8"));
+  const matrixRouter = matrix.find((node) => node.id === "function-device-matrix-router");
+  assert.match(matrixRouter.func, /const writableTotal = 0/);
+  assert.match(matrixRouter.func, /This matrix is read-only/);
+  for (const id of ["inject-device-matrix-write", "inject-device-matrix-run-all-write"]) {
+    assert.equal(matrix.find((node) => node.id === id).d, true, id);
+  }
+
+  const monitor = JSON.parse(fs.readFileSync(path.join(flowDirectory, "kvhostlink-multi-plc-monitor.json"), "utf8"));
+  assert.equal(monitor.some((node) => node.type === "kvhostlink-write"), false);
+});

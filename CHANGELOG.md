@@ -20,6 +20,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
 
+### BREAKING
+
+- Library: High-level addresses now use one complete grammar across JavaScript helpers, Node-RED runtime input, and editor validation. Extra selectors or trailing text, incompatible `BIT`/`F`/`COMMENT` selectors, selector counts where they have no meaning, and counts outside the safe-integer range fail before transport.
+- Library: Integer-only client arguments, polling intervals, and endpoint options no longer coerce strings, Booleans, fractions, non-finite values, or unsafe integers. Node-RED form text is converted explicitly at the editor/runtime configuration boundary.
+- Library: Float32 writes to every direct-bit device family now fail before any read or write. `writeNamed` validates the complete update set and its command-size limits before the first request instead of allowing a partial write.
+
+### Fixed
+
+- Library: UDP requests are bound to their socket generation. Closing a client promptly rejects the active request and all queued requests from that generation; none can be sent on a replacement socket.
+- Library: A TCP response line belongs to exactly one pending request. Stale partial data, unsolicited lines, and additional non-empty lines invalidate the owning connection and cannot be consumed by a later request.
+- Library: Decoder-originated malformed-response errors now invalidate only the socket generation that supplied the bytes. PLC `E0` through `E9` command errors remain reusable.
+- Library: PLC operating-mode confirmation accepts only the exact complete responses `0` and `1`; all other values invalidate the session.
+
+### Tests
+
+- Tests: Added deterministic address-vector, no-send validation, TCP response-ownership, UDP generation/close, exact-mode, decoder invalidation, safe-integer, Float32 direct-bit, and named-write limit coverage.
+
+### Samples
+
+- Samples: Reviewed every flow. The basic, typed, and array manual write paths now save the original state, use format-valid random values, restore the saved state, and read again; the device matrix and multi-PLC monitor are read-only.
+
+### CI
+
+- CI: GitHub source archives now include the complete test suite and fixtures and run the documented syntax, sample JSON, test, and package checks after extraction. The npm registry package remains limited to runtime, editor, documentation, license, and example-flow files.
+
 ## [3.2.1] - 2026-07-29
 
 - Release: Bumped npm package and lockfile metadata to `3.2.1`.

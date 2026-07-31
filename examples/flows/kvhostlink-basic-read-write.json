@@ -2,16 +2,16 @@
     {
         "id":  "tab-kv-basic",
         "type":  "tab",
-        "label":  "KV Host Link Basic Read Write",
+        "label":  "KV Host Link Basic Safe Read Write",
         "disabled":  false,
-        "info":  "Starter flow for scalar KEYENCE KV Host Link read and write. Use canonical uppercase addresses in the examples. The flow nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior."
+        "info":  "Starter flow for scalar KEYENCE KV Host Link reads and a manual random write/restore check. The write path reads DM100 first, writes a random unsigned word, restores the saved value, and reads again. Use only a controlled test address because a transport or PLC failure can interrupt restoration."
     },
     {
         "id":  "comment-kv-basic",
         "type":  "comment",
         "z":  "tab-kv-basic",
-        "name":  "Start here: scalar read/write smoke test",
-        "info":  "First-use scalar smoke test. Confirm the connection node uses host 192.168.250.100, port 8501, and the canonical PLC Profile for your PLC, deploy, trigger Read DM100:U, then trigger Write DM100:U=123 and read again.",
+        "name":  "Start here: read-only first; optional random write + restore",
+        "info":  "First trigger Read DM100:U. Only on a controlled test PLC/address, the optional write button reads the original value, writes a random different value, restores the original value, then reads again. Restoration is best effort and cannot be guaranteed after a connection or PLC failure.",
         "x":  270,
         "y":  40,
         "wires":  [
@@ -47,7 +47,7 @@
         "id":  "inject-kv-basic-write",
         "type":  "inject",
         "z":  "tab-kv-basic",
-        "name":  "Write DM100:U=123",
+        "name":  "Test DM100:U (random + restore)",
         "props":  [
                       {
                           "p":  "payload"
@@ -58,13 +58,13 @@
         "once":  false,
         "onceDelay":  0.1,
         "topic":  "",
-        "payload":  "{\"DM100:U\":123}",
-        "payloadType":  "json",
+        "payload":  "",
+        "payloadType":  "date",
         "x":  130,
         "y":  180,
         "wires":  [
                       [
-                          "write-kv-basic"
+                          "read-kv-basic-original"
                       ]
                   ]
     },
@@ -102,7 +102,92 @@
         "errorHandling":  "output2",
         "metadataMode":  "minimal",
         "outputs":  2,
-        "x":  390,
+        "x":  960,
+        "y":  180,
+        "wires":  [
+                      [
+                          "prepare-kv-basic-restore"
+                      ],
+                      [
+                          "debug-kv-basic-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "read-kv-basic-original",
+        "type":  "kvhostlink-read",
+        "z":  "tab-kv-basic",
+        "name":  "Read original DM100:U",
+        "connection":  "cfg-kv-basic",
+        "addresses":  "DM100:U",
+        "addressesType":  "str",
+        "outputMode":  "value",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "outputs":  2,
+        "x":  400,
+        "y":  180,
+        "wires":  [
+                      [
+                          "prepare-kv-basic-random"
+                      ],
+                      [
+                          "debug-kv-basic-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "prepare-kv-basic-random",
+        "type":  "function",
+        "z":  "tab-kv-basic",
+        "name":  "Save original + choose random value",
+        "func":  "const original = msg.payload;\nlet testValue = Math.floor(Math.random() * 65536);\nif (testValue === original) {\n    testValue = (testValue + 1) % 65536;\n}\nmsg.kvSampleOriginal = original;\nmsg.kvSampleTestValue = testValue;\nmsg.payload = { 'DM100:U': testValue };\nreturn msg;",
+        "outputs":  1,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [],
+        "x":  700,
+        "y":  180,
+        "wires":  [
+                      [
+                          "write-kv-basic"
+                      ]
+                  ]
+    },
+    {
+        "id":  "prepare-kv-basic-restore",
+        "type":  "function",
+        "z":  "tab-kv-basic",
+        "name":  "Prepare original value restore",
+        "func":  "msg.payload = { 'DM100:U': msg.kvSampleOriginal };\nreturn msg;",
+        "outputs":  1,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [],
+        "x":  1220,
+        "y":  180,
+        "wires":  [
+                      [
+                          "restore-kv-basic"
+                      ]
+                  ]
+    },
+    {
+        "id":  "restore-kv-basic",
+        "type":  "kvhostlink-write",
+        "z":  "tab-kv-basic",
+        "name":  "Restore DM100:U",
+        "connection":  "cfg-kv-basic",
+        "updates":  "payload",
+        "updatesType":  "msg",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "outputs":  2,
+        "x":  1470,
         "y":  180,
         "wires":  [
                       [
@@ -141,8 +226,8 @@
         "tostatus":  false,
         "complete":  "true",
         "targetType":  "full",
-        "x":  650,
-        "y":  200,
+        "x":  1470,
+        "y":  300,
         "wires":  [
 
                   ]

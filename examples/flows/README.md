@@ -4,7 +4,12 @@
 
 This directory contains importable Node-RED JSON flows for `kvhostlink-read`, `kvhostlink-write`, and the shared `kvhostlink-connection` node.
 Start with the basic flow, then move through typed and array examples before using the device matrix.
-Use only test addresses that are safe for your PLC program before you run any write example. These flows intentionally keep writes simple and do not restore previous values automatically; add a restore write in your copied flow when needed.
+Read each selected address first. The basic, typed, and array write buttons are
+manual controlled-test paths: each saves the original value or snapshot,
+generates format-valid random values, writes once, restores the saved state, and
+reads again. A transport or PLC failure can interrupt restoration, so use only
+test addresses that are safe for the PLC program. The device matrix and
+multi-PLC monitor are read-only.
 
 ## How to import
 
@@ -38,8 +43,8 @@ To persist CSV-equivalent rows, route the long-form row messages through a CSV n
 
 | File | What it demonstrates | First-time use order |
 | --- | --- | --- |
-| `kvhostlink-basic-read-write.json` | Reads `DM100:U`, writes `DM100:U=123`, and reads back the value. | 1 |
+| `kvhostlink-basic-read-write.json` | Reads `DM100:U`; its optional test path saves, randomly writes, restores, and reads again. | 1 |
 | `kvhostlink-multi-plc-monitor.json` | Read-only multi-PLC monitor with long-form row output and reconnect backoff. | 1 after connection settings are known |
-| `kvhostlink-typed-read-write.json` | Uses `:S`, `:D`, `:L`, `:F`, and `.bit` forms. | 2 |
-| `kvhostlink-array-read-write.json` | Uses `,count` forms such as `DM160:U,4` and `R200:BIT,4`. | 3 |
-| `kvhostlink-device-matrix.json` | Runs one-by-one read/write checks across many device families and records JSONL results. | After the first three flows work |
+| `kvhostlink-typed-read-write.json` | Reads `:S`, `:D`, `:L`, `:F`, and `.bit`; its optional random write restores the saved snapshot. | 2 |
+| `kvhostlink-array-read-write.json` | Reads `,count` forms; its optional random write restores both arrays. | 3 |
+| `kvhostlink-device-matrix.json` | Runs read-only one-by-one checks across device families and records JSONL results. | After the first three flows work |

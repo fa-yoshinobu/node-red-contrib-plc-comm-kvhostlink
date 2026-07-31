@@ -42,8 +42,19 @@ Install the package, then restart Node-RED if your runtime asks you to.
 6. Set **PLC Profile** to the exact canonical profile for your PLC, such as `keyence:kv-5000`.
 7. Deploy the flow.
 8. Trigger `Read DM100:U` and check the debug sidebar.
-9. Trigger `Write DM100:U=123`, then read again to confirm the value.
-10. The starter flow does not restore the previous value; use only a test address or add a restore write before production use.
+9. On a controlled test PLC/address only, optionally trigger `Test DM100:U (random + restore)`.
+10. The write path first saves the original value, writes a random different unsigned value, restores the original, and reads again. Restoration is best effort and can be interrupted by a transport or PLC failure.
+
+Address and integer input is strict. Each high-level address must match one
+complete supported form; extra selectors or trailing text and incompatible
+`BIT`, `F`, or `COMMENT` selectors fail before connection or transport. Direct
+client integer arguments must be safe JavaScript integers. Configuration-node
+port and timeout text is converted explicitly at the Node-RED boundary.
+
+Malformed response bytes, an unknown operating-mode response, stale or extra
+TCP response lines, and failed UDP socket generations invalidate only the
+connection that produced them. The next operation does not silently reuse or
+replay work on a replacement connection; reconnect explicitly.
 
 ## Documentation
 

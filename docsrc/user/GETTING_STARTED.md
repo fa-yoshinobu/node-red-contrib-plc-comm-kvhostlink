@@ -93,7 +93,12 @@ For a single manual write, configure a `kvhostlink-write` node like this:
 | Errors | `Second output` |
 
 Use only a test address that is safe for your machine and PLC program.
-The imported starter flow writes the sample value and does not restore the previous value automatically.
+The table above shows the write-node input shape; it does not by itself provide
+a restore sequence. The imported starter flow provides the safer demonstration:
+`Test DM100:U (random + restore)` reads and saves the original value, writes a
+random different unsigned value, restores the saved value, and reads again.
+Restoration is best effort and cannot be guaranteed if the PLC or connection
+fails during the sequence, so use only a controlled test address.
 
 ## Confirm success
 
@@ -103,8 +108,8 @@ The imported starter flow writes the sample value and does not restore the previ
 | Read status | The read node reports `1 item(s)`. |
 | Debug output | The debug sidebar shows `msg.payload`. |
 | Error output | The error output stays quiet. |
-| Write readback | The follow-up read shows the value written to your test address. |
-| Restore plan | You use a test-only address or add a follow-up write that restores the previous value. |
+| Write path | The optional starter-flow path writes a random valid value only after saving the original. |
+| Restore readback | The final read shows the restored original value. |
 
 ## If it does not work
 

@@ -4,8 +4,8 @@
     if (!/^\d+$/.test(text)) {
       return false;
     }
-    const parsed = Number.parseInt(text, 10);
-    return Number.isInteger(parsed) && parsed >= min && parsed <= max;
+    const parsed = Number(text);
+    return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max;
   }
 
   const KVHOSTLINK_PLC_PROFILES = Object.freeze([
@@ -110,6 +110,8 @@
   <p><b>Name</b> is an optional display-only label. Empty, whitespace, or non-string values mean no custom label; duplicate labels are allowed. It never selects the connection, endpoint, profile, route, or request content.</p>
   <p><b>PLC Profile</b> is shown as a model-family label, but saved as a canonical lowercase profile such as <code>keyence:kv-x500</code>. Legacy model labels such as <code>KV-X500</code> are not accepted as profile input.</p>
   <p>Start with the default TCP port <code>8501</code> unless your PLC or bridge uses a different endpoint.</p>
+  <p>Port and timeout must be complete decimal integers in range. The config node converts editor text once before constructing the client; direct JavaScript client calls do not coerce numeric strings.</p>
+  <p>TCP assigns one non-empty response line to one request. Stale, unsolicited, or additional lines invalidate that socket. UDP requests belong to one socket generation; close or failure rejects old active and queued work instead of replaying it after reconnect.</p>
   <p>Commands are sent as Host Link command lines terminated with <code>CR</code>.</p>
   <p><code>kvhostlink-read</code> and <code>kvhostlink-write</code> can send <code>connect</code>, <code>disconnect</code>, and <code>reinitialize</code> control messages through this shared connection.</p>
 </script>

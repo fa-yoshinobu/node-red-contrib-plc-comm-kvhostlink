@@ -23,6 +23,10 @@ Accepted profile values are listed in [PLC profiles](PROFILES.md).
 The values shown in a newly created editor node are initial form values. A
 saved flow must retain explicit port and transport fields; the runtime does not
 repair missing values.
+Port and timeout must be decimal integer text within their documented range.
+The connection node converts that form text once at the Node-RED boundary;
+direct `HostLinkClient` construction requires actual safe JavaScript integers
+and never coerces numeric strings.
 
 ## Performance notes
 
@@ -44,6 +48,14 @@ connection.
 Use the connection control messages `connect`, `disconnect`, and `reinitialize`
 for deliberate connection control. Create separate connection config nodes only
 when you intentionally want separate PLC sessions.
+
+Each TCP request exclusively owns one non-empty response line. Stale partial
+data, an unsolicited line, or an additional line invalidates that socket rather
+than becoming a later request's response. UDP work is bound to the socket
+generation on which it was queued. Close rejects active and queued work from
+that generation; it is never resent on a replacement socket. Malformed decoder
+output and mode responses other than exact `0` or `1` also invalidate the
+supplying generation. PLC command errors `E0` through `E9` remain reusable.
 
 ## kvhostlink-read node
 
@@ -105,7 +117,12 @@ the node does not execute configured updates as a fallback.
 Every update is validated before the first PLC request. Numeric values must be
 finite JavaScript numbers in the selected format's exact range; strings,
 Booleans, fractional integers, wraparound values, and Float32 overflow are
-rejected. An empty update object performs no write and is rejected.
+rejected. Float32 is valid only for word device families; every direct-bit
+family rejects it before any read or write. An empty update object performs no
+write and is rejected. A complete `writeNamed` update set is also checked
+against Host Link command limits before its first request: at most 1000 word
+points, 500 dword/Float32 points, or 120 timer/counter points per compiled
+operation. Oversized input fails as a whole instead of partially writing.
 
 | Output msg field | Description |
 | --- | --- |
@@ -138,8 +155,13 @@ match the selected mode exactly; conflicting old flows are rejected for review.
 Use `:` for data types and `.0` through `.F` for bit-in-word access.
 `DM100.D` means bit `D` inside `DM100`; use `DM100:D` for a 32-bit value.
 High-level read/write addresses must specify the data type explicitly, such as `:U`, `:D`, or `:BIT`.
-The complete address-list input is parsed. Extra text before, between, or after
-addresses is an error rather than being ignored.
+Each address contains exactly one complete selector: one dtype, or one word-bit
+selector, followed by an optional positive safe-integer count only where that
+form supports a count. `BIT` is limited to direct-bit device families,
+Float32 `F` is limited to word device families, and `COMMENT` is limited to
+devices supported by `RDC`. Comment and word-bit forms do not accept a count.
+The editor and runtime use this same grammar. Extra selectors or text before,
+between, or after addresses is an error rather than being ignored.
 
 ## Timer and counter
 
@@ -166,6 +188,12 @@ Both read and write nodes accept connection control messages.
 ## Operational recipes
 
 The `examples/flows/kvhostlink-multi-plc-monitor.json` flow is a read-only multi-PLC monitor. It polls `DM100:U`, emits long-form rows shaped as `timestamp,plc,tag,value`, and uses `connected`, `lost`, `reconnecting`, and `recovered` state transitions with a 1 second to 30 second backoff.
+
+The basic, typed, and array write buttons are manual controlled-test paths.
+Each saves the original value or snapshot, generates format-valid random test
+values, writes once, restores the saved state, and reads again. Restoration is
+best effort after communication failure. The device-matrix flow is read-only;
+its write controls and write router are deliberately disabled.
 
 For config-driven polling, keep a JSON config in an Inject or Function node and feed `msg.addresses` into `kvhostlink-read`; no extra node type is required.
 

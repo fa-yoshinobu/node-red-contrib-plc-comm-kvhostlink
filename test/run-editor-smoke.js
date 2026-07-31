@@ -3,7 +3,6 @@
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
-const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 
@@ -11,7 +10,11 @@ const repoRoot = path.resolve(__dirname, "..");
 const packageJson = require(path.join(repoRoot, "package.json"));
 const flowPath = path.join(repoRoot, "examples", "flows", "kvhostlink-basic-read-write.json");
 const expectedTypes = new Set(["kvhostlink-connection", "kvhostlink-read", "kvhostlink-write"]);
-const smokeDir = path.join(os.tmpdir(), `${packageJson.name.replace(/[^a-z0-9._-]+/gi, "-")}-editor-smoke`);
+const smokeDir = path.resolve(
+  repoRoot,
+  "..",
+  `.${packageJson.name.replace(/[^a-z0-9._-]+/gi, "-")}-editor-smoke`,
+);
 const npmCacheDir = path.join(smokeDir, ".npm-cache");
 const npmRunner = resolveNpmRunner();
 const nodeRedRunner = resolveNodeRedRunner();

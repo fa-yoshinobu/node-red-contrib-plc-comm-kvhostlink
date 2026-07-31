@@ -2,16 +2,16 @@
     {
         "id":  "tab-kv-typed",
         "type":  "tab",
-        "label":  "KV Host Link Typed Read Write",
+        "label":  "KV Host Link Typed Safe Read Write",
         "disabled":  false,
-        "info":  "Typed scalar flow for signed, dword, long, float, and bit-in-word access. Use canonical uppercase addresses in the examples. The flow nodes keep the caller-visible logical request shape and do not silently switch to a different fallback split behavior."
+        "info":  "Typed scalar reads plus a manual random write/restore check for signed, dword, long, float, and bit-in-word access. The write path saves every original value before writing and restores the saved snapshot afterward. Use only controlled test addresses because restoration can be interrupted by a transport or PLC failure."
     },
     {
         "id":  "comment-kv-typed",
         "type":  "comment",
         "z":  "tab-kv-typed",
-        "name":  "Typed sample: signed, dword, float, bit-in-word",
-        "info":  "Typed read/write sample for DM110:S, DM120:D, DM130:L, DM140:F, and DM150.3. Confirm the connection node uses a canonical PLC Profile, and use this after the basic DM100:U flow works.",
+        "name":  "Typed sample: read-only first; optional random write + restore",
+        "info":  "Read DM110:S, DM120:D, DM130:L, DM140:F, and DM150.3 first. The optional write button reads and saves all originals, writes random valid values, restores the snapshot, then reads again. Restoration is best effort and requires controlled test addresses.",
         "x":  290,
         "y":  40,
         "wires":  [
@@ -47,7 +47,7 @@
         "id":  "inject-kv-typed-write",
         "type":  "inject",
         "z":  "tab-kv-typed",
-        "name":  "Write typed sample",
+        "name":  "Test typed values (random + restore)",
         "props":  [
                       {
                           "p":  "payload"
@@ -58,13 +58,13 @@
         "once":  false,
         "onceDelay":  0.1,
         "topic":  "",
-        "payload":  "{\"DM110:S\":-22,\"DM120:D\":987654321,\"DM130:L\":-2023406815,\"DM140:F\":45.5,\"DM150.3\":true}",
-        "payloadType":  "json",
+        "payload":  "",
+        "payloadType":  "date",
         "x":  120,
         "y":  180,
         "wires":  [
                       [
-                          "write-kv-typed"
+                          "read-kv-typed-original"
                       ]
                   ]
     },
@@ -102,7 +102,92 @@
         "errorHandling":  "output2",
         "metadataMode":  "minimal",
         "outputs":  2,
+        "x":  970,
+        "y":  180,
+        "wires":  [
+                      [
+                          "prepare-kv-typed-restore"
+                      ],
+                      [
+                          "debug-kv-typed-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "read-kv-typed-original",
+        "type":  "kvhostlink-read",
+        "z":  "tab-kv-typed",
+        "name":  "Read original typed values",
+        "connection":  "cfg-kv-typed",
+        "addresses":  "DM110:S\nDM120:D\nDM130:L\nDM140:F\nDM150.3",
+        "addressesType":  "str",
+        "outputMode":  "object",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "outputs":  2,
         "x":  410,
+        "y":  180,
+        "wires":  [
+                      [
+                          "prepare-kv-typed-random"
+                      ],
+                      [
+                          "debug-kv-typed-error"
+                      ]
+                  ]
+    },
+    {
+        "id":  "prepare-kv-typed-random",
+        "type":  "function",
+        "z":  "tab-kv-typed",
+        "name":  "Save snapshot + choose random values",
+        "func":  "const original = Object.assign({}, msg.payload);\nmsg.kvSampleOriginal = original;\nmsg.payload = {\n    'DM110:S': Math.floor(Math.random() * 65536) - 32768,\n    'DM120:D': Math.floor(Math.random() * 4294967296),\n    'DM130:L': Math.floor(Math.random() * 4294967296) - 2147483648,\n    'DM140:F': Math.fround((Math.random() * 2000) - 1000),\n    'DM150.3': !Boolean(original['DM150.3'])\n};\nreturn msg;",
+        "outputs":  1,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [],
+        "x":  700,
+        "y":  180,
+        "wires":  [
+                      [
+                          "write-kv-typed"
+                      ]
+                  ]
+    },
+    {
+        "id":  "prepare-kv-typed-restore",
+        "type":  "function",
+        "z":  "tab-kv-typed",
+        "name":  "Prepare typed snapshot restore",
+        "func":  "msg.payload = Object.assign({}, msg.kvSampleOriginal);\nreturn msg;",
+        "outputs":  1,
+        "timeout":  0,
+        "noerr":  0,
+        "initialize":  "",
+        "finalize":  "",
+        "libs":  [],
+        "x":  1230,
+        "y":  180,
+        "wires":  [
+                      [
+                          "restore-kv-typed"
+                      ]
+                  ]
+    },
+    {
+        "id":  "restore-kv-typed",
+        "type":  "kvhostlink-write",
+        "z":  "tab-kv-typed",
+        "name":  "Restore typed snapshot",
+        "connection":  "cfg-kv-typed",
+        "updates":  "payload",
+        "updatesType":  "msg",
+        "errorHandling":  "output2",
+        "metadataMode":  "minimal",
+        "outputs":  2,
+        "x":  1490,
         "y":  180,
         "wires":  [
                       [
@@ -141,8 +226,8 @@
         "tostatus":  false,
         "complete":  "true",
         "targetType":  "full",
-        "x":  670,
-        "y":  200,
+        "x":  1490,
+        "y":  300,
         "wires":  [
 
                   ]

@@ -12,10 +12,6 @@ release-artifacts export-ignore
 release-artifacts/** export-ignore
 scripts export-ignore
 scripts/** export-ignore
-test export-ignore
-test/** export-ignore
-tests export-ignore
-tests/** export-ignore
 tools export-ignore
 tools/** export-ignore
 build export-ignore

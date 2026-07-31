@@ -1,9 +1,9 @@
 <script type="text/javascript">
-  const KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE = /^[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]+|:[A-Z]+)?(?:,\d+)?$/i;
+  const KVHOSTLINK_WRITE_ADDRESS_TOKEN_RE = /^[A-Z][A-Z0-9]*[0-9A-F]+(?:\.[0-9A-F]|:[A-Z]+)(?:,\d+)?$/i;
   const KVHOSTLINK_WRITE_DEVICE_BASES = Object.freeze({
     R: 10, B: 16, MR: 10, LR: 10, CR: 10, VB: 16,
     DM: 10, EM: 10, FM: 10, ZF: 10, W: 16, TM: 10, Z: 10,
-    T: 10, TC: 10, TS: 10, C: 10, CC: 10, CS: 10, AT: 10,
+    T: 10, TC: 10, TS: 10, C: 10, CC: 10, CS: 10, CTH: 10, CTC: 10, AT: 10,
     CM: 10, VM: 10, X: 10, Y: 10, M: 10, L: 10, D: 10, E: 10, F: 10
   });
   const KVHOSTLINK_WRITE_DEVICE_CODES = Object.keys(KVHOSTLINK_WRITE_DEVICE_BASES).sort(function (left, right) {
@@ -12,6 +12,8 @@
   const KVHOSTLINK_WRITE_DTYPE_SUFFIXES = new Set(["U", "S", "D", "L", "F", "H", "BIT"]);
   const KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_WRITE_XY_DEVICE_TYPES = new Set(["X", "Y"]);
+  const KVHOSTLINK_WRITE_DIRECT_BIT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"]);
+  const KVHOSTLINK_WRITE_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"]);
 
   function kvGetWriteCurrentType(typeSelector, savedType, node) {
     const activeNode = RED.editor && RED.editor.activeNode;
@@ -35,39 +37,29 @@
   }
 
   function kvValidateWriteAddressToken(value) {
-    let text = String(value == null ? "" : value).trim().toUpperCase();
+    const text = String(value == null ? "" : value).trim().toUpperCase();
     if (!text) {
       return false;
     }
 
-    const countMatch = /^(.*?),\s*(\d+)$/.exec(text);
-    if (countMatch) {
-      text = countMatch[1].trim();
-      if (Number.parseInt(countMatch[2], 10) <= 0) {
-        return false;
-      }
-    }
-
-    const suffixMatch = /^(.*?):([A-Z]+)$/.exec(text);
-    if (suffixMatch) {
-      text = suffixMatch[1].trim();
-      if (!KVHOSTLINK_WRITE_DTYPE_SUFFIXES.has(suffixMatch[2].toUpperCase())) {
-        return false;
-      }
-    }
-
-    const bitMatch = /^(.*?)\.([0-9A-F])$/i.exec(text);
-    if (bitMatch) {
-      if (countMatch || suffixMatch) {
-        return false;
-      }
-      text = bitMatch[1].trim();
-    }
-    if (!suffixMatch && !bitMatch) {
+    const match = /^([A-Z][A-Z0-9]*[0-9A-F]+)(?::([A-Z]+)|\.([0-9A-F]))(?:,([0-9]+))?$/.exec(text);
+    if (!match || !kvValidateWriteDeviceToken(match[1])) {
       return false;
     }
-
-    return kvValidateWriteDeviceToken(text);
+    const count = match[4] === undefined ? 1 : Number(match[4]);
+    if (!Number.isSafeInteger(count) || count <= 0) {
+      return false;
+    }
+    const deviceType = KVHOSTLINK_WRITE_DEVICE_CODES.find(function (code) { return match[1].startsWith(code); });
+    if (deviceType === "AT") {
+      return false;
+    }
+    if (match[2]) {
+      return KVHOSTLINK_WRITE_DTYPE_SUFFIXES.has(match[2])
+        && !(match[2] === "BIT" && !KVHOSTLINK_WRITE_DIRECT_BIT_DEVICE_TYPES.has(deviceType))
+        && !(match[2] === "F" && !KVHOSTLINK_WRITE_FLOAT_DEVICE_TYPES.has(deviceType));
+    }
+    return match[3] !== undefined && match[4] === undefined;
   }
 
   function kvValidateWriteDeviceToken(text) {
@@ -239,6 +231,8 @@
   <p>Preferred dynamic input is <code>msg.updates</code> as an object, for example <code>{ "DM100:U": 123, "DM110:S": -5, "DM150.3": true, "R010:BIT": true }</code>.</p>
   <p>A present runtime field is authoritative: invalid or empty <code>msg.updates</code>/<code>msg.address</code> is an error and never falls back to configured updates. <code>msg.updates</code> and <code>msg.address</code> are mutually exclusive; <code>msg.value</code>/<code>msg.dtype</code> cannot appear without <code>msg.address</code>.</p>
   <p>Count-qualified addresses expect arrays, for example <code>{ "DM160:U,4": [1,2,3,4], "R200:BIT,4": [true,false,true,true] }</code>.</p>
+  <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families, and Float32 <code>F</code> is only for word device families; direct-bit Float32 fails before any read or write.</p>
+  <p>The complete update set is validated before the first request. A compiled group above 1000 word points, 500 dword/Float32 points, or 120 timer/counter points rejects the whole call and is not split automatically.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects only.</p>
   <p>You can also send a single write with <code>msg.address</code> and <code>msg.value</code>. A bare address requires exactly one uppercase <code>msg.dtype</code>: <code>BIT</code>, <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code>, <code>F</code>, or <code>H</code>. Omit <code>msg.dtype</code> when the address already contains a dtype or word-bit selector; specifying both is an error. If <code>msg.address</code> already includes <code>,count</code>, the dtype is inserted before the count suffix. <code>COMMENT</code> is read-only.</p>

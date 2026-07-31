@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const dgram = require("node:dgram");
 const { EventEmitter } = require("node:events");
 const canonicalKvProfiles = require("./fixtures/kv_device_ranges.json");
 
@@ -122,9 +123,9 @@ test("HostLinkClient requires port and transport and rejects invalid ports", () 
     /transport/
   );
   assert.equal(createTestClient().port, 8501);
-  assert.equal(createTestClient({ port: "8502" }).port, 8502);
+  assert.equal(createTestClient({ port: 8502 }).port, 8502);
 
-  for (const port of [undefined, null, "", " ", false, true, 0, -1, "abc", "1e3", 65536, 1.5]) {
+  for (const port of [undefined, null, "", " ", "8502", false, true, 0, -1, "abc", "1e3", 65536, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(
       () => createTestClient({ port }),
       /port (is required|out of range)/
@@ -138,13 +139,13 @@ test("HostLinkClient validates timeout and requires PLC profile metadata", () =>
     /plcProfile is required/
   );
   assert.equal(createTestClient().timeout, 3000);
-  assert.equal(createTestClient({ timeout: "2500" }).timeout, 2500);
+  assert.equal(createTestClient({ timeout: 2500 }).timeout, 2500);
   assert.equal(
     createTestClient({ plcProfile: " keyence:kv-5000 " }).plcProfile,
     "keyence:kv-5000"
   );
 
-  for (const timeout of ["", " ", 0, -1, "abc", Number.POSITIVE_INFINITY]) {
+  for (const timeout of ["", " ", "2500", 0, -1, "abc", Number.POSITIVE_INFINITY, 1.5, true]) {
     assert.throws(
       () => createTestClient({ timeout }),
       /timeout/
@@ -213,6 +214,7 @@ test("an old TCP write callback cannot destroy or feed a replacement connection"
   const oldSocket = new FakeSocket();
   client._socket = oldSocket;
   const request = client.sendRaw("?K");
+  const requestRejected = assert.rejects(request, /Connection closed|old write failed/);
   await Promise.resolve();
   assert.equal(typeof oldSocket.writeCallback, "function");
 
@@ -222,7 +224,7 @@ test("an old TCP write callback cannot destroy or feed a replacement connection"
   client._handleTcpData(Buffer.from("STALE\r", "ascii"), oldSocket);
   oldSocket.writeCallback(new Error("old write failed"));
 
-  await assert.rejects(() => request, /old write failed/);
+  await requestRejected;
   await closing;
   assert.equal(newSocket.destroyed, false);
   assert.equal(client._socket, newSocket);
@@ -273,6 +275,7 @@ test("TCP response cap accepts the boundary and discards one-byte overflow state
 
 test("TCP failure paths count only complete response lines", async () => {
   const completeError = createTestClient({ timeout: 100 });
+  completeError._socket = { destroyed: false, destroy() { this.destroyed = true; } };
   const errorLine = completeError._readTcpLine();
   completeError._handleTcpData(Buffer.from("E1\r", "ascii"));
   assert.deepEqual(await errorLine, Buffer.from("E1", "ascii"));
@@ -294,6 +297,7 @@ test("TCP failure paths count only complete response lines", async () => {
 
 test("TCP traffic stats are independent of CRLF segmentation", async () => {
   const coalesced = createTestClient({ timeout: 100 });
+  coalesced._socket = { destroyed: false, destroy() { this.destroyed = true; } };
   const coalescedFirst = coalesced._readTcpLine();
   coalesced._handleTcpData(Buffer.from("FIRST\r\n", "ascii"));
   assert.deepEqual(await coalescedFirst, Buffer.from("FIRST", "ascii"));
@@ -303,6 +307,7 @@ test("TCP traffic stats are independent of CRLF segmentation", async () => {
   assert.equal(coalesced.trafficStats().rxBytes, 13);
 
   const split = createTestClient({ timeout: 100 });
+  split._socket = { destroyed: false, destroy() { this.destroyed = true; } };
   const splitFirst = split._readTcpLine();
   split._handleTcpData(Buffer.from("FIRST\r", "ascii"));
   assert.deepEqual(await splitFirst, Buffer.from("FIRST", "ascii"));
@@ -501,6 +506,215 @@ test("confirmOperatingMode rejects unknown mode values", async () => {
   await assert.rejects(() => client.confirmOperatingMode(), /Unsupported PLC mode response/);
 
   assert.deepEqual(frames, ["?M\r"]);
+});
+
+test("confirmOperatingMode accepts only complete exact 0 or 1 responses", async () => {
+  for (const [response, expected] of [["0", 0], ["1", 1]]) {
+    const client = createTestClient();
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    client._exchange = async () => Buffer.from(response, "ascii");
+    assert.equal(await client.confirmOperatingMode(), expected);
+    assert.equal(client._socket, socket);
+  }
+
+  for (const response of ["2", "01", " 1", "+1", "1-corrupt", "", "RUN"]) {
+    const client = createTestClient();
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    client._exchange = async () => Buffer.from(response, "ascii");
+    await assert.rejects(() => client.confirmOperatingMode(), /Empty response|Unsupported PLC mode response/);
+    assert.equal(client._socket, null, response);
+    assert.equal(socket.destroyed, true, response);
+  }
+});
+
+test("decoder protocol errors invalidate the exact generation but PLC errors remain reusable", async () => {
+  for (const response of [Buffer.alloc(0), Buffer.from("\r", "ascii"), Buffer.from([0xff, 0x0d])]) {
+    const client = createTestClient();
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    client._exchange = async () => response;
+    await assert.rejects(() => client.checkErrorNo(), /Empty response|Malformed response|Non-ASCII/);
+    assert.equal(client._socket, null);
+    assert.equal(socket.destroyed, true);
+  }
+
+  const reusable = createTestClient();
+  const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  reusable._socket = socket;
+  let response = "E1";
+  reusable._exchange = async () => Buffer.from(response, "ascii");
+  await assert.rejects(() => reusable.checkErrorNo(), (error) => error.code === "E1");
+  assert.equal(reusable._socket, socket);
+  response = "0";
+  assert.equal(await reusable.checkErrorNo(), "0");
+
+  const raced = createTestClient();
+  const oldSocket = { destroyed: false, destroy() { this.destroyed = true; } };
+  const replacementSocket = { destroyed: false, destroy() { this.destroyed = true; } };
+  raced._socket = oldSocket;
+  raced._generation = 4;
+  raced._exchange = async () => {
+    raced._socket = replacementSocket;
+    raced._generation = 5;
+    return Buffer.from([0xff]);
+  };
+  await assert.rejects(() => raced.checkErrorNo(), /Non-ASCII/);
+  assert.equal(raced._socket, replacementSocket);
+  assert.equal(replacementSocket.destroyed, false);
+});
+
+test("TCP assigns one nonempty response to one request and rejects stale or extra data", async () => {
+  const socket = { destroyed: false, writes: 0, write(_payload, callback) { this.writes += 1; callback(null); }, destroy() { this.destroyed = true; } };
+  const client = createTestClient({ timeout: 100 });
+  client._socket = socket;
+  const first = client.sendRaw("?K");
+  await Promise.resolve();
+  client._handleTcpData(Buffer.from("111\r222\r", "ascii"), socket);
+  assert.deepEqual(await first, Buffer.from("111", "ascii"));
+  assert.equal(client._socket, null);
+  assert.equal(socket.destroyed, true);
+  await assert.rejects(() => client.sendRaw("?K"), /not connected|generation changed/i);
+  assert.equal(socket.writes, 1);
+
+  const staleSocket = { destroyed: false, writes: 0, write(_payload, callback) { this.writes += 1; callback(null); }, destroy() { this.destroyed = true; } };
+  const stale = createTestClient();
+  stale._socket = staleSocket;
+  stale._receiveBuffer = Buffer.from("PARTIAL", "ascii");
+  await assert.rejects(() => stale.sendRaw("?K"), /Stale TCP response data/);
+  assert.equal(staleSocket.writes, 0);
+  assert.equal(stale._socket, null);
+});
+
+test("UDP close invalidates active and queued old-generation work without resend", async () => {
+  class FakeUdpSocket extends EventEmitter {
+    constructor() {
+      super();
+      this.sent = [];
+      this.closed = false;
+    }
+    send(payload, callback) {
+      this.sent.push(Buffer.from(payload));
+      callback(null);
+    }
+    close(callback) {
+      this.closed = true;
+      if (callback) callback();
+    }
+  }
+
+  const client = createTestClient({ transport: "udp", timeout: 1000 });
+  const oldSocket = new FakeUdpSocket();
+  client._socket = oldSocket;
+  client._generation = 1;
+  const active = client.sendRaw("FIRST");
+  const queued = client.sendRaw("SECOND");
+  const activeRejected = assert.rejects(active, /Connection closed/);
+  const queuedRejected = assert.rejects(queued, /generation changed/);
+  await Promise.resolve();
+  assert.equal(oldSocket.sent.length, 1);
+  await client.close();
+  await Promise.all([activeRejected, queuedRejected]);
+  assert.equal(oldSocket.closed, true);
+  assert.equal(oldSocket.listenerCount("message"), 0);
+
+  const newSocket = new FakeUdpSocket();
+  client._socket = newSocket;
+  client._generation += 1;
+  const next = client.sendRaw("THIRD");
+  await Promise.resolve();
+  oldSocket.emit("message", Buffer.from("STALE\r", "ascii"));
+  newSocket.emit("message", Buffer.from("NEW\r", "ascii"));
+  assert.deepEqual(await next, Buffer.from("NEW", "ascii"));
+  assert.equal(newSocket.sent.length, 1);
+});
+
+test("UDP loopback close error reinitialize and reconnect isolate request generations", async () => {
+  const server = dgram.createSocket("udp4");
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.bind(0, "127.0.0.1", resolve);
+  });
+  const port = server.address().port;
+  const commands = [];
+  const datagramWaiters = [];
+  server.on("message", (message, rinfo) => {
+    const command = message.toString("ascii").replace(/[\r\n]+$/, "");
+    commands.push(command);
+    const waiter = datagramWaiters.shift();
+    if (waiter) waiter({ command, rinfo });
+    if (["THIRD", "FIFTH", "SIXTH"].includes(command)) {
+      server.send(Buffer.from(`REPLY-${command}\r`, "ascii"), rinfo.port, rinfo.address);
+    }
+  });
+  const nextDatagram = () => new Promise((resolve) => datagramWaiters.push(resolve));
+  const client = createTestClient({ transport: "udp", port, timeout: 1000 });
+
+  try {
+    await client.connect();
+    const firstDatagram = nextDatagram();
+    const active = client.sendRaw("FIRST");
+    const queued = client.sendRaw("SECOND");
+    const activeRejected = assert.rejects(active, /Connection closed/);
+    const queuedRejected = assert.rejects(queued, /generation changed/);
+    const first = await firstDatagram;
+    assert.equal(first.command, "FIRST");
+    await client.close();
+    await Promise.all([activeRejected, queuedRejected]);
+    await new Promise((resolve, reject) => {
+      server.send(Buffer.from("STALE\r", "ascii"), first.rinfo.port, first.rinfo.address, (error) => error ? reject(error) : resolve());
+    });
+
+    await client.connect();
+    const thirdDatagram = nextDatagram();
+    const third = client.sendRaw("THIRD");
+    assert.equal((await thirdDatagram).command, "THIRD");
+    assert.deepEqual(await third, Buffer.from("REPLY-THIRD", "ascii"));
+
+    const fourthDatagram = nextDatagram();
+    const interruptedByReinitialize = client.sendRaw("FOURTH");
+    const reinitializeRejected = assert.rejects(interruptedByReinitialize, /Connection closed/);
+    assert.equal((await fourthDatagram).command, "FOURTH");
+    await client.close();
+    await reinitializeRejected;
+    await client.connect();
+    const fifthDatagram = nextDatagram();
+    const fifth = client.sendRaw("FIFTH");
+    assert.equal((await fifthDatagram).command, "FIFTH");
+    assert.deepEqual(await fifth, Buffer.from("REPLY-FIFTH", "ascii"));
+
+    const errorDatagram = nextDatagram();
+    const interruptedByError = client.sendRaw("ERROR");
+    const queuedAfterError = client.sendRaw("NEVER");
+    const errorRejected = assert.rejects(interruptedByError, /injected loopback socket error/);
+    const errorQueuedRejected = assert.rejects(queuedAfterError, /generation changed/);
+    assert.equal((await errorDatagram).command, "ERROR");
+    client._socket.emit("error", new Error("injected loopback socket error"));
+    await Promise.all([errorRejected, errorQueuedRejected]);
+    await client.connect();
+    const sixthDatagram = nextDatagram();
+    const sixth = client.sendRaw("SIXTH");
+    assert.equal((await sixthDatagram).command, "SIXTH");
+    assert.deepEqual(await sixth, Buffer.from("REPLY-SIXTH", "ascii"));
+
+    assert.deepEqual(commands, ["FIRST", "THIRD", "FOURTH", "FIFTH", "ERROR", "SIXTH"]);
+  } finally {
+    await client.close().catch(() => undefined);
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("integer-only public API arguments reject coercion before send", async () => {
+  const { client, frames } = createFrameRecorder();
+  for (const value of ["1", true, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(() => client.switchBank(value), (error) => error.name === "ValueError");
+    await assert.rejects(() => client.readExpansionUnitBuffer(value, 0, 1, ".U"), (error) => error.name === "ValueError");
+    await assert.rejects(() => client.readExpansionUnitBuffer(1, value, 1, ".U"), (error) => error.name === "ValueError");
+    await assert.rejects(() => client.readExpansionUnitBuffer(1, 0, value, ".U"), (error) => error.name === "ValueError");
+    await assert.rejects(() => client.writeBitInWord("DM0", value, true), (error) => error.name === "ValueError");
+  }
+  assert.deepEqual(frames, []);
 });
 
 test("forced bit command helpers preserve exact CR-terminated frames", async () => {

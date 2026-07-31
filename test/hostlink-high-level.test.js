@@ -1,6 +1,9 @@
 "use strict";
 
 const { EventEmitter } = require("node:events");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -17,6 +20,12 @@ const {
   writeNamed,
   writeTyped,
 } = require("../lib/hostlink");
+const {
+  DEFAULT_FORMAT_BY_DEVICE_TYPE,
+  DIRECT_BIT_DEVICE_TYPES,
+  RDC_DEVICE_TYPES,
+  WR_DEVICE_TYPES,
+} = require("../lib/hostlink/device");
 
 test("parseAddress supports dtype, count, and bit-in-word", () => {
   assert.deepEqual(parseAddress("DM100:U"), {
@@ -75,22 +84,121 @@ test("parseAddress supports dtype, count, and bit-in-word", () => {
     hasCount: true,
     explicitDtype: true,
   });
-  assert.throws(() => parseAddress("DM100"), /requires an explicit data type/);
-  assert.throws(() => parseAddress("DM100:"), /requires a dtype after/);
+  assert.throws(() => parseAddress("DM100"), /complete.*grammar/i);
+  assert.throws(() => parseAddress("DM100:"), /complete.*grammar/i);
   assert.throws(() => parseAddress("DM100:BOGUS"), /unsupported dtype/i);
 });
 
 test("normalizeAddress and formatParsedAddress keep one canonical spelling", () => {
   assert.equal(normalizeAddress(" dm200:d,4 "), "DM200:D,4");
-  assert.throws(() => normalizeAddress("100"), /Invalid device string/);
+  assert.throws(() => normalizeAddress("100"), /complete.*grammar/i);
   assert.equal(normalizeAddress("dm50.3"), "DM50.3");
   assert.equal(normalizeAddress("dm50.d"), "DM50.D");
   assert.equal(normalizeAddress(" dm250:comment "), "DM250:COMMENT");
   assert.equal(formatParsedAddress(parseAddress("R10:BIT,4")), "R010:BIT,4");
   assert.throws(() => normalizeAddress("dm100:bogus"), /unsupported dtype/i);
-  assert.throws(() => normalizeAddress("dm50.s"), /invalid bit-in-word/i);
+  assert.throws(() => normalizeAddress("dm50.s"), /complete.*grammar/i);
   assert.throws(() => parseAddress("DM50:BIT_IN_WORD"), /no bit index/i);
 });
+
+test("runtime and editor apply the same complete address grammar vectors", () => {
+  const valid = ["DM100:U", "DM200:D,4", "DM50.3", "R010:BIT", "R010.3", "T0:D", "CTH0:D", "Z1:F"];
+  const invalid = [
+    "DM100:U:COMMENT",
+    "DM200.3.extra",
+    "DM100:",
+    "DM100:U.3",
+    "DM100:BIT",
+    "T0:BIT",
+    "T0:F",
+    "R0:F",
+    "VB0:COMMENT",
+    "DM100:BIT_IN_WORD",
+    "DM100:U,0",
+    "DM100:COMMENT,2",
+    "DM100.3,2",
+    "DM100:U trailing",
+  ];
+  const readEditor = loadEditorFunctions("kvhostlink-read.html");
+  const writeEditor = loadEditorFunctions("kvhostlink-write.html");
+
+  for (const address of valid) {
+    assert.doesNotThrow(() => parseAddress(address), address);
+    assert.equal(readEditor.kvValidateAddressToken(address, { allowComment: true }), true, address);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(address), true, address);
+  }
+  for (const address of invalid) {
+    assert.throws(() => parseAddress(address), undefined, address);
+    assert.equal(readEditor.kvValidateAddressToken(address, { allowComment: true }), false, address);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(address), false, address);
+  }
+  assert.doesNotThrow(() => parseAddress("AT0:D"));
+  assert.equal(readEditor.kvValidateAddressToken("AT0:D", { allowComment: true }), true);
+  assert.equal(writeEditor.kvValidateWriteAddressToken("AT0:D"), false);
+});
+
+test("editor device and dtype compatibility matches runtime metadata exhaustively", () => {
+  const readEditor = loadEditorFunctions("kvhostlink-read.html");
+  const writeEditor = loadEditorFunctions("kvhostlink-write.html");
+  for (const deviceType of Object.keys(DEFAULT_FORMAT_BY_DEVICE_TYPE)) {
+    const base = `${deviceType}0`;
+    for (const dtype of ["U", "S", "D", "L", "H"]) {
+      const address = `${base}:${dtype}`;
+      assert.doesNotThrow(() => parseAddress(address), address);
+      assert.equal(readEditor.kvValidateAddressToken(address, { allowComment: true }), true, address);
+      assert.equal(writeEditor.kvValidateWriteAddressToken(address), WR_DEVICE_TYPES.has(deviceType), address);
+    }
+
+    const floatAddress = `${base}:F`;
+    const floatAllowed = DEFAULT_FORMAT_BY_DEVICE_TYPE[deviceType] === ".U";
+    assert.equal(succeeds(() => parseAddress(floatAddress)), floatAllowed, floatAddress);
+    assert.equal(readEditor.kvValidateAddressToken(floatAddress, { allowComment: true }), floatAllowed, floatAddress);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(floatAddress), floatAllowed && WR_DEVICE_TYPES.has(deviceType), floatAddress);
+
+    const bitAddress = `${base}:BIT`;
+    const bitAllowed = DIRECT_BIT_DEVICE_TYPES.has(deviceType);
+    assert.equal(succeeds(() => parseAddress(bitAddress)), bitAllowed, bitAddress);
+    assert.equal(readEditor.kvValidateAddressToken(bitAddress, { allowComment: true }), bitAllowed, bitAddress);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(bitAddress), bitAllowed && WR_DEVICE_TYPES.has(deviceType), bitAddress);
+
+    const commentAddress = `${base}:COMMENT`;
+    const commentAllowed = RDC_DEVICE_TYPES.has(deviceType);
+    assert.equal(succeeds(() => parseAddress(commentAddress)), commentAllowed, commentAddress);
+    assert.equal(readEditor.kvValidateAddressToken(commentAddress, { allowComment: true }), commentAllowed, commentAddress);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(commentAddress), false, commentAddress);
+
+    const wordBitAddress = `${base}.3`;
+    assert.doesNotThrow(() => parseAddress(wordBitAddress), wordBitAddress);
+    assert.equal(readEditor.kvValidateAddressToken(wordBitAddress, { allowComment: true }), true, wordBitAddress);
+    assert.equal(writeEditor.kvValidateWriteAddressToken(wordBitAddress), WR_DEVICE_TYPES.has(deviceType), wordBitAddress);
+  }
+});
+
+function succeeds(action) {
+  try {
+    action();
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function loadEditorFunctions(fileName) {
+  const html = fs.readFileSync(path.join(__dirname, "..", "nodes", fileName), "utf8");
+  const script = /<script type="text\/javascript">([\s\S]*?)<\/script>/.exec(html)[1];
+  const context = {
+    RED: { nodes: { registerType() {} }, editor: null },
+    console,
+    Set,
+    Object,
+    Number,
+    String,
+    Array,
+    JSON,
+  };
+  vm.runInNewContext(script, context, { filename: fileName });
+  return context;
+}
 
 test("readNamed and writeNamed reject BIT_IN_WORD without an explicit bit index", async () => {
   const fakeClient = {
@@ -152,6 +260,19 @@ test("writeTyped parses BIT values explicitly and rejects ambiguous input", asyn
     /invalid BIT value/i,
   );
   await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": "not-a-bit" }), /invalid BIT value/i);
+});
+
+test("Float32 writes reject every direct bit family before client send", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async writeConsecutive() { calls += 1; },
+    async write() { calls += 1; },
+  };
+  for (const device of ["Y0", "R0", "B0", "MR0", "LR0", "CR0", "VB0", "X0", "M0", "L0"]) {
+    await assert.rejects(() => writeTyped(fakeClient, device, "F", 1.0), (error) => error.name === "ValueError");
+    await assert.rejects(() => writeNamed(fakeClient, { [`${device}:F`]: 1.0 }), (error) => error.name === "ValueError");
+  }
+  assert.equal(calls, 0);
 });
 
 test("readTyped parses explicit Host Link BIT response tokens", async () => {
@@ -692,6 +813,30 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
   ]);
 });
 
+test("writeNamed preflights complete word dword and timer groups before any send", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async writeConsecutive() { calls += 1; },
+    async writeSetValueConsecutive() { calls += 1; },
+  };
+  const wordTooLarge = Object.fromEntries(Array.from({ length: 1001 }, (_, index) => [`DM${index}:U`, index & 0xffff]));
+  const dwordTooLarge = Object.fromEntries(Array.from({ length: 501 }, (_, index) => [`DM${index * 2}:D`, index]));
+  const timerTooLarge = Object.fromEntries(Array.from({ length: 121 }, (_, index) => [`T${index}:D`, index]));
+  for (const updates of [wordTooLarge, dwordTooLarge, timerTooLarge, { "DM0:U": 1, ...timerTooLarge }]) {
+    await assert.rejects(() => writeNamed(fakeClient, updates), /allowed|out of range/i);
+  }
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "DM0:U": 1, "AT0:D": 2 }),
+    /read-only device family 'AT'/i,
+  );
+  assert.equal(calls, 0);
+
+  await writeNamed(fakeClient, Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`DM${index}:U`, index & 0xffff])));
+  await writeNamed(fakeClient, Object.fromEntries(Array.from({ length: 500 }, (_, index) => [`DM${index * 2}:D`, index])));
+  await writeNamed(fakeClient, Object.fromEntries(Array.from({ length: 120 }, (_, index) => [`T${index}:D`, index])));
+  assert.equal(calls, 3);
+});
+
 test("writeNamed does not merge typed word values on direct-bit device families", async () => {
   const calls = [];
   const fakeClient = {
@@ -714,8 +859,6 @@ test("writeNamed does not merge typed word values on direct-bit device families"
     "M202:D": 0x23456789,
     "M300:L": -2,
     "M302:L": -3,
-    "M400:F": 1.5,
-    "M402:F": 2.5,
     "M500:BIT": true,
     "M501:BIT": false,
   });
@@ -733,10 +876,12 @@ test("writeNamed does not merge typed word values on direct-bit device families"
     { kind: "write", device: "M302", dataFormat: ".L" },
   ]);
   assert.deepEqual(calls.slice(10), [
-    { kind: "writeConsecutive", device: "M400", values: [0, 16320], dataFormat: ".U" },
-    { kind: "writeConsecutive", device: "M402", values: [0, 16416], dataFormat: ".U" },
     { kind: "writeConsecutive", device: "M500", values: [1, 0], dataFormat: undefined },
   ]);
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "M400:F": 1.5, "M402:F": 2.5 }),
+    /Float32.*direct bit/i,
+  );
 });
 
 function createMockRed() {

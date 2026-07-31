@@ -102,8 +102,8 @@ function withDtype(address, dtype, dtypePresent) {
   const trimmed = String(address).trim();
   const colonCount = (trimmed.match(/:/g) || []).length;
   const dotCount = (trimmed.match(/\./g) || []).length;
-  const embedded = (colonCount === 1 && dotCount === 0 && /:[A-Z]+(?:\s*,\s*\d+)?$/i.test(trimmed))
-    || (colonCount === 0 && dotCount === 1 && /\.[0-9A-F]+$/i.test(trimmed));
+  const embedded = (colonCount === 1 && dotCount === 0 && /:[A-Z]+(?:,\d+)?$/i.test(trimmed))
+    || (colonCount === 0 && dotCount === 1 && /\.[0-9A-F]$/i.test(trimmed));
   if ((colonCount > 0 || dotCount > 0) && !embedded) {
     throw new Error("msg.address contains an incomplete or conflicting dtype/bit selector");
   }

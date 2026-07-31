@@ -218,3 +218,27 @@ Acceptance criteria:
 - [x] Live PLC verification is not required for this deterministic local framing and counter contract.
 - [x] Documentation, migration notes, changelog, and API reference agree with the implementation.
 - [x] Final acceptance criteria verified and the item marked complete.
+
+## 2026-08-01 Host Link evaluation migration
+
+The approved GOAL records and machine-verifiable acceptance criteria are
+`HL-EVAL-001`, `HL-EVAL-002`, `HL-EVAL-003`, `HL-EVAL-004`, and
+`HL-EVAL-020` through `HL-EVAL-024` in `TODO.md`. This section records the
+required caller migration without duplicating their acceptance history.
+
+| Record | Required migration |
+| --- | --- |
+| `HL-EVAL-001` | Move Float32 values to a word device address; every direct-bit family now rejects `F` before transport. |
+| `HL-EVAL-002` | Supply one complete address selector only. Remove extra selectors/trailing text, incompatible `BIT`/`F`/`COMMENT`, and counts on comment or word-bit forms. |
+| `HL-EVAL-003` | Treat UDP close/failure as cancellation of that generation. Submit new work explicitly after reconnect; old queued work is not replayed. |
+| `HL-EVAL-004` | Fix PLC/bridge behavior that emits unsolicited or multiple response lines. A TCP request owns exactly one non-empty line and the socket is discarded on ambiguity. |
+| `HL-EVAL-020` | Reconnect after malformed decoded response bytes. PLC `E0` through `E9` errors remain command results and do not alone require reconnect. |
+| `HL-EVAL-021` | Accept operating mode only from exact `0` or `1`; remove consumers that relied on numeric-prefix parsing. |
+| `HL-EVAL-022` | Pass actual safe JavaScript integers to direct APIs. Node-RED form text is the only boundary that validates and converts decimal strings. |
+| `HL-EVAL-023` | Keep one `writeNamed` call within 1000 word, 500 dword/Float32, and 120 timer/counter points per compiled group. Split into multiple calls only when the application explicitly accepts partial-success ordering. |
+| `HL-EVAL-024` | Treat the GitHub source archive as a testable source distribution. Keep the npm package-content contract separate and minimal. |
+
+The basic, typed, and array flows now make the optional write path explicit,
+random, and best-effort restoring. The device-matrix and multi-PLC monitor flows
+are read-only. No comment-decoder encoding behavior changes under this migration;
+`HL-EVAL-TODO-006` remains a separate evidence-dependent decision.
