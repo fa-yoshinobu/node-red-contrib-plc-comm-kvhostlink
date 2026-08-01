@@ -518,11 +518,11 @@ Machine-verifiable acceptance criteria:
 - [x] Tests use the repository-only runner and the package-installed artifact.
 - [x] Relevant local static, unit, Editor-smoke, package, and source-archive gates passed for the final source state.
 - [x] The equivalent local Windows/Node 24 Editor smoke passed with Node-RED 4.1.11 and the exact configured `red.js`.
-- [ ] The GitHub-hosted Ubuntu/Node 20 Editor-smoke job passed for the final source state.
+- [x] The GitHub-hosted Ubuntu/Node 20 Editor-smoke job passed for the final source state.
 - [x] Codex self-review completed against the approved CI/package boundary.
 - [x] Live PLC verification is not required for package installation and editor registration.
 - [x] Changelog and maintainer documentation agree with the implementation.
-- [ ] Final acceptance criteria verified and the item marked complete.
+- [x] Final acceptance criteria verified and the item marked complete.
 
 Verification evidence collected before the consolidated final gate:
 
@@ -533,9 +533,10 @@ Verification evidence collected before the consolidated final gate:
   package and isolated consumer passed. The synthetic current-worktree source
   archive contained 57 files, 6 sample files, and 6 test files and passed its
   extracted syntax, unit, JSON-flow, and package dry-run checks.
-- GitHub-hosted Ubuntu/Node 20 Editor evidence remains unchecked. The Ubuntu
-  Node 18/20/22 matrix and Windows/Node 20 job were not reproduced because
-  those hosted OS/runtime combinations were unavailable locally.
+- PR #38 head `01eeccee7fd963b0365de2ab70e081de13c01413` passed the
+  GitHub-hosted Ubuntu/Node 20 Editor smoke pinned to Node-RED 4.1.11, the
+  Ubuntu Node 18/20/22 matrix, and the Windows/Node 20 job. GitHub merged that
+  reviewed source as `e7d094fba21c1c3895b43327bb84af0b91739990` on 2026-08-01.
 
 Self-review disposition:
 
@@ -578,17 +579,20 @@ Machine-verifiable acceptance criteria:
 - [x] Tests cover every local status and error-route acceptance criterion.
 - [x] Relevant local static, unit, package, source-archive, and docs checks passed for the final source state.
 - [x] The equivalent local Windows/Node 24 status contract and package/source gates passed.
-- [ ] The GitHub-hosted Ubuntu Node 18/20/22 matrix and Windows/Node 20 job passed for the final source state.
+- [x] The GitHub-hosted Ubuntu Node 18/20/22 matrix and Windows/Node 20 job passed for the final source state.
 - [x] Codex self-review completed against runtime values, tests, docs, and cross-library consistency.
 - [x] Live PLC verification is not required; status transitions and routing are deterministic runtime behavior.
 - [x] Usage guide, generated site copy, changelog, and maintainer record agree.
-- [ ] Final acceptance criteria verified and the item marked complete.
+- [x] Final acceptance criteria verified and the item marked complete.
 
 Verification and self-review disposition:
 
 - The local Windows/Node 24.14.1 run passed all 109 tests, the 27-file/5-flow
   isolated npm consumer, the Node-RED 4.1.11 Editor smoke, and the 57-file
   current-worktree source archive retaining all 6 samples and 6 test files.
+- PR #38 head `01eeccee7fd963b0365de2ab70e081de13c01413` passed the
+  GitHub-hosted Ubuntu Node 18/20/22 matrix and Windows/Node 20 job before its
+  merge as `e7d094fba21c1c3895b43327bb84af0b91739990` on 2026-08-01.
 - Runtime source, exact-status assertions, and both Node-RED source usage guides
   were compared field by field. The generated docs-site paths are ignored
   build output by design; their local copies contain the same status contract
