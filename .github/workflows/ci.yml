@@ -90,3 +90,26 @@ jobs:
       - name: Validate package contents
         shell: pwsh
         run: ./scripts/check_package_contents.ps1
+
+  editor-smoke:
+    name: Editor smoke / Node-RED 4.1.11
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install fixed Node-RED editor runtime
+        env:
+          NODE_RED_RUNTIME_DIR: ${{ runner.temp }}/node-red-editor-smoke-runtime
+        run: npm install --prefix "$NODE_RED_RUNTIME_DIR" --no-save --package-lock=false node-red@4.1.11
+
+      - name: Install package and round-trip the maintained example in Node-RED
+        env:
+          NODE_RED_CMD: ${{ runner.temp }}/node-red-editor-smoke-runtime/node_modules/node-red/red.js
+        run: node test/run-editor-smoke.js

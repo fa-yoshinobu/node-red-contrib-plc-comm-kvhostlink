@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const path = require("node:path");
+const { HostLinkError } = require("../lib/hostlink");
 
 function createRuntime() {
   const types = new Map();
@@ -18,7 +19,8 @@ function createRuntime() {
         const emitter = new EventEmitter();
         node.on = emitter.on.bind(emitter);
         node.emit = emitter.emit.bind(emitter);
-        node.status = () => undefined;
+        node.statusCalls = [];
+        node.status = (status) => node.statusCalls.push(status);
         node.send = () => undefined;
         node.id = config.id;
       },
@@ -136,6 +138,122 @@ test("Node-RED HostLink saved-flow contract rejects missing and contradictory mo
   assert.match(writeHtml, /metadataMode:\s*\{\s*value:\s*"full",\s*required:\s*true\s*\}/);
   assert.doesNotMatch(readHtml, /metadataMode\s*\|\|\s*"full"/);
   assert.doesNotMatch(writeHtml, /metadataMode\s*\|\|\s*"full"/);
+});
+
+test("Node-RED HostLink connection reports the exact lifecycle status contract", async () => {
+  const runtime = createRuntime();
+  const connection = runtime.create("kvhostlink-connection", {
+    id: "status-connection",
+    name: "",
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    timeout: 3000,
+    plcProfile: "keyence:kv-x500",
+  });
+  connection.client = {
+    async connect() {},
+    async close() {},
+  };
+
+  assert.deepEqual(connection.statusCalls, [
+    { fill: "grey", shape: "ring", text: "ready" },
+  ]);
+
+  await connection.connect();
+  await connection.disconnect();
+  await connection.reinitialize();
+  assert.deepEqual(connection.statusCalls.slice(1), [
+    { fill: "yellow", shape: "ring", text: "connecting" },
+    { fill: "green", shape: "dot", text: "connected" },
+    { fill: "yellow", shape: "ring", text: "disconnecting" },
+    { fill: "red", shape: "ring", text: "disconnected" },
+    { fill: "yellow", shape: "ring", text: "reinitializing" },
+    { fill: "green", shape: "dot", text: "connected" },
+  ]);
+
+  await new Promise((resolve) => connection.emit("close", false, resolve));
+  assert.deepEqual(connection.statusCalls.at(-1), {
+    fill: "grey",
+    shape: "ring",
+    text: "closed",
+  });
+});
+
+test("Node-RED HostLink read/write nodes expose exact operation, control, and error statuses", async () => {
+  const runtime = createRuntime();
+  const actions = [];
+  const routedError = new HostLinkError("E1", "E1");
+  let failRead = false;
+  const client = {
+    async readConsecutive() {
+      if (failRead) throw routedError;
+      return [7];
+    },
+    async writeConsecutive() {},
+  };
+  runtime.setNode("status-shared-connection", {
+    async connect() { actions.push("connect"); },
+    async disconnect() { actions.push("disconnect"); },
+    async reinitialize() { actions.push("reinitialize"); },
+    getClient: () => client,
+    getProfile: () => ({ plcProfile: "keyence:kv-x500" }),
+  });
+
+  const read = runtime.create("kvhostlink-read", readConfig({
+    id: "status-read",
+    connection: "status-shared-connection",
+  }));
+  const write = runtime.create("kvhostlink-write", writeConfig({
+    id: "status-write",
+    connection: "status-shared-connection",
+  }));
+
+  assert.equal((await invoke(read, {})).error, undefined);
+  assert.deepEqual(read.statusCalls, [
+    { fill: "blue", shape: "dot", text: "reading" },
+    { fill: "green", shape: "dot", text: "1 item(s)" },
+  ]);
+  assert.equal((await invoke(write, {})).error, undefined);
+  assert.deepEqual(write.statusCalls, [
+    { fill: "blue", shape: "dot", text: "writing" },
+    { fill: "green", shape: "dot", text: "1 item(s)" },
+  ]);
+
+  read.statusCalls = [];
+  actions.length = 0;
+  await invoke(read, { connect: true });
+  await invoke(read, { topic: "disconnect" });
+  await invoke(read, { reinitialize: true });
+  assert.deepEqual(actions, ["connect", "disconnect", "reinitialize"]);
+  assert.deepEqual(read.statusCalls, [
+    { fill: "yellow", shape: "ring", text: "connect" },
+    { fill: "green", shape: "dot", text: "connect" },
+    { fill: "yellow", shape: "ring", text: "disconnect" },
+    { fill: "red", shape: "dot", text: "disconnect" },
+    { fill: "yellow", shape: "ring", text: "reinitialize" },
+    { fill: "green", shape: "dot", text: "reinitialize" },
+  ]);
+
+  failRead = true;
+  const failedRead = runtime.create("kvhostlink-read", readConfig({
+    id: "status-read-error",
+    connection: "status-shared-connection",
+    errorHandling: "output2",
+    outputs: 2,
+  }));
+  const failure = await invoke(failedRead, {});
+  assert.equal(failure.error, undefined);
+  assert.equal(failure.sent.length, 1);
+  assert.equal(failure.sent[0][0], null);
+  assert.equal(failure.sent[0][1].error, routedError);
+  assert.ok(failure.sent[0][1].error instanceof HostLinkError);
+  assert.equal(failure.sent[0][1].error.name, "HostLinkError");
+  assert.equal(failure.sent[0][1].error.code, "E1");
+  assert.deepEqual(failedRead.statusCalls, [
+    { fill: "blue", shape: "dot", text: "reading" },
+    { fill: "red", shape: "ring", text: "PLC returned Host Link error E1" },
+  ]);
 });
 
 test("connection node close prevents an in-flight connect from leaking a replacement socket", async () => {
