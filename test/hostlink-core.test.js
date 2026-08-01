@@ -12,6 +12,7 @@ const {
   HostLinkClient,
   HostLinkCanceledError,
   HostLinkClosedError,
+  HostLinkConnectionError,
   HostLinkOperationOutcomeUnknownError,
   HostLinkTimeoutError,
   buildFrame,
@@ -338,7 +339,7 @@ test("setTime requires a value and rejects invalid calendar/weekday combinations
   assert.deepEqual(frames, []);
 });
 
-test("UDP response requires a CR/LF terminator and invalidates the socket", async () => {
+test("UDP response requires a CR/LF terminator and retires the request socket from reuse", async () => {
   class FakeUdpSocket extends EventEmitter {
     constructor(response) {
       super();
@@ -360,15 +361,18 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
   const invalid = createTestClient({ transport: "udp", timeout: 100 });
   const invalidSocket = new FakeUdpSocket("OK");
   invalid._socket = invalidSocket;
-  await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r")), /missing.*terminator/i);
+  await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r"), invalidSocket, 0), /missing.*terminator/i);
   assert.deepEqual(invalid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(invalid._socket, null);
+  assert.equal(invalid._udpSocketUsed, false);
+  assert.equal(invalidSocket.closed, true);
+  await invalid.close();
   assert.equal(invalidSocket.closed, true);
 
   const valid = createTestClient({ transport: "udp", timeout: 100 });
   const validSocket = new FakeUdpSocket("E1\r");
   valid._socket = validSocket;
-  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r")), Buffer.from("E1\r"));
+  assert.deepEqual(await valid._writeUdpAndRead(Buffer.from("ER\r"), validSocket, 0), Buffer.from("E1\r"));
   assert.deepEqual(valid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 3 });
   assert.equal(valid._socket, validSocket);
   assert.equal(validSocket.closed, false);
@@ -378,18 +382,25 @@ test("UDP response requires a CR/LF terminator and invalidates the socket", asyn
   const timedOut = createTestClient({ transport: "udp", timeout: 10 });
   const timeoutSocket = new FakeUdpSocket(null);
   timedOut._socket = timeoutSocket;
-  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r")), HostLinkTimeoutError);
+  await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r"), timeoutSocket, 0), HostLinkTimeoutError);
   assert.deepEqual(timedOut.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
+  assert.equal(timedOut._socket, null);
+  assert.equal(timedOut._udpSocketUsed, false);
+  assert.equal(timeoutSocket.closed, true);
+  await timedOut.close();
   assert.equal(timeoutSocket.closed, true);
 
   const stateChanging = createTestClient({ transport: "udp", timeout: 10 });
-  stateChanging._socket = new FakeUdpSocket(null);
+  const stateChangingSocket = new FakeUdpSocket(null);
+  stateChanging._socket = stateChangingSocket;
   await assert.rejects(
     () => stateChanging.write("DM0", 1, ".U"),
     (error) => error instanceof HostLinkOperationOutcomeUnknownError
       && error.reason === "timeout"
       && error.cause instanceof HostLinkTimeoutError,
   );
+  assert.equal(stateChanging._socket, null);
+  assert.equal(stateChangingSocket.closed, true);
 });
 
 test("buildFrame and decodeResponse handle Host Link CR framing", () => {
@@ -602,16 +613,20 @@ test("active cancellation and close retain distinct read/write outcome classific
   }
 
   const canceledRead = createTestClient({ transport: "udp", timeout: 1000 });
-  canceledRead._socket = new NoResponseUdpSocket();
+  const canceledReadSocket = new NoResponseUdpSocket();
+  canceledRead._socket = canceledReadSocket;
   canceledRead._generation = 1;
   const readController = new AbortController();
   const read = canceledRead.queryModel({ signal: readController.signal });
   await new Promise((resolve) => setImmediate(resolve));
   readController.abort();
   await assert.rejects(read, HostLinkCanceledError);
+  assert.equal(canceledRead._socket, null);
+  assert.equal(canceledReadSocket.closed, true);
 
   const canceledWrite = createTestClient({ transport: "udp", timeout: 1000 });
-  canceledWrite._socket = new NoResponseUdpSocket();
+  const canceledWriteSocket = new NoResponseUdpSocket();
+  canceledWrite._socket = canceledWriteSocket;
   canceledWrite._generation = 1;
   const writeController = new AbortController();
   const write = canceledWrite.write("DM0", 1, ".U", { signal: writeController.signal });
@@ -623,6 +638,8 @@ test("active cancellation and close retain distinct read/write outcome classific
       && error.reason === "canceled"
       && error.cause instanceof HostLinkCanceledError,
   );
+  assert.equal(canceledWrite._socket, null);
+  assert.equal(canceledWriteSocket.closed, true);
 
   const closedRead = createTestClient({ transport: "udp", timeout: 1000 });
   closedRead._socket = new NoResponseUdpSocket();
@@ -831,14 +848,19 @@ test("decoder protocol errors invalidate the exact generation but PLC errors rem
   }
 });
 
-test("TCP assigns one nonempty response to one request and rejects stale or extra data", async () => {
+test("TCP rejects both the request and transport when one chunk contains two nonempty responses", async () => {
   const socket = { destroyed: false, writes: 0, write(_payload, callback) { this.writes += 1; callback(null); }, destroy() { this.destroyed = true; } };
   const client = createTestClient({ timeout: 100 });
   client._socket = socket;
   const first = client.sendRaw("?K");
   await Promise.resolve();
   client._handleTcpData(Buffer.from("111\r222\r", "ascii"), socket);
-  assert.deepEqual(await first, Buffer.from("111", "ascii"));
+  await assert.rejects(
+    first,
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "invalid-response"
+      && /Additional TCP response/.test(error.cause && error.cause.message),
+  );
   assert.equal(client._socket, null);
   assert.equal(socket.destroyed, true);
   await assert.rejects(() => client.sendRaw("?K"), /not connected|generation changed/i);
@@ -851,6 +873,28 @@ test("TCP assigns one nonempty response to one request and rejects stale or extr
   await assert.rejects(() => stale.sendRaw("?K"), /Stale TCP response data/);
   assert.equal(staleSocket.writes, 0);
   assert.equal(stale._socket, null);
+});
+
+test("TCP rejects a second response that arrives before the write callback without overwriting the first", async () => {
+  const client = createTestClient({ timeout: 100 });
+  const socket = {
+    destroyed: false,
+    write(_payload, callback) {
+      client._handleTcpData(Buffer.from("E1\rOK\r", "ascii"), this);
+      setImmediate(() => callback(null));
+    },
+    destroy() { this.destroyed = true; },
+  };
+  client._socket = socket;
+
+  await assert.rejects(
+    () => client.clearError(),
+    (error) => error instanceof HostLinkOperationOutcomeUnknownError
+      && error.reason === "invalid-response"
+      && /Additional TCP response/.test(error.cause && error.cause.message),
+  );
+  assert.equal(client._socket, null);
+  assert.equal(socket.destroyed, true);
 });
 
 test("UDP close invalidates active and queued old-generation work without resend", async () => {
@@ -873,12 +917,13 @@ test("UDP close invalidates active and queued old-generation work without resend
   const client = createTestClient({ transport: "udp", timeout: 1000 });
   const oldSocket = new FakeUdpSocket();
   client._socket = oldSocket;
+  client._udpConnected = true;
   client._generation = 1;
   const active = client.sendRaw("FIRST");
   const queued = client.sendRaw("SECOND");
   const activeRejected = assert.rejects(active, HostLinkOperationOutcomeUnknownError);
   const queuedRejected = assert.rejects(queued, HostLinkClosedError);
-  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(oldSocket.sent.length, 1);
   await client.close();
   await Promise.all([activeRejected, queuedRejected]);
@@ -887,9 +932,11 @@ test("UDP close invalidates active and queued old-generation work without resend
 
   const newSocket = new FakeUdpSocket();
   client._socket = newSocket;
+  client._udpConnected = true;
+  client._udpSocketUsed = false;
   client._generation += 1;
   const next = client.sendRaw("THIRD");
-  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
   oldSocket.emit("message", Buffer.from("STALE\r", "ascii"));
   newSocket.emit("message", Buffer.from("NEW\r", "ascii"));
   assert.deepEqual(await next, Buffer.from("NEW", "ascii"));
@@ -910,7 +957,7 @@ test("UDP loopback close error reinitialize and reconnect isolate request genera
     commands.push(command);
     const waiter = datagramWaiters.shift();
     if (waiter) waiter({ command, rinfo });
-    if (["THIRD", "FIFTH", "SIXTH"].includes(command)) {
+    if (["THIRD", "FIFTH", "NEVER", "SIXTH"].includes(command)) {
       server.send(Buffer.from(`REPLY-${command}\r`, "ascii"), rinfo.port, rinfo.address);
     }
   });
@@ -954,17 +1001,19 @@ test("UDP loopback close error reinitialize and reconnect isolate request genera
     const interruptedByError = client.sendRaw("ERROR");
     const queuedAfterError = client.sendRaw("NEVER");
     const errorRejected = assert.rejects(interruptedByError, HostLinkOperationOutcomeUnknownError);
-    const errorQueuedRejected = assert.rejects(queuedAfterError, /generation changed|not connected/i);
+    const neverDatagram = nextDatagram();
     assert.equal((await errorDatagram).command, "ERROR");
     client._socket.emit("error", new Error("injected loopback socket error"));
-    await Promise.all([errorRejected, errorQueuedRejected]);
+    await errorRejected;
+    assert.equal((await neverDatagram).command, "NEVER");
+    assert.deepEqual(await queuedAfterError, Buffer.from("REPLY-NEVER", "ascii"));
     await client.connect();
     const sixthDatagram = nextDatagram();
     const sixth = client.sendRaw("SIXTH");
     assert.equal((await sixthDatagram).command, "SIXTH");
     assert.deepEqual(await sixth, Buffer.from("REPLY-SIXTH", "ascii"));
 
-    assert.deepEqual(commands, ["FIRST", "THIRD", "FOURTH", "FIFTH", "ERROR", "SIXTH"]);
+    assert.deepEqual(commands, ["FIRST", "THIRD", "FOURTH", "FIFTH", "ERROR", "NEVER", "SIXTH"]);
   } finally {
     await client.close().catch(() => undefined);
     await new Promise((resolve) => server.close(resolve));
@@ -1156,6 +1205,82 @@ test("typed numeric reads reject response tokens that contradict dataFormat", as
   }
 });
 
+test("UDP keeps logical connection while assigning a fresh local endpoint to each request", async () => {
+  const server = dgram.createSocket("udp4");
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.bind(0, "127.0.0.1", resolve);
+  });
+  const client = createTestClient({ transport: "udp", port: server.address().port, timeout: 1000 });
+  const endpoints = [];
+  server.on("message", (message, rinfo) => {
+    const command = message.toString("ascii").trim();
+    endpoints.push(`${rinfo.address}:${rinfo.port}`);
+    const response = command === "BAD" ? "MALFORMED" : `ACK-${command}\r`;
+    server.send(Buffer.from(response, "ascii"), rinfo.port, rinfo.address);
+  });
+
+  try {
+    await client.connect();
+    assert.deepEqual(await client.sendRaw("ONE"), Buffer.from("ACK-ONE", "ascii"));
+    assert.deepEqual(await client.sendRaw("TWO"), Buffer.from("ACK-TWO", "ascii"));
+    assert.deepEqual(await client.sendRaw("THREE"), Buffer.from("ACK-THREE", "ascii"));
+    await assert.rejects(
+      () => client.sendRaw("BAD"),
+      (error) => error instanceof HostLinkOperationOutcomeUnknownError && error.reason === "invalid-response",
+    );
+    assert.deepEqual(await client.sendRaw("FOUR"), Buffer.from("ACK-FOUR", "ascii"));
+    assert.equal(client._udpConnected, true);
+    assert.equal(endpoints.length, 5);
+    assert.notEqual(endpoints[0], endpoints[1]);
+    assert.notEqual(endpoints[1], endpoints[2]);
+    assert.notEqual(endpoints[2], endpoints[3]);
+    assert.notEqual(endpoints[3], endpoints[4]);
+  } finally {
+    await client.close().catch(() => undefined);
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("semantic H reads return exactly four uppercase digits while raw reads and writes remain unchanged", async () => {
+  const { client, frames } = createFrameRecorder((command) => command === "RD DM0.H" || command === "?RAW" ? "a\r" : "OK\r");
+  assert.equal(await client.read("DM0", ".H"), "000A");
+  assert.deepEqual(await client.sendRaw("?RAW"), Buffer.from("a", "ascii"));
+  await client.write("DM1", 0x000a, ".H");
+  assert.deepEqual(frames, ["RD DM0.H\r", "?RAW\r", "WR DM1.H A\r"]);
+});
+
+test("UDP request-endpoint setup failure is definitive before a state-changing send", async () => {
+  const client = createTestClient({ transport: "udp", timeout: 100 });
+  client._udpConnected = true;
+  client._prepareUdpRequestSocket = async () => {
+    throw new HostLinkConnectionError("injected endpoint bind failure");
+  };
+
+  await assert.rejects(
+    () => client.clearError(),
+    (error) => error instanceof HostLinkConnectionError
+      && !(error instanceof HostLinkOperationOutcomeUnknownError)
+      && /bind failure/.test(error.message),
+  );
+  assert.deepEqual(client.trafficStats(), { requestCount: 0, txBytes: 0, rxBytes: 0 });
+});
+
+test("Z Float32 is rejected by every low-level numeric entrance before send", async () => {
+  const { client, frames } = createFrameRecorder();
+  const calls = [
+    () => client.read("Z1", ".F"),
+    () => client.readConsecutive("Z1", 2, ".F"),
+    () => client.write("Z1", 1, ".F"),
+    () => client.writeConsecutive("Z1", [1, 2], ".F"),
+    () => client.registerMonitorWords([{ device: "Z1", dataFormat: ".F" }]),
+  ];
+  for (const call of calls) {
+    await assert.rejects(call, /Float32.*ineligible.*Z|Unsupported data format suffix/i);
+  }
+  assert.deepEqual(frames, []);
+});
+
 test("set-value and monitor read helpers preserve exact CR-terminated frames", async () => {
   const { client, frames } = createFrameRecorder((command) => {
     if (command === "MBR") return "1 0 1\r";
@@ -1172,7 +1297,7 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
     { device: "DM2", dataFormat: ".U" },
   ]);
   assert.deepEqual(await client.readMonitorBits(), [1, 0, 1]);
-  assert.deepEqual(await client.readMonitorWords(), ["10", "ABC", "30"]);
+  assert.deepEqual(await client.readMonitorWords(), [10, "0ABC", 30]);
   await assert.rejects(() => client.writeSetValueConsecutive("T0", Array(121).fill(0), ".D"), /count out of range/);
 
   assert.deepEqual(frames, [
@@ -1183,6 +1308,21 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
     "MBR\r",
     "MWR\r",
   ]);
+});
+
+test("monitor word reads validate every token with its registered format", async () => {
+  let response = "OK\r";
+  const { client } = createFrameRecorder((command) => command === "MWR" ? response : "OK\r");
+  await client.registerMonitorWords([
+    { device: "DM0", dataFormat: ".U" },
+    { device: "DM1", dataFormat: ".H" },
+    { device: "DM2", dataFormat: ".U" },
+  ]);
+
+  for (const invalid of ["NOT_A_NUMBER ABC 30\r", "10 10000 30\r", "10 ABC -1\r"]) {
+    response = invalid;
+    await assert.rejects(() => client.readMonitorWords(), /Invalid|outside the range/);
+  }
 });
 
 test("readComments and readCommentBytes accept XYM alias device types", async () => {

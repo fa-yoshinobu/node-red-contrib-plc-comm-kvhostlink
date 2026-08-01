@@ -13,7 +13,7 @@
   const KVHOSTLINK_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_XY_DEVICE_TYPES = new Set(["X", "Y"]);
   const KVHOSTLINK_DIRECT_BIT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"]);
-  const KVHOSTLINK_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"]);
+  const KVHOSTLINK_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "CM", "VM", "D", "E", "F"]);
   const KVHOSTLINK_COMMENT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "DM", "EM", "FM", "ZF", "W", "TM", "Z", "T", "C", "CTH", "CTC", "CM", "X", "Y", "M", "L", "D", "E", "F"]);
   const KVHOSTLINK_COMMENT_ENCODINGS = new Set(["utf8", "cp932"]);
 
@@ -326,7 +326,7 @@
   <p>Reads one or more KEYENCE KV Host Link addresses and writes the result to <code>msg.payload</code>.</p>
   <p><b>Name</b> is an optional display-only label. It is not a node ID, connection reference, route, request field, or metadata field, and duplicate labels are allowed.</p>
   <p>Supported forms include <code>DM100:U</code>, <code>DM110:S</code>, <code>DM120:D</code>, <code>DM130:L</code>, <code>DM140:F</code>, <code>DM145:COMMENT</code>, <code>DM150.3</code>, <code>DM160:U,4</code>, <code>R200:BIT,4</code>, <code>T10:D</code>, and <code>C10:D</code>.</p>
-  <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families. Float32 <code>F</code> is only for ordinary one-word <code>.U</code> families with consecutive two-word access; direct-bit and special-response families such as <code>R</code>, <code>T</code>, <code>C</code>, and <code>AT</code> are invalid. <code>COMMENT</code> is only for devices accepted by <code>RDC</code>. Comment and word-bit forms do not accept a count.</p>
+  <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families. Float32 <code>F</code> is only for ordinary one-word <code>.U</code> families with consecutive two-word access; direct-bit and native 32-bit/special-response families such as <code>R</code>, <code>T</code>, <code>C</code>, <code>Z</code>, and <code>AT</code> are invalid. <code>COMMENT</code> is only for devices accepted by <code>RDC</code>. Comment and word-bit forms do not accept a count.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>Output can be an object keyed by address, an array in address order, or a single scalar when exactly one address is requested.</p>
   <p>Comment addresses such as <code>DM145:COMMENT</code> require an explicit RDC comment mode. Choose decoded text and explicitly select <code>utf8</code> or <code>cp932</code>, or choose raw Buffer when the stored encoding is not known. <code>cp932</code> means Windows-31J compatibility commonly described by KEYENCE as Shift_JIS; there is no separate strict Shift_JIS mode.</p>

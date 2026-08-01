@@ -1,4 +1,4 @@
-# Node-RED KV HostLink Quality Overhaul
+﻿# Node-RED KV HostLink Quality Overhaul
 
 This maintainer record preserves the approved target contracts, breaking-change scope, acceptance criteria, and verification evidence. User documentation contains only the resulting supported behavior.
 
@@ -20,7 +20,7 @@ Acceptance criteria:
 
 Scope: raw response handling, receive limits, trace hooks, and timeout/failure state.
 
-Target contract: raw command responses are undecoded body bytes without CR/LF. Semantic commands privately decode and classify PLC errors. Buffer sizing is internal with an absolute cap. Trace is maintainer-only and disabled by default. Timeout/failure invalidates transport state.
+Target contract: raw command responses are undecoded body bytes without CR/LF. Semantic commands privately decode and classify PLC errors. Buffer sizing is internal with an absolute cap. Trace is maintainer-only and disabled by default. Timeout/failure retires the exact physical transport generation; TCP loses logical connection, while UDP follows the later per-request socket contract in `HL-005`.
 
 Compatibility impact: decoded `sendRaw`, custom decoder, `bufferSize`, and public `traceHook` are removed.
 
@@ -28,7 +28,7 @@ Acceptance criteria:
 
 1. Raw ASCII, PLC error, and non-ASCII bodies are preserved as bytes; semantic operations alone decode and raise PLC errors.
 2. Public buffer/trace options fail instead of being ignored; cap errors discard partial state.
-3. Concurrent commands remain serialized and a failed transport is not recreated by the next command.
+3. Concurrent commands remain serialized. A failed TCP transport requires reconnect; a retired UDP request socket is replaced under the existing logical connection without retrying the failed command.
 
 ## NR-KV-OH-003 — Explicit device and data-format identity
 
@@ -134,7 +134,7 @@ that affect this Node.js/Node-RED repository.
 
 Target contract: numeric writes are strict and never coerce or wrap; a named
 write is compiled completely before transport; UDP requires a response
-terminator and invalidates failed transport; JavaScript `Date` clock values use
+terminator and retires the failed request transport; JavaScript `Date` clock values use
 years 2000 through 2099; address parsing consumes the complete input; editor
 validation reads only the active node's DOM state. Cross-implementation vectors
 are owned by the separate cross-verification repository, not copied into this
@@ -150,8 +150,8 @@ Acceptance criteria:
    range overflow, and Float32 encoding overflow before the first request.
 2. Empty named operations reject, and an invalid later entry in `writeNamed`
    proves that zero earlier writes were sent.
-3. An unterminated UDP response fails, closes the socket generation, and a
-   terminated response remains accepted.
+3. An unterminated UDP response fails, retires its socket generation from reuse,
+   and keeps that socket only until a replacement endpoint is bound; a terminated response remains accepted.
 4. Address-list parsing rejects any unconsumed characters, and editor source
    validation is invariant under another node being open in the editor.
 5. User documentation, changelog, tests, and package contents describe only the
@@ -195,7 +195,11 @@ verification is unnecessary. Final packaging and publication acceptance complete
 
 Scope: runtime TCP receive framing and `trafficStats().rxBytes`.
 
-Family equivalence: all four HostLink implementations count TCP `OK\r`, `OK\n`, coalesced `OK\r\n`, and either split CR/LF ordering as 3 bytes; UDP `OK\r\n` remains 4 bytes. Incomplete oversize/EOF/timeout/cancellation data contributes zero, while a complete PLC error line is counted before semantic decoding. The family comparison is preserved in the archived workspace record `communication_library_quality_review_20260714.md`.
+Family equivalence: all four HostLink implementations count TCP `OK\r`, `OK\n`, coalesced
+`OK\r\n`, and either split CR/LF ordering as 3 bytes; UDP `OK\r\n` remains 4 bytes. Incomplete
+oversize/EOF/timeout/cancellation data contributes zero, while a complete PLC error line is counted
+before semantic decoding. The family comparison is preserved in the archived workspace record
+`communication_library_quality_review_20260714.md`.
 
 Target contract: one completed TCP response counts its body through the first CR or LF. Additional
 CR/LF separator bytes are consumed without changing the counter, whether they arrive together or
@@ -220,6 +224,139 @@ Acceptance criteria:
 - [x] Documentation, migration notes, changelog, and API reference agree with the implementation.
 - [x] Final acceptance criteria verified and the item marked complete.
 
+## HL-001 — One owned TCP response
+
+Implementation scope: Node.js TCP response assembly, request ownership, transport retirement, and
+deterministic race tests.
+
+Target contract: the first nonempty response line owns the active request. A later nonempty line
+cannot overwrite it, including when both lines arrive before the socket write callback. The later
+line is a protocol error and retires the TCP transport.
+
+Compatibility impact: peers that emit multiple nonempty response lines for one request now fail
+deterministically instead of allowing a later line to decide the result.
+
+Acceptance criteria:
+
+1. A first response received before write completion is stored once but is not finalized until the
+   complete receive chunk has been checked for another nonempty line.
+2. A second response in the same receive chunk produces a protocol failure and transport retirement,
+   regardless of write-callback ordering.
+3. Existing post-write extra-response rejection and FIFO behavior remain unchanged.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and the full local gate passed 124/124.
+- [x] Codex self-review covered response ownership, write-callback ordering, state-changing error classification, and transport retirement.
+- [x] Live PLC is not required; the event ordering and byte ownership are deterministic local transport behavior.
+- [x] README, changelog, and implementation agree.
+- [x] Final acceptance criteria verified.
+
+## HL-002 — Preserve monitor-word formats
+
+Implementation scope: Node.js `registerMonitorWords`, `readMonitorWords`, typed token decoding,
+registration lifecycle resets, and tests.
+
+Target contract: successful MWS registration stores every entry format in wire order. MWR requires
+the exact registered token count and validates each token against its corresponding format.
+
+Compatibility impact: raw or format-incompatible MWR tokens that were previously returned as
+strings now fail; valid values return their semantic numeric or canonical hexadecimal form.
+
+Acceptance criteria:
+
+1. Mixed `.U/.H/.U` registration retains that order after the MWS acknowledgement.
+2. MWR rejects invalid unsigned, hexadecimal, and range-overflow tokens at their registered position.
+3. Close and TCP logical-connection failure clear both the monitor count and stored formats.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and the full local gate passed 124/124.
+- [x] Codex self-review covered registration snapshotting, validation order, lifecycle reset, and typed output.
+- [x] Live PLC is not required; fixed response vectors completely determine the behavior.
+- [x] README/changelog and implementation agree; no generated API literal required an update.
+- [x] Final acceptance criteria verified.
+
+## HL-003 — Reject `Z:F` before admission
+
+Implementation scope: runtime and editor semantic address validation, typed/named read and write
+helpers, polling, and low-level no-send validation.
+
+Target contract: native 32-bit `Z` is not an ordinary two-word Float32 route. Every `Z:F` semantic
+entrance rejects before FIFO admission or transport; supported `Z:D` access remains unchanged.
+
+Compatibility impact: applications using the invalid `Z:F` interpretation must use an ordinary
+word family for Float32 or use the supported native `Z:D` contract.
+
+Acceptance criteria:
+
+1. Parser, formatter, normalizer, typed/named read/write, poll, and Node-RED editor validation reject `Z:F`.
+2. Direct client attempts with unsupported `.F` issue zero requests.
+3. `Z:D` and Float32 on eligible ordinary-word families remain supported.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and the full local gate passed 124/124.
+- [x] Codex self-review covered all public semantic entrances and editor/runtime consistency.
+- [x] Live PLC is not required because rejection occurs before communication.
+- [x] README, editor help, changelog, and implementation agree.
+- [x] Final acceptance criteria verified.
+
+## HL-004 — Canonical semantic hexadecimal reads
+
+Implementation scope: Node.js HostLink scalar token parsing and high-level typed/named coercion.
+
+Target contract: every semantic `.H` read returns exactly four uppercase hexadecimal digits.
+`sendRaw()` bytes and hexadecimal write framing remain unchanged.
+
+Compatibility impact: valid short or lowercase semantic read values gain leading zeroes and uppercase
+normalization; raw reads and existing unpadded writes preserve their prior wire contract.
+
+Acceptance criteria:
+
+1. Semantic `a` becomes `000A`, including typed and named helpers.
+2. More than four digits or a non-hexadecimal token is rejected.
+3. Raw `a` remains byte `0x61`, and writing value `0x000A` still sends `A`.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and the full local gate passed 124/124.
+- [x] Codex self-review covered raw/semantic separation and read/write asymmetry.
+- [x] Live PLC is not required; token and frame vectors are deterministic.
+- [x] README, changelog, and implementation agree.
+- [x] Final acceptance criteria verified.
+
+## HL-005 — Per-request UDP socket generations
+
+Implementation scope: Node.js UDP logical connection state, request socket allocation, local-endpoint
+rotation, timeout/cancel/close/error handling, response correlation, and local loopback tests.
+
+Target contract: each UDP request uses exactly one physical socket generation. The explicit logical
+connection remains active after a request socket is retired. A successful immediately previous socket
+is kept open until the next socket has bound a different local endpoint, then it is closed; no more than
+one previous socket is retained. Timeout, cancellation, malformed response, and socket failure close the
+active request socket immediately. Endpoint setup failure is a definitive pre-send error. Failed requests
+are never retried.
+
+Compatibility impact: sequential UDP requests use different local endpoints and no longer require an
+explicit reconnect merely because one physical request socket failed. Applications must not assume a
+stable UDP source port.
+
+Acceptance criteria:
+
+1. Three sequential requests remain logically connected and consecutive requests have different local endpoints.
+2. A successful previous socket is closed only after the replacement reports its bound endpoint;
+   failed active sockets close immediately.
+3. Delayed datagrams, socket errors, timeout, cancellation, close, and queued work cannot cross request generations.
+4. FIFO ordering, one absolute deadline, traffic accounting, and no automatic retry remain intact.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and the full local gate passed 124/124 with npm audit and package validation.
+- [x] Codex self-review covered lifecycle generations, connection state, endpoint reuse, cancellation, timeout, response ownership, monitor state, and close.
+- [x] Live PLC is not required; local UDP peers expose endpoint identity and delayed-response isolation exactly.
+- [x] README, changelog, and implementation agree.
+- [x] Final acceptance criteria verified.
+
+Self-review disposition for `HL-005`: accepted and corrected successful predecessor retention,
+immediate failed-generation closure, and definitive pre-send endpoint-setup classification. Rejected:
+none. Duplicate: none. Deferred: none.
+
 ## 2026-08-01 Host Link evaluation migration
 
 The approved GOAL records and machine-verifiable acceptance criteria are
@@ -231,10 +368,10 @@ required caller migration without duplicating their acceptance history.
 | --- | --- |
 | `HL-EVAL-001` | Move Float32 values to a word device address; every direct-bit family now rejects `F` before transport. |
 | `HL-EVAL-002` | Supply one complete address selector only. Remove extra selectors/trailing text, incompatible `BIT`/`F`/`COMMENT`, and counts on comment or word-bit forms. |
-| `HL-EVAL-003` | Treat UDP close/failure as cancellation of that generation. Submit new work explicitly after reconnect; old queued work is not replayed. |
+| `HL-EVAL-003` | On explicit close, old active and queued work is canceled and never replayed. `HL-005` supersedes the former reconnect requirement for request-socket failure: the logical UDP connection remains and later admitted work uses a fresh endpoint. |
 | `HL-EVAL-004` | Fix PLC/bridge behavior that emits unsolicited or multiple response lines. A TCP request owns exactly one non-empty line and the socket is discarded on ambiguity. |
 | `HL-EVAL-TODO-006` | Choose exact `utf8` or `cp932` for RDC text, or use raw bytes. Remove heuristic/profile decoding and all Shift_JIS/Windows-31J aliases; `cp932` is the Windows-31J-compatible KEYENCE Shift_JIS selection. |
-| `HL-EVAL-020` | Reconnect after malformed decoded response bytes. PLC `E0` through `E9` errors remain command results and do not alone require reconnect. |
+| `HL-EVAL-020` | Reconnect TCP after malformed decoded response bytes. UDP retires only the supplying request socket and rotates before later work. PLC `E0` through `E9` errors remain command results. |
 | `HL-EVAL-021` | Accept operating mode only from exact `0` or `1`; remove consumers that relied on numeric-prefix parsing. |
 | `HL-EVAL-022` | Pass actual safe JavaScript integers to direct APIs. Node-RED form text is the only boundary that validates and converts decimal strings. |
 | `HL-EVAL-023` | Keep one `writeNamed` call representable as exactly one request within 1000 word, 500 dword/Float32, or 120 timer/counter points. Submit separate calls only when the application explicitly owns partial-success and outcome-unknown handling. |
@@ -349,11 +486,13 @@ framing/receive, decode, cancellation, close, and generation retirement.
 Target contract: immediately before the first transport send attempt, the
 active operation creates one monotonic deadline covering send completion,
 response framing/receive, and decode. Progress cannot restart it. Timeout and
-active cancellation retire the exact transport generation. Reuse requires an
-explicit reconnect; no command is retried.
+active cancellation retire the exact physical transport generation. TCP reuse
+requires reconnect; UDP later work rotates to a new request endpoint under the
+same logical connection. No command is retried.
 
 Compatibility impact: phase-by-phase or trickle-extended waits end at the one
-configured deadline, and a timed-out/canceled active connection is not reusable.
+configured deadline. A timed-out/canceled TCP connection is not reusable; a UDP
+request endpoint is not reused and remains held only until its replacement binds.
 
 Machine-verifiable acceptance criteria:
 

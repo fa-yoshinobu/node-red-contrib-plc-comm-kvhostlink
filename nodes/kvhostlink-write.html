@@ -13,7 +13,7 @@
   const KVHOSTLINK_WRITE_BIT_BANK_DEVICE_TYPES = new Set(["R", "MR", "LR", "CR"]);
   const KVHOSTLINK_WRITE_XY_DEVICE_TYPES = new Set(["X", "Y"]);
   const KVHOSTLINK_WRITE_DIRECT_BIT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"]);
-  const KVHOSTLINK_WRITE_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"]);
+  const KVHOSTLINK_WRITE_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "CM", "VM", "D", "E", "F"]);
 
   function kvGetWriteCurrentType(typeSelector, savedType, node) {
     const activeNode = RED.editor && RED.editor.activeNode;
@@ -231,7 +231,7 @@
   <p>Preferred dynamic input is <code>msg.updates</code> as an object, for example <code>{ "DM100:U": 123, "DM110:S": -5, "DM150.3": true, "R010:BIT": true }</code>.</p>
   <p>A present runtime field is authoritative: invalid or empty <code>msg.updates</code>/<code>msg.address</code> is an error and never falls back to configured updates. <code>msg.updates</code> and <code>msg.address</code> are mutually exclusive; <code>msg.value</code>/<code>msg.dtype</code> cannot appear without <code>msg.address</code>.</p>
   <p>Count-qualified addresses expect arrays, for example <code>{ "DM160:U,4": [1,2,3,4], "R200:BIT,4": [true,false,true,true] }</code>.</p>
-  <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families. Float32 <code>F</code> is only for ordinary one-word <code>.U</code> families with consecutive two-word access; direct-bit and special-response families such as <code>R</code>, <code>T</code>, <code>C</code>, and <code>AT</code> fail before FIFO admission or transport.</p>
+  <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families. Float32 <code>F</code> is only for ordinary one-word <code>.U</code> families with consecutive two-word access; direct-bit and native 32-bit/special-response families such as <code>R</code>, <code>T</code>, <code>C</code>, <code>Z</code>, and <code>AT</code> fail before FIFO admission or transport.</p>
   <p>The complete update set is validated before the first request. A compiled group above 1000 word points, 500 dword/Float32 points, or 120 timer/counter points rejects the whole call and is not split automatically.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. Literal text accepts JSON objects only.</p>

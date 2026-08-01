@@ -55,6 +55,11 @@ in strict FIFO order, uses one absolute active transaction deadline, and never
 automatically reconnects or retries. Direct-bit writes require JavaScript
 Booleans; bit-in-word writes are intentionally unsupported.
 
+Float32 selectors require ordinary one-word device families; native 32-bit `Z`
+devices reject `:F` before FIFO admission or transport. Semantic `.H` reads
+return exactly four uppercase hexadecimal digits. Raw responses and hexadecimal
+write framing are not normalized by that read contract.
+
 RDC device comments are byte payloads until the caller makes an explicit
 choice. For decoded text, select exactly `utf8` or `cp932`; `cp932` means
 Windows-31J compatibility commonly described by KEYENCE as Shift_JIS. There is
@@ -62,10 +67,14 @@ no automatic/profile codec and no separate strict Shift_JIS alias. When the
 stored encoding is unknown, select raw Buffer output. Malformed text bytes fail
 strictly without fallback or replacement characters.
 
-Malformed response bytes, an unknown operating-mode response, stale or extra
-TCP response lines, and failed UDP socket generations invalidate only the
-connection that produced them. The next operation does not silently reuse or
-replay work on a replacement connection; reconnect explicitly.
+Malformed response bytes, an unknown operating-mode response, and stale or extra
+TCP response lines invalidate the TCP connection that produced them. UDP keeps
+the explicit logical connection while assigning each request its own socket
+generation and local endpoint; the immediately preceding socket remains open
+until the next endpoint is bound, preventing delayed datagrams from becoming a
+later response. Timeout, cancellation, malformed response, and socket failure
+close the active request socket immediately. A failed request is never retried
+or replayed automatically.
 
 ## Documentation
 

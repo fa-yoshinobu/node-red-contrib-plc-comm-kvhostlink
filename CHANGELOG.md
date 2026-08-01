@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: TCP now assigns only the first owned response line to a request even when data arrives before the write callback; an additional nonempty line is a protocol error and retires that transport generation.
+- Library: Monitor-word registration preserves each entry's data format, and every `MWR` token is validated and decoded in the registered order.
+- Library: Native 32-bit `Z` devices reject Float32 `:F` at every semantic entrance before FIFO admission or transport. Semantic `.H` reads return exactly four uppercase hexadecimal digits while raw responses and hexadecimal write framing remain unchanged.
+- Library: UDP now uses a dedicated socket generation and local endpoint for every request while retaining logical connected state. A successful predecessor is held only until the next endpoint is bound; failed active sockets close immediately, and endpoint-setup failure remains a definitive pre-send error.
+- Tests: Added deterministic TCP pre-write response-race, mixed-format monitor, `Z:F` no-send, canonical hexadecimal, and local UDP endpoint-rotation coverage.
 - CI: Added a dedicated normal-CI Node-RED 4.1.11 editor smoke job that installs the packed npm artifact into an isolated user directory and round-trips the maintained connection/read/write example.
 - Tests: Added exact coverage for connection lifecycle, read/write progress and counts, control actions, dynamic error text, and structured second-output error routing.
 - Docs: Documented the exact stable node statuses and directed error diagnosis to the selected error route and structured Error object instead of status-text matching.

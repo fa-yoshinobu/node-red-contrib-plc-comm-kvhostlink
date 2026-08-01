@@ -112,7 +112,7 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
 });
 
 test("runtime and editor apply the same complete address grammar vectors", () => {
-  const valid = ["DM100:U", "DM200:D,4", "DM50.3", "R010:BIT", "R010.3", "T0:D", "CTH0:D", "Z1:F"];
+  const valid = ["DM100:U", "DM200:D,4", "DM50.3", "R010:BIT", "R010.3", "T0:D", "CTH0:D", "ZF1:F"];
   const invalid = [
     "DM100:U:COMMENT",
     "DM200.3.extra",
@@ -122,6 +122,7 @@ test("runtime and editor apply the same complete address grammar vectors", () =>
     "T0:BIT",
     "T0:F",
     "R0:F",
+    "Z1:F",
     "VB0:COMMENT",
     "DM100:BIT_IN_WORD",
     "DM100:U,0",
@@ -185,11 +186,8 @@ test("editor device and dtype compatibility matches runtime metadata exhaustivel
 });
 
 test("Float32 eligibility is the complete canonical ordinary-word family set", () => {
-  const expected = ["CM", "D", "DM", "E", "EM", "F", "FM", "TM", "VM", "W", "Z", "ZF"];
-  const derived = Object.entries(DEFAULT_FORMAT_BY_DEVICE_TYPE)
-    .filter(([, defaultFormat]) => defaultFormat === ".U")
-    .map(([deviceType]) => deviceType)
-    .sort();
+  const expected = ["CM", "D", "DM", "E", "EM", "F", "FM", "TM", "VM", "W", "ZF"];
+  const derived = Array.from(FLOAT32_DEVICE_TYPES).sort();
 
   assert.deepEqual(Array.from(FLOAT32_DEVICE_TYPES).sort(), expected);
   assert.deepEqual(derived, expected);
@@ -299,7 +297,7 @@ test("Float32 special-response families fail every high-level entry before FIFO 
     async writeSetValueConsecutive() { sends += 1; },
   };
 
-  for (const device of ["R0", "T0", "C0", "AT0"]) {
+  for (const device of ["R0", "T0", "C0", "Z1", "AT0"]) {
     const address = `${device}:F`;
     assert.throws(() => parseAddress(address), /Float32.*ordinary one-word/i);
     assert.throws(() => normalizeAddress(address), /Float32.*ordinary one-word/i);
@@ -354,6 +352,14 @@ test("DM Float32 remains available through parser, formatter, typed, named, and 
     { device: "DM0", values: words, dataFormat: ".U" },
     { device: "DM0", values: words, dataFormat: ".U" },
   ]);
+});
+
+test("high-level H reads normalize to exactly four uppercase digits", async () => {
+  const fakeClient = {
+    async read() { return "a"; },
+  };
+  assert.equal(await readTyped(fakeClient, "DM0", "H"), "000A");
+  assert.deepEqual(await readNamed(fakeClient, ["DM0:H"]), { "DM0:H": "000A" });
 });
 
 test("readTyped parses explicit Host Link BIT response tokens", async () => {
