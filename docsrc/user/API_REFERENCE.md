@@ -114,6 +114,14 @@ when the plan is one wire request. Any state-changing plan that would require tw
 or more requests, including a bit-in-word read-modify-write, fails before
 connection or transport. The library never auto-splits or retries writes.
 
+Direct `BIT` entries for the decimal sixteen-bit bank families `R`, `MR`, `LR`,
+and `CR` are consecutive by logical bit number. Thus `R115:BIT` followed in
+insertion order by `R200:BIT` produces one `writeConsecutive` request whose
+displayed start remains `R115`. Within-bank behavior is unchanged. Gaps,
+duplicates, reverse order, mixed families, mixed dtypes, invalid display-bit
+positions, and more than 1000 bit values reject the complete update before
+transport; the planner never sorts or deduplicates entries.
+
 ## Error contract
 
 | Error | Meaning |
