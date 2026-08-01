@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING
 
+- Library: Float32 parsing, formatting, typed/named reads and writes, and polling now share the canonical ordinary-word family set. Float32 remains available for normal one-word `.U` families with consecutive two-word access; direct-bit and special-response families such as `R`, `T`, `C`, and `AT` reject it before FIFO admission or transport.
+- Library: `poll` now requires `intervalMs` in `1..2147483647`; zero-delay polling and delays that overflow Node.js native timers are rejected before a read. Named reads reject semantic duplicate keys across case, leading-zero, and explicit-count spelling variants while preserving original keys for successful results.
+- Library: Public address parsing, normalization, formatting, and every address-list input form now share device/data-type semantic validation. Invalid JavaScript/JSON array elements and hand-constructed invalid formatted addresses fail immediately without changing valid trimmed result-key spelling.
 - Library: RDC comment text no longer uses UTF-8-first/Shift_JIS fallback. `decodeCommentResponse`, `HostLinkClient.readComments`, and the high-level `readComments` helper require the exact public encoding `utf8` or `cp932`; named reads and the read node require an explicit `text` or `buffer` comment mode. `cp932` is Windows-31J compatibility commonly described by KEYENCE as Shift_JIS, and no separate strict Shift_JIS alias is accepted.
 - Node-RED editor: `:COMMENT` reads now require an explicit decoded-text codec or raw-Buffer selection. Saved and runtime plans reject missing, contradictory, automatic, profile-derived, or alias codec settings before connection or request send.
 - Library: The ordinary `HostLinkClient` now provides the sole strict-FIFO contract; no queued-client wrapper is exported. Each admitted call snapshots its effective inputs, a waiting call starts its timeout only on activation, and `close()` rejects active and queued calls so none can leak into a later connection.
@@ -39,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Library: Timer/counter composite reads now accept only status `0` or `1` in the shared client response parser used by typed, named, and composite helpers; existing exact token-count and numeric validation remains centralized.
 - Library: Added `readCommentBytes` and `decodeCommentBytes` as exact RDC body-byte paths. Strict UTF-8/CP932 decoding rejects malformed bytes with `HostLinkProtocolError`, invalidates the supplying connection generation, and never falls back or emits replacement characters; the replacement-decoding `iconv-lite` dependency was removed.
 - Library: CP932 decoding now preserves bytes `00` through `7F` as the identical ASCII code points instead of accepting WHATWG Shift_JIS control-byte remapping. Half-width and double-byte code units remain strict, and CP932-invalid single bytes `80`, `A0`, and `FD` through `FF` are rejected.
 - Library: One monotonic transaction deadline now spans request sending, complete response framing/receive, and decoding. Partial writes or trickled response bytes cannot restart it; timeout or active cancellation retires the exact transport generation.

@@ -162,8 +162,10 @@ the node does not execute configured updates as a fallback.
 Every update is validated before the first PLC request. Numeric values must be
 finite JavaScript numbers in the selected format's exact range; strings,
 Booleans, fractional integers, wraparound values, and Float32 overflow are
-rejected. Float32 is valid only for word device families; every direct-bit
-family rejects it before any read or write. Direct-bit write values must be
+rejected. Float32 is valid only for ordinary one-word `.U` device families
+that support consecutive two-word access. Direct-bit and special-response
+families such as `R`, `T`, `C`, and `AT` reject it before FIFO admission or
+transport. Direct-bit write values must be
 actual JavaScript Booleans; numeric/string `0`, `1`, `ON`, and `OFF` are not
 coerced. An empty update object performs no write and is rejected.
 
@@ -208,16 +210,28 @@ Use `:` for data types and `.0` through `.F` for bit-in-word access.
 High-level read/write addresses must specify the data type explicitly, such as `:U`, `:D`, or `:BIT`.
 Each address contains exactly one complete selector: one dtype, or one word-bit
 selector, followed by an optional positive safe-integer count only where that
-form supports a count. `BIT` is limited to direct-bit device families,
-Float32 `F` is limited to word device families, and `COMMENT` is limited to
-devices supported by `RDC`. Comment and word-bit forms do not accept a count.
+form supports a count. `BIT` is limited to direct-bit device families.
+Float32 `F` is limited to ordinary one-word `.U` families with consecutive
+two-word access; direct-bit and special-response families such as `R`, `T`,
+`C`, and `AT` are invalid. `COMMENT` is limited to devices supported by `RDC`.
+Comment and word-bit forms do not accept a count.
 The editor and runtime use this same grammar. Extra selectors or text before,
 between, or after addresses is an error rather than being ignored.
+The public parser, normalizer, formatter, JavaScript-array input, JSON-array
+input, and delimited-list input apply the same device/data-type rules. Valid
+list entries retain their trimmed spelling for result keys.
+
+Named reads require one entry per semantic address. Case and leading-zero
+variants, including an omitted versus explicit count of one, are duplicates.
+Different dtypes or bit indexes and non-identical overlapping ranges remain
+valid. Polling requires a positive integer interval of at most `2147483647`
+milliseconds; use at least `1`, never zero.
 
 ## Timer and counter
 
 `T10:D` and `C10:D` use the high-level timer/counter behavior.
 Reads return the preset value for compatibility with ordinary scalar reads.
+Composite responses require exactly three numeric fields and status `0` or `1`.
 Timer/counter preset writes use Host Link `WS` and `WSS`, which are supported only on KV-8000/7000-series CPU units.
 Other CPU units may return PLC error `E1`.
 
