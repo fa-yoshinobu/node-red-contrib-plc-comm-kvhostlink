@@ -223,6 +223,44 @@ Other CPU units may return PLC error `E1`.
 
 Use `TC`, `TS`, `CC`, and `CS` when you want the timer/counter current/contact device families directly.
 
+## Node status and diagnosis
+
+Node status is a concise progress indicator. Use the selected error route and
+its Error object for diagnosis; do not parse status text as an error code.
+
+| Node / state | Fill | Shape | Exact text |
+| --- | --- | --- | --- |
+| Connection created | grey | ring | `ready` |
+| Connection opening | yellow | ring | `connecting` |
+| Connection open | green | dot | `connected` |
+| Connection closing | yellow | ring | `disconnecting` |
+| Connection closed by a disconnect operation | red | ring | `disconnected` |
+| Connection closing and opening again | yellow | ring | `reinitializing` |
+| Config node removed or runtime stopped | grey | ring | `closed` |
+| Read in progress | blue | dot | `reading` |
+| Write in progress | blue | dot | `writing` |
+| Successful read or write | green | dot | `N item(s)` |
+| Failed read, write, or control action | red | ring | The actual `error.message` |
+
+A `connect`, `disconnect`, or `reinitialize` control message first shows a
+yellow ring with that exact action name. Success then shows a dot with the same
+text: green for `connect` and `reinitialize`, red for `disconnect`.
+
+The failure status is deliberately dynamic. Timeout and
+operation-outcome-unknown failures are error classifications, not promised
+status strings. Depending on the configured Errors mode, inspect the Error
+passed to `done(error)` or the Error in `msg.error` on output 1 or output 2.
+Its JavaScript type and structured fields such as `code`, `reason`, and
+`cause` provide the available diagnosis.
+
+PLC profile selection and unsupported local input are validated before
+transport; such a failure does not prove that a PLC rejected a request. If a
+state-changing request may have been sent and its outcome is unknown, the node
+does not retry it automatically. Confirm PLC/application state with an
+appropriate read or operator procedure before deciding whether to issue
+another write.
+
+
 ## Connection control messages
 
 Both read and write nodes accept connection control messages.

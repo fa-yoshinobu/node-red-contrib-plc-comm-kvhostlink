@@ -89,7 +89,10 @@ function resolveNpmRunner() {
 
 function resolveNodeRedRunner() {
   const explicit = process.env.NODE_RED_CMD;
-  if (explicit && fs.existsSync(explicit)) {
+  if (explicit) {
+    if (!fs.existsSync(explicit)) {
+      throw new Error(`NODE_RED_CMD does not exist: ${explicit}`);
+    }
     if (explicit.toLowerCase().endsWith(".js")) {
       return { command: process.execPath, args: [explicit] };
     }

@@ -487,3 +487,114 @@ not actually under test. This finding was accepted. That mode now builds a
 synthetic archive from the complete non-ignored current worktree and handles
 deletions before extracting and running the checks. The corrected archive gate
 passed with 104 tests and the package consumer gate passed from its tarball.
+
+## GOAL-NODE-EDITOR-SMOKE-001 — Required package-installed Editor smoke
+
+Implementation scope: the normal GitHub Actions CI workflow and the
+repository-only Node-RED Editor smoke runner.
+
+Target contract: one dedicated representative Linux/Node job installs an
+explicit Node-RED version, supplies its exact executable through
+`NODE_RED_CMD`, packs this repository, installs the tarball into an isolated
+Node-RED user directory, starts the editor, imports and reads back the
+maintained example, and proves registration of the connection, read, and write
+node types. The consumer package manifest gains no test or smoke script.
+
+Compatibility impact: none. This is a stricter CI and packaging acceptance
+gate without a runtime or package-manifest API change.
+
+Machine-verifiable acceptance criteria:
+
+1. Normal CI contains one independent Ubuntu/Node 20 Editor smoke job pinned to
+   Node-RED 4.1.11.
+2. The job passes the exact existing `red.js` path through `NODE_RED_CMD`;
+   an invalid explicit path fails instead of falling back to a global command.
+3. The runner creates the npm tarball, installs it into an isolated user
+   directory, imports and reads back `kvhostlink-basic-read-write.json`, and finds
+   `kvhostlink-connection`, `kvhostlink-read`, and `kvhostlink-write`.
+4. `package.json` contains no `test`, `check`, or Editor-smoke script.
+
+- [x] Implementation completed in this repository.
+- [x] Tests use the repository-only runner and the package-installed artifact.
+- [x] Relevant local static, unit, Editor-smoke, package, and source-archive gates passed for the final source state.
+- [x] The equivalent local Windows/Node 24 Editor smoke passed with Node-RED 4.1.11 and the exact configured `red.js`.
+- [ ] The GitHub-hosted Ubuntu/Node 20 Editor-smoke job passed for the final source state.
+- [x] Codex self-review completed against the approved CI/package boundary.
+- [x] Live PLC verification is not required for package installation and editor registration.
+- [x] Changelog and maintainer documentation agree with the implementation.
+- [ ] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence collected before the consolidated final gate:
+
+- The direct 109-test suite passed.
+- The package-installed Editor smoke passed with Node-RED 4.1.11 and the exact
+  `red.js` path supplied through `NODE_RED_CMD`.
+- On Windows with Node 24.14.1 and PowerShell 7.6.3, the 27-file/5-flow npm
+  package and isolated consumer passed. The synthetic current-worktree source
+  archive contained 57 files, 6 sample files, and 6 test files and passed its
+  extracted syntax, unit, JSON-flow, and package dry-run checks.
+- GitHub-hosted Ubuntu/Node 20 Editor evidence remains unchecked. The Ubuntu
+  Node 18/20/22 matrix and Windows/Node 20 job were not reproduced because
+  those hosted OS/runtime combinations were unavailable locally.
+
+Self-review disposition:
+
+- Accepted: an explicit but missing `NODE_RED_CMD` previously fell back to a
+  global executable, so the smoke could pass without using the CI-selected
+  runtime. An explicit invalid path now fails immediately.
+- Rejected: adding an npm manifest smoke script would duplicate the
+  repository-only runner in a consumer artifact and conflicts with the
+  approved package boundary.
+- No duplicate or deferred finding remains for this item.
+
+## GOAL-NODE-STATUS-DOC-001 — Exact node status and diagnosis contract
+
+Implementation scope: connection/read/write runtime status tests and the
+Node-RED usage guide collected by `plc-comm-docs-site`.
+
+Target contract: stable lifecycle, operation, count, and control status values
+match the runtime exactly. A failure is a red ring containing the actual
+`error.message`; diagnosis uses the selected Node-RED error route and
+structured Error type/fields. Timeout and operation-outcome-unknown
+classifications are not fixed status strings.
+
+Compatibility impact: none. Existing runtime values are locked by tests and
+documented without inventing new status values.
+
+Machine-verifiable acceptance criteria:
+
+1. Connection status tests cover `ready`, `connecting`, `connected`,
+   `disconnecting`, `disconnected`, `reinitializing`, and `closed`
+   with exact fill and shape.
+2. Read/write tests cover `reading`, `writing`, successful `N item(s)`,
+   all three control-action transitions, and dynamic red-ring error text.
+3. Error-route tests retain the Error object and its structured classification.
+4. The source usage guide and generated docs-site copy contain one matching
+   status table and direct diagnosis to the selected error route.
+5. Outcome-unknown writes are not described as retryable and local validation
+   is not described as PLC evidence.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every local status and error-route acceptance criterion.
+- [x] Relevant local static, unit, package, source-archive, and docs checks passed for the final source state.
+- [x] The equivalent local Windows/Node 24 status contract and package/source gates passed.
+- [ ] The GitHub-hosted Ubuntu Node 18/20/22 matrix and Windows/Node 20 job passed for the final source state.
+- [x] Codex self-review completed against runtime values, tests, docs, and cross-library consistency.
+- [x] Live PLC verification is not required; status transitions and routing are deterministic runtime behavior.
+- [x] Usage guide, generated site copy, changelog, and maintainer record agree.
+- [ ] Final acceptance criteria verified and the item marked complete.
+
+Verification and self-review disposition:
+
+- The local Windows/Node 24.14.1 run passed all 109 tests, the 27-file/5-flow
+  isolated npm consumer, the Node-RED 4.1.11 Editor smoke, and the 57-file
+  current-worktree source archive retaining all 6 samples and 6 test files.
+- Runtime source, exact-status assertions, and both Node-RED source usage guides
+  were compared field by field. The generated docs-site paths are ignored
+  build output by design; their local copies contain the same status contract
+  and deployment recollects the tracked source guide.
+- Accepted: HostLink had no exact lifecycle or operation-status test. The
+  runtime mock now records status calls and verifies every stable value.
+- Accepted: the failure-route test now uses the actual `HostLinkError` type
+  and preserves its `code` while the red ring displays its real message.
+- No rejected, duplicate, or deferred finding remains for this item.

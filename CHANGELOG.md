@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- CI: Added a dedicated normal-CI Node-RED 4.1.11 editor smoke job that installs the packed npm artifact into an isolated user directory and round-trips the maintained connection/read/write example.
+- Tests: Added exact coverage for connection lifecycle, read/write progress and counts, control actions, dynamic error text, and structured second-output error routing.
+- Docs: Documented the exact stable node statuses and directed error diagnosis to the selected error route and structured Error object instead of status-text matching.
 - Docs: Documented Node.js 18 as the package's minimum supported runtime so the getting-started requirements agree with package metadata and CI.
 - Release: Made the npm artifact consumer-only while retaining Node-RED example flows, removed the packaged `test`, `check`, and `smoke:editor` developer commands whose runners are excluded, and made the GitHub source archive retain tracked tests, CI, and maintainer validation inputs.
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
