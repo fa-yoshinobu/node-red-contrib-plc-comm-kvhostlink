@@ -177,6 +177,15 @@ transport. State-changing operations are never auto-split or auto-retried.
 Bit-in-word writing is unsupported because a client-side read-modify-write is
 not atomic against PLC logic or another connection.
 
+For `R`, `MR`, `LR`, and `CR` direct `BIT` updates, consecutive planning uses
+the logical sixteen-bit bank order rather than the displayed decimal number.
+For example, insertion-ordered `R115:BIT` then `R200:BIT` is one consecutive
+request starting at `R115`; the two values retain that order. `writeNamed` does
+not sort, deduplicate, fill a gap, or merge another device family or dtype.
+Duplicates, reverse order, and non-consecutive logical bits therefore remain a
+complete pre-transport rejection. Existing `00` through `15` display-bit
+validation and the 1000-bit request limit still apply.
+
 | Output msg field | Description |
 | --- | --- |
 | `msg.payload` | Original payload is passed through. |

@@ -1111,6 +1111,96 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
   ]);
 });
 
+test("writeNamed batches R MR LR and CR bits across display-bank boundaries", async () => {
+  const calls = [];
+  const fakeClient = {
+    async writeConsecutive(device, values, dataFormat) {
+      calls.push({ device, values: Array.from(values), dataFormat });
+    },
+  };
+
+  for (const family of ["R", "MR", "LR", "CR"]) {
+    await writeNamed(fakeClient, {
+      [`${family}115:BIT`]: true,
+      [`${family}200:BIT`]: false,
+    });
+  }
+  await writeNamed(fakeClient, { "R114:BIT": false, "R115:BIT": true });
+  await writeNamed(fakeClient, {
+    "CR3614:BIT": false,
+    "CR3615:BIT": true,
+    "CR3700:BIT": false,
+    "CR3701:BIT": true,
+  });
+
+  assert.deepEqual(calls, [
+    { device: "R115", values: [true, false], dataFormat: undefined },
+    { device: "MR115", values: [true, false], dataFormat: undefined },
+    { device: "LR115", values: [true, false], dataFormat: undefined },
+    { device: "CR115", values: [true, false], dataFormat: undefined },
+    { device: "R114", values: [false, true], dataFormat: undefined },
+    { device: "CR3614", values: [false, true, false, true], dataFormat: undefined },
+  ]);
+});
+
+test("writeNamed rejects bit-bank gaps duplicates reverse order and mixed batches atomically", async () => {
+  let sends = 0;
+  const fakeClient = {
+    async write() { sends += 1; },
+    async writeConsecutive() { sends += 1; },
+    async writeSetValueConsecutive() { sends += 1; },
+  };
+  const rejectedUpdates = [
+    { "R115:BIT": true, "R201:BIT": false },
+    { "R0:BIT": true, "R000:BIT": false },
+    { "R200:BIT": true, "R115:BIT": false },
+    { "R115:BIT": true, "MR200:BIT": false },
+    { "R115:BIT": true, "R200:U": 1 },
+    { "R115:BIT": true, "M32:BIT": false },
+  ];
+  for (const updates of rejectedUpdates) {
+    await assert.rejects(() => writeNamed(fakeClient, updates), /must fit one Host Link request/i);
+  }
+
+  for (const address of ["R116:BIT", "MR199:BIT", "LR999:BIT", "CR900719925474099100:BIT"]) {
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: true }), /invalid|safe integer/i);
+  }
+  await assert.rejects(
+    () => writeNamed(fakeClient, { "R115:BIT_IN_WORD": true }),
+    /no bit index/i,
+  );
+
+  await writeNamed(fakeClient, { "M115:BIT": true, "M116:BIT": false });
+  await writeNamed(fakeClient, { "R115:U": 123 });
+  assert.equal(sends, 2);
+});
+
+test("writeNamed preserves the 1000-bit request limit across bit-bank boundaries", async () => {
+  const calls = [];
+  const fakeClient = {
+    async writeConsecutive(device, values, dataFormat) {
+      calls.push({ device, values: Array.from(values), dataFormat });
+    },
+  };
+  const bitBankAddress = (logicalNumber) => {
+    const bank = Math.floor(logicalNumber / 16);
+    const bit = logicalNumber % 16;
+    return `R${bank}${String(bit).padStart(2, "0")}:BIT`;
+  };
+  const makeUpdates = (count) => Object.fromEntries(
+    Array.from({ length: count }, (_, index) => [bitBankAddress(15 + index), index % 2 === 0]),
+  );
+
+  await writeNamed(fakeClient, makeUpdates(1000));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].device, "R015");
+  assert.equal(calls[0].values.length, 1000);
+  assert.deepEqual(calls[0].values.slice(0, 4), [true, false, true, false]);
+
+  await assert.rejects(() => writeNamed(fakeClient, makeUpdates(1001)), /allowed:? 1\.\.1000/i);
+  assert.equal(calls.length, 1);
+});
+
 test("writeNamed preflights complete word dword and timer groups before any send", async () => {
   let calls = 0;
   const fakeClient = {

@@ -602,3 +602,42 @@ Verification and self-review disposition:
 - Accepted: the failure-route test now uses the actual `HostLinkError` type
   and preserves its `code` while the red ring displays its real message.
 - No rejected, duplicate, or deferred finding remains for this item.
+
+## HOSTLINK-NODE-BIT-BANK-WRITE-BATCH-001 — Logical bit-bank write batching
+
+Target contract: `writeNamed` treats direct `BIT` entries in `R`, `MR`, `LR`,
+and `CR` as consecutive by their sixteen-bit-bank logical number while keeping
+the caller's first displayed address as the wire request start and preserving
+insertion order. It does not apply this conversion to another family or dtype.
+
+Compatibility impact and migration: a valid boundary pair such as `R115:BIT`
+then `R200:BIT` now produces one consecutive write instead of failing locally
+because it appeared to need two state-changing requests. Applications may
+remove workarounds that split such a logically consecutive update. They must
+not rely on sorting, deduplication, gap filling, multi-request splitting, or
+partial transmission: gaps, duplicates, reverse order, family/dtype changes,
+invalid display positions, and more than 1000 points remain atomic pre-send
+errors.
+
+Machine-verifiable acceptance criteria:
+
+1. `R`, `MR`, `LR`, and `CR` boundary pairs and multi-boundary sequences use
+   one request from the original first display address in caller order.
+2. Within-bank sequences retain their previous request shape.
+3. Gaps, duplicates, reverse order, family/dtype changes, invalid positions,
+   unsafe values, and 1001 points fail before FIFO admission or transport.
+4. Exactly 1000 consecutive logical bit-bank points remain one valid request.
+5. Non-bit-bank families, non-`BIT` dtypes, and `BIT_IN_WORD` retain their
+   previous planning and validation.
+
+- [x] Implementation, deterministic tests, documentation, changelog, and
+  migration guidance completed in this repository.
+- [x] Targeted high-level tests passed 45/45 and the final full local gate
+  passed 117/117 with npm audit and package-content validation.
+- [x] Codex diff self-review completed; the accepted overly narrow test-match
+  finding was corrected and no runtime, duplicate, deferred, or rejected
+  finding remains.
+- [x] Live PLC verification is not required because this is a deterministic
+  pre-transport planner-coordinate correction and the lower wire encoder is
+  unchanged.
+- [x] Final acceptance criteria verified and the item marked complete.

@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Library: `writeNamed` now recognizes `R`, `MR`, `LR`, and `CR` direct `BIT` addresses as consecutive by their sixteen-bit bank logical numbers. Valid boundary pairs such as `R115` then `R200` use one request starting at the caller's first display address; gaps, duplicates, reverse order, mixed dtypes/families, and the existing 1000-bit limit remain atomic pre-send checks. Applications that previously split a valid boundary pair may remove that workaround.
 - Library: Timer/counter composite reads now accept only status `0` or `1` in the shared client response parser used by typed, named, and composite helpers; existing exact token-count and numeric validation remains centralized.
 - Library: Added `readCommentBytes` and `decodeCommentBytes` as exact RDC body-byte paths. Strict UTF-8/CP932 decoding rejects malformed bytes with `HostLinkProtocolError`, invalidates the supplying connection generation, and never falls back or emits replacement characters; the replacement-decoding `iconv-lite` dependency was removed.
 - Library: CP932 decoding now preserves bytes `00` through `7F` as the identical ASCII code points instead of accepting WHATWG Shift_JIS control-byte remapping. Half-width and double-byte code units remain strict, and CP932-invalid single bytes `80`, `A0`, and `FD` through `FF` are rejected.
@@ -56,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Tests: Added all-family `R`/`MR`/`LR`/`CR` boundary-write vectors, multi-boundary and within-bank regression cases, gap/duplicate/reverse/mixed-dtype isolation, invalid display positions, and exact 1000/1001-bit limits.
 - Tests: Added explicit UTF-8/CP932 ambiguity vectors, UTF-8 BOM-as-payload preservation and CP932 rejection vectors, CP932 ASCII-control identity and Windows-31J extension-pair vectors, invalid-single-byte and malformed/fatal-decoder vectors, exact raw payload checks, comment-plan zero-send preflight, connection invalidation, Node-RED text/raw output, and packed-consumer API coverage.
 - Tests: Added deterministic FIFO/cancellation/close, absolute-deadline send/trickle/decode, IPv4-only resolution, exact request-capacity, Boolean-only writes, removed-helper, input snapshot, input-order aggregate, entry-boundary split, complete preflight, and outcome-unknown coverage.
 - Tests: Added deterministic address-vector, no-send validation, TCP response-ownership, UDP generation/close, exact-mode, decoder invalidation, safe-integer, Float32 direct-bit, and named-write limit coverage.
