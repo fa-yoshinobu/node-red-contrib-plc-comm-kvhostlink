@@ -15,6 +15,7 @@
   const KVHOSTLINK_DIRECT_BIT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"]);
   const KVHOSTLINK_FLOAT_DEVICE_TYPES = new Set(["DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"]);
   const KVHOSTLINK_COMMENT_DEVICE_TYPES = new Set(["R", "B", "MR", "LR", "CR", "DM", "EM", "FM", "ZF", "W", "TM", "Z", "T", "C", "CTH", "CTC", "CM", "X", "Y", "M", "L", "D", "E", "F"]);
+  const KVHOSTLINK_COMMENT_ENCODINGS = new Set(["utf8", "cp932"]);
 
   function kvGetCurrentType(typeSelector, savedType, node) {
     const activeNode = RED.editor && RED.editor.activeNode;
@@ -26,6 +27,30 @@
       }
     }
     return savedType;
+  }
+
+  function kvGetCurrentValue(valueSelector, savedValue, node) {
+    const activeNode = RED.editor && RED.editor.activeNode;
+    const isActiveNode = Boolean(node && activeNode && (node === activeNode || (node.id && activeNode.id === node.id)));
+    if (isActiveNode) {
+      const field = $(valueSelector);
+      if (field.length > 0) {
+        return field.val();
+      }
+    }
+    return savedValue;
+  }
+
+  function kvLiteralUsesComment(node) {
+    const type = kvGetCurrentType("#node-input-addressesType", node && node.addressesType, node);
+    if (type !== "str") {
+      return false;
+    }
+    const value = kvGetCurrentValue("#node-input-addressesLiteral", node && node.addresses, node);
+    const tokens = kvTokenizeAddressList(value);
+    return Array.isArray(tokens) && tokens.some(function (token) {
+      return /:COMMENT$/i.test(token.trim());
+    });
   }
 
   function kvValidateReferencePath(value, allowEmpty) {
@@ -171,6 +196,28 @@
       },
       addressesType: { value: "str", required: true },
       outputMode: { value: "object", required: true },
+      commentOutput: {
+        value: "",
+        validate: function (value) {
+          const output = String(value == null ? "" : value);
+          if (!["", "text", "buffer"].includes(output)) {
+            return false;
+          }
+          if (!output && kvLiteralUsesComment(this)) {
+            return false;
+          }
+          const encoding = String(kvGetCurrentValue("#node-input-commentEncoding", this && this.commentEncoding, this) || "");
+          return output === "text" ? KVHOSTLINK_COMMENT_ENCODINGS.has(encoding) : encoding === "";
+        }
+      },
+      commentEncoding: {
+        value: "",
+        validate: function (value) {
+          const encoding = String(value == null ? "" : value);
+          const output = String(kvGetCurrentValue("#node-input-commentOutput", this && this.commentOutput, this) || "");
+          return output === "text" ? KVHOSTLINK_COMMENT_ENCODINGS.has(encoding) : encoding === "";
+        }
+      },
       errorHandling: { value: "throw", required: true },
       metadataMode: { value: "full", required: true },
       outputs: { value: 1 }
@@ -194,6 +241,15 @@
         "#node-input-addresses"
       );
       refreshAddresses();
+      const refreshCommentEncoding = function () {
+        const textMode = $("#node-input-commentOutput").val() === "text";
+        $("#node-input-commentEncodingRow").toggle(textMode);
+        if (!textMode) {
+          $("#node-input-commentEncoding").val("");
+        }
+      };
+      $("#node-input-commentOutput").on("change", refreshCommentEncoding);
+      refreshCommentEncoding();
     },
     oneditsave: function () {
       const sourceField = $("#node-input-addressesSource");
@@ -233,6 +289,22 @@
     </select>
   </div>
   <div class="form-row">
+    <label for="node-input-commentOutput"><i class="fa fa-comment"></i> RDC comment</label>
+    <select id="node-input-commentOutput">
+      <option value="">Select when using :COMMENT</option>
+      <option value="text">Decoded text</option>
+      <option value="buffer">Raw Buffer</option>
+    </select>
+  </div>
+  <div class="form-row" id="node-input-commentEncodingRow">
+    <label for="node-input-commentEncoding"><i class="fa fa-font"></i> Encoding</label>
+    <select id="node-input-commentEncoding">
+      <option value="">Select an encoding</option>
+      <option value="utf8">UTF-8</option>
+      <option value="cp932">CP932 / Windows-31J (KEYENCE Shift_JIS compatibility)</option>
+    </select>
+  </div>
+  <div class="form-row">
     <label for="node-input-metadataMode"><i class="fa fa-database"></i> Metadata</label>
     <select id="node-input-metadataMode">
       <option value="full">Full msg.kvhostlink</option>
@@ -257,7 +329,8 @@
   <p>Each address must match one complete selector grammar. Extra selectors or trailing text fail. <code>BIT</code> is only for direct-bit device families, <code>F</code> is only for word device families, and <code>COMMENT</code> is only for devices accepted by <code>RDC</code>. Comment and word-bit forms do not accept a count.</p>
   <p>Use <code>:</code> for typed data. <code>DM100.D</code> means bit <code>D</code> / bit 13 inside <code>DM100</code>; use <code>DM100:D</code> for an unsigned 32-bit value.</p>
   <p>Output can be an object keyed by address, an array in address order, or a single scalar when exactly one address is requested.</p>
-  <p>Comment addresses such as <code>DM145:COMMENT</code> return strings via the Host Link <code>RDC</code> command.</p>
+  <p>Comment addresses such as <code>DM145:COMMENT</code> require an explicit RDC comment mode. Choose decoded text and explicitly select <code>utf8</code> or <code>cp932</code>, or choose raw Buffer when the stored encoding is not known. <code>cp932</code> means Windows-31J compatibility commonly described by KEYENCE as Shift_JIS; there is no separate strict Shift_JIS mode.</p>
+  <p>Malformed text bytes are errors. The node never guesses, retries with another codec, substitutes replacement characters, or selects a codec from the PLC profile. Raw Buffer output contains the exact RDC response body bytes without CR/LF, including any trailing padding spaces.</p>
   <p>Metadata can emit full <code>msg.kvhostlink</code>, a minimal object with item count only, or leave <code>msg.kvhostlink</code> unchanged.</p>
   <p>The configured source can be literal text, <code>msg</code>, <code>flow</code>, <code>global</code>, or <code>env</code>. At runtime, a present <code>msg.addresses</code> must be a valid non-empty string or array of non-empty strings. Invalid input is an error and never falls back to the configured source.</p>
   <p>Send <code>msg.connect</code>, <code>msg.disconnect</code>, or <code>msg.reinitialize</code> as <code>true</code>, or send the same words in <code>msg.topic</code>, to control the shared connection.</p>

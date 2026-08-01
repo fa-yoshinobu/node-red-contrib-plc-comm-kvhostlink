@@ -223,8 +223,8 @@ Acceptance criteria:
 ## 2026-08-01 Host Link evaluation migration
 
 The approved GOAL records and machine-verifiable acceptance criteria are
-`HL-EVAL-001`, `HL-EVAL-002`, `HL-EVAL-003`, `HL-EVAL-004`, and
-`HL-EVAL-020` through `HL-EVAL-024` in `TODO.md`. This section records the
+`HL-EVAL-001`, `HL-EVAL-002`, `HL-EVAL-003`, `HL-EVAL-004`,
+`HL-EVAL-TODO-006`, and `HL-EVAL-020` through `HL-EVAL-024` in `TODO.md`. This section records the
 required caller migration without duplicating their acceptance history.
 
 | Record | Required migration |
@@ -233,6 +233,7 @@ required caller migration without duplicating their acceptance history.
 | `HL-EVAL-002` | Supply one complete address selector only. Remove extra selectors/trailing text, incompatible `BIT`/`F`/`COMMENT`, and counts on comment or word-bit forms. |
 | `HL-EVAL-003` | Treat UDP close/failure as cancellation of that generation. Submit new work explicitly after reconnect; old queued work is not replayed. |
 | `HL-EVAL-004` | Fix PLC/bridge behavior that emits unsolicited or multiple response lines. A TCP request owns exactly one non-empty line and the socket is discarded on ambiguity. |
+| `HL-EVAL-TODO-006` | Choose exact `utf8` or `cp932` for RDC text, or use raw bytes. Remove heuristic/profile decoding and all Shift_JIS/Windows-31J aliases; `cp932` is the Windows-31J-compatible KEYENCE Shift_JIS selection. |
 | `HL-EVAL-020` | Reconnect after malformed decoded response bytes. PLC `E0` through `E9` errors remain command results and do not alone require reconnect. |
 | `HL-EVAL-021` | Accept operating mode only from exact `0` or `1`; remove consumers that relied on numeric-prefix parsing. |
 | `HL-EVAL-022` | Pass actual safe JavaScript integers to direct APIs. Node-RED form text is the only boundary that validates and converts decimal strings. |
@@ -241,8 +242,76 @@ required caller migration without duplicating their acceptance history.
 
 The basic, typed, and array flows now make the optional write path explicit,
 random, and best-effort restoring. The device-matrix and multi-PLC monitor flows
-are read-only. No comment-decoder encoding behavior changes under this migration;
-`HL-EVAL-TODO-006` remains a separate evidence-dependent decision.
+are read-only. RDC comment migration is governed separately by
+`HL-EVAL-TODO-006`.
+
+## HL-EVAL-TODO-006 — Explicit RDC text codec or raw bytes
+
+Implementation scope: protocol comment decoding, `HostLinkClient`, high-level
+comment/named/poll helpers, Node-RED read runtime/editor, package surface, and
+user documentation.
+
+Target contract: RDC response bodies remain exact bytes until the caller chooses
+text. Public text accepts only exact `utf8` or `cp932`; `cp932` is the
+Windows-31J-compatible codec commonly described by KEYENCE as Shift_JIS. No
+automatic, profile-selected, fallback, replacement, alias, or separate strict
+Shift_JIS mode exists. Raw APIs and Node output return an exact body `Buffer`
+without CR/LF, including trailing spaces.
+
+Compatibility impact: `decodeCommentResponse`, low/high-level `readComments`,
+named reads, polling, and `:COMMENT` read nodes that previously decoded without
+an explicit choice must select text plus codec or raw Buffer. Invalid/malformed
+selection or bytes fail; decoder protocol failure retires the supplying
+connection generation.
+
+Machine-verifiable acceptance criteria:
+
+1. Every public text path rejects omission, alias, automatic/profile selection,
+   and contradictory raw-plus-codec options before FIFO admission/send.
+2. `decodeCommentBytes`, `readCommentBytes`, and Node Buffer mode preserve the
+   exact RDC body bytes, including padding, while excluding CR/LF framing.
+3. The ambiguous bytes `C2 A2` decode only as UTF-8 `¢` or CP932 `ﾂ｢` according
+   to selection; malformed vectors fail fatally with no replacement/fallback.
+   UTF-8 `EF BB BF 41` retains the BOM as `U+FEFF A`; selecting CP932 for those
+   bytes follows CP932 and fails rather than applying Unicode BOM handling.
+   CP932 `1A`, `1C`, and `7F` preserve identical ASCII code points; invalid
+   single bytes, malformed/unassigned pairs, and extension pairs `87 90`,
+   `ED 40`, and `FA 4A` have strict deterministic outcomes.
+4. Node 18/24 use WHATWG `shift_jis` internally for the documented
+   Windows-31J/CP932 target; no separate Shift_JIS public selection is exposed.
+5. Runtime, editor/help, tests, API reference, changelog, dependency lockfile,
+   npm package, and extracted source agree.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every acceptance criterion and pass.
+- [x] Static, editor, package, and extracted-source checks pass.
+- [x] Codex actual-diff/public-API self-review passes.
+- [x] Live PLC verification is not required; the explicit-selection contract already has approved evidence and decoding is deterministic.
+- [x] Documentation, migration notes, changelog, dependency metadata, and API reference agree.
+- [x] Final acceptance criteria verified for this repository; other runtimes remain independently tracked by the family record.
+
+Verification evidence: current Node.js 24 and explicit Node.js 18.20.8 each
+passed 107 tests with zero skips. `run_ci.bat`, editor import/startup smoke, the
+27-file/5-flow isolated npm consumer gate, and the 57-file extracted source
+archive gate passed. The source archive retained all 6 samples and all 6 test
+files. `git diff --check` passed, the public export list matches
+`API_REFERENCE.md`, and no live PLC communication was performed for this
+implementation.
+
+Codex self-review accepted and corrected five findings: raw `E0`-through-`E9`
+responses now remain `HostLinkError` values with string `code`/`response`
+fields; the packed consumer smoke now exercises both text codecs, exact raw
+bytes, malformed CP932, and the new public APIs; and `poll` plus low-level
+invalid-codec pre-send behavior now have explicit tests. Cross-runtime review
+also found that Node's `TextDecoder` stripped a leading BOM by default;
+`ignoreBOM: true` now preserves it as payload data, with deterministic UTF-8
+preservation and CP932 rejection vectors in unit and packed-consumer checks.
+The same review found WHATWG Shift_JIS remapping CP932 ASCII controls `1A`,
+`1C`, and `7F`; CP932 decoding now handles exact ASCII code points itself and
+uses the fatal Shift_JIS decoder only for half-width and valid double-byte code
+units. Invalid single bytes, malformed/unassigned pairs, and three Windows-31J
+extension pairs are covered in unit and packed-consumer checks. No rejected,
+duplicate, or deferred finding remains for this repository.
 
 ## GOAL-SERIAL-DEFER-001 — Complete single-request capacity
 

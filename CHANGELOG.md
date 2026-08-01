@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING
 
+- Library: RDC comment text no longer uses UTF-8-first/Shift_JIS fallback. `decodeCommentResponse`, `HostLinkClient.readComments`, and the high-level `readComments` helper require the exact public encoding `utf8` or `cp932`; named reads and the read node require an explicit `text` or `buffer` comment mode. `cp932` is Windows-31J compatibility commonly described by KEYENCE as Shift_JIS, and no separate strict Shift_JIS alias is accepted.
+- Node-RED editor: `:COMMENT` reads now require an explicit decoded-text codec or raw-Buffer selection. Saved and runtime plans reject missing, contradictory, automatic, profile-derived, or alias codec settings before connection or request send.
 - Library: The ordinary `HostLinkClient` now provides the sole strict-FIFO contract; no queued-client wrapper is exported. Each admitted call snapshots its effective inputs, a waiting call starts its timeout only on activation, and `close()` rejects active and queued calls so none can leak into a later connection.
 - Library: IPv6 is explicitly unsupported. Endpoints must be IPv4 literals or host names with an IPv4 result, and PLC profile identifiers must match one canonical identifier exactly without trimming/coercion.
 - Library: Direct-bit writes now accept JavaScript Booleans only. Numeric/string bit aliases are rejected, the public `writeBitInWord` helper is removed, and high-level bit-in-word writes fail before transport.
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Library: Added `readCommentBytes` and `decodeCommentBytes` as exact RDC body-byte paths. Strict UTF-8/CP932 decoding rejects malformed bytes with `HostLinkProtocolError`, invalidates the supplying connection generation, and never falls back or emits replacement characters; the replacement-decoding `iconv-lite` dependency was removed.
+- Library: CP932 decoding now preserves bytes `00` through `7F` as the identical ASCII code points instead of accepting WHATWG Shift_JIS control-byte remapping. Half-width and double-byte code units remain strict, and CP932-invalid single bytes `80`, `A0`, and `FD` through `FF` are rejected.
 - Library: One monotonic transaction deadline now spans request sending, complete response framing/receive, and decoding. Partial writes or trickled response bytes cannot restart it; timeout or active cancellation retires the exact transport generation.
 - Library: Added distinct cancellation, close, timeout, not-connected, transport/protocol/PLC, and state-changing outcome-unknown errors. Outcome-unknown errors retain a structured `reason` and underlying `cause` so applications can avoid unsafe automatic retries.
 - Library: `readNamed` now validates and snapshots the complete plan, preserves declared input order as wire order without sorting, and splits only between complete declared entries. It holds one FIFO turn, stops on first failure, and exposes no partial result; multi-request reads remain explicitly non-atomic.
@@ -45,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Tests: Added explicit UTF-8/CP932 ambiguity vectors, UTF-8 BOM-as-payload preservation and CP932 rejection vectors, CP932 ASCII-control identity and Windows-31J extension-pair vectors, invalid-single-byte and malformed/fatal-decoder vectors, exact raw payload checks, comment-plan zero-send preflight, connection invalidation, Node-RED text/raw output, and packed-consumer API coverage.
 - Tests: Added deterministic FIFO/cancellation/close, absolute-deadline send/trickle/decode, IPv4-only resolution, exact request-capacity, Boolean-only writes, removed-helper, input snapshot, input-order aggregate, entry-boundary split, complete preflight, and outcome-unknown coverage.
 - Tests: Added deterministic address-vector, no-send validation, TCP response-ownership, UDP generation/close, exact-mode, decoder invalidation, safe-integer, Float32 direct-bit, and named-write limit coverage.
 

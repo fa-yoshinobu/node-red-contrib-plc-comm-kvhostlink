@@ -64,7 +64,30 @@ try {
     try {
         & npm install --ignore-scripts --no-audit --no-fund $tarballPath
         if ($LASTEXITCODE -ne 0) { throw "Packed npm consumer install failed." }
-        & node -e "require('@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink')"
+        $smokePath = Join-Path $consumerDirectory "package-consumer-smoke.js"
+        $smoke = @'
+const assert = require("node:assert/strict");
+const hostlink = require("@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink");
+assert.equal(typeof hostlink.HostLinkClient.prototype.readComments, "function");
+assert.equal(typeof hostlink.HostLinkClient.prototype.readCommentBytes, "function");
+assert.equal(typeof hostlink.readComments, "function");
+assert.equal(typeof hostlink.readCommentBytes, "function");
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0xc2, 0xa2]), "utf8"), "¢");
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0xc2, 0xa2]), "cp932"), "ﾂ｢");
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0xef, 0xbb, 0xbf, 0x41]), "utf8"), "\uFEFFA");
+assert.throws(() => hostlink.decodeCommentResponse(Buffer.from([0xef, 0xbb, 0xbf, 0x41]), "cp932"), hostlink.HostLinkProtocolError);
+assert.deepEqual(Array.from(hostlink.decodeCommentResponse(Buffer.from([0x1a, 0x1c, 0x7f]), "cp932"), c => c.codePointAt(0)), [0x1a, 0x1c, 0x7f]);
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0x87, 0x90]), "cp932"), "≒");
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0xed, 0x40]), "cp932"), "纊");
+assert.equal(hostlink.decodeCommentResponse(Buffer.from([0xfa, 0x4a]), "cp932"), "Ⅰ");
+for (const invalidByte of [0x80, 0xa0, 0xfd, 0xfe, 0xff]) assert.throws(() => hostlink.decodeCommentResponse(Buffer.from([invalidByte]), "cp932"), hostlink.HostLinkProtocolError);
+for (const invalidPair of [[0x82, 0x20], [0x81, 0xad]]) assert.throws(() => hostlink.decodeCommentResponse(Buffer.from(invalidPair), "cp932"), hostlink.HostLinkProtocolError);
+assert.deepEqual(hostlink.decodeCommentBytes(Buffer.from([0x82, 0xa0, 0x20, 0x0d])), Buffer.from([0x82, 0xa0, 0x20]));
+assert.throws(() => hostlink.decodeCommentResponse(Buffer.from([0x82]), "cp932"), hostlink.HostLinkProtocolError);
+console.log("[OK] packed RDC text/raw contract reached");
+'@
+        [System.IO.File]::WriteAllText($smokePath, $smoke, [System.Text.UTF8Encoding]::new($false))
+        & node $smokePath
         if ($LASTEXITCODE -ne 0) { throw "Packed npm consumer import failed." }
     }
     finally {

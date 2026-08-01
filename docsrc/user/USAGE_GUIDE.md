@@ -78,6 +78,8 @@ supplying generation. PLC command errors `E0` through `E9` remain reusable.
 | Source | Literal text, `msg`, `flow`, `global`, or `env`. |
 | Addresses | Literal address list when Source is `str`. |
 | Output | `object` always returns an address-keyed object, `array` always returns an array, and `value` requires exactly one address. |
+| RDC comment | Required when the resolved plan contains `:COMMENT`: select decoded `text` or raw `buffer`. |
+| Encoding | Required only for text comments: exact `utf8` or `cp932`. |
 | Metadata | `full`, `minimal`, or `off`. |
 | Errors | `throw`, `msg.error`, or second output. |
 
@@ -107,6 +109,28 @@ between requests. The operation stops on first failure and returns no partial
 object. Multiple requests are not an atomic/coherent PLC snapshot because the
 PLC may change between them. Use one protocol request or a PLC-side sequence/
 handshake when values must describe one instant.
+
+### RDC comment bytes and text
+
+Every RDC response is first an exact byte body without CR/LF. Raw `buffer`
+output returns those bytes unchanged, including trailing ASCII padding spaces.
+Text output requires the exact saved encoding `utf8` or `cp932`; `cp932` is the
+Windows-31J-compatible mapping commonly described by KEYENCE as Shift_JIS.
+There is no separate strict Shift_JIS selection and aliases such as `utf-8`,
+`shift_jis`, `windows-31j`, or `auto` are invalid public settings.
+
+The node preflights the complete resolved address plan. Missing text encoding,
+an encoding combined with raw Buffer output, or any unsupported value fails
+before connection or send. Decoding is fatal: malformed bytes raise a protocol
+error, invalidate the connection generation that supplied them, and never fall
+back to another codec or insert replacement characters. Ambiguous bytes are
+decoded only by the selected codec.
+A leading UTF-8 BOM is payload data and decodes to `U+FEFF`; it is not silently
+removed. The same bytes selected as `cp932` are decoded only as CP932 and fail
+when they are not a valid CP932 sequence.
+For `cp932`, bytes `00` through `7F` retain the identical ASCII code points;
+`80`, `A0`, and `FD` through `FF` are invalid. Half-width and double-byte code
+units are decoded strictly, including Windows-31J extension characters.
 
 ## kvhostlink-write node
 
@@ -172,7 +196,7 @@ match the selected mode exactly; conflicting old flows are rejected for review.
 | Signed 32-bit | `DM130:L` | Interpret two words as signed 32-bit. |
 | Float32 | `DM130:F` | Interpret two words as a 32-bit float. |
 | Hex word | `DM140:H` | Read or write a word as uppercase hexadecimal text. |
-| Comment read | `DM145:COMMENT` | Read the device comment string. |
+| Comment read | `DM145:COMMENT` | Read explicit-codec text or the exact raw RDC body Buffer. |
 | Bit in word | `DM150.3` | Read bit 3 in `DM150`; bit-in-word writing is unsupported. |
 | Word array | `DM160:U,4` | Read or write four consecutive unsigned word values. |
 | Bit array | `R200:BIT,4` | Read or write four consecutive relay bits. |

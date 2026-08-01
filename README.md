@@ -55,6 +55,13 @@ in strict FIFO order, uses one absolute active transaction deadline, and never
 automatically reconnects or retries. Direct-bit writes require JavaScript
 Booleans; bit-in-word writes are intentionally unsupported.
 
+RDC device comments are byte payloads until the caller makes an explicit
+choice. For decoded text, select exactly `utf8` or `cp932`; `cp932` means
+Windows-31J compatibility commonly described by KEYENCE as Shift_JIS. There is
+no automatic/profile codec and no separate strict Shift_JIS alias. When the
+stored encoding is unknown, select raw Buffer output. Malformed text bytes fail
+strictly without fallback or replacement characters.
+
 Malformed response bytes, an unknown operating-mode response, stale or extra
 TCP response lines, and failed UDP socket generations invalidate only the
 connection that produced them. The next operation does not silently reuse or

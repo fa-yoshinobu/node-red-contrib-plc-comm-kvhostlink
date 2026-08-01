@@ -14,6 +14,7 @@ const {
   normalizeAddressList,
   parseAddress,
   poll,
+  readCommentBytes,
   readComments,
   readNamed,
   readTimerCounter,
@@ -379,15 +380,22 @@ test("readTyped reads float through two words", async () => {
   assert.equal(await readTyped(fakeClient, "DM100", "F"), 12.5);
 });
 
-test("readComments delegates to the low-level RDC command", async () => {
+test("comment helpers delegate explicit text encoding or exact raw bytes", async () => {
   const fakeClient = {
-    async readComments(device) {
+    async readComments(device, encoding) {
       assert.equal(device, "DM250");
+      assert.equal(encoding, "cp932");
       return "MAIN COMMENT";
+    },
+    async readCommentBytes(device) {
+      assert.equal(device, "DM250");
+      return Buffer.from([0x82, 0xa0, 0x20]);
     },
   };
 
-  assert.equal(await readComments(fakeClient, "DM250"), "MAIN COMMENT");
+  assert.equal(await readComments(fakeClient, "DM250", "cp932"), "MAIN COMMENT");
+  assert.deepEqual(await readCommentBytes(fakeClient, "DM250"), Buffer.from([0x82, 0xa0, 0x20]));
+  await assert.rejects(() => readComments(fakeClient, "DM250"), /encoding.*utf8, cp932/i);
 });
 
 test("readTyped uses preset value from timer and counter composite responses", async () => {
@@ -710,15 +718,20 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       }
       throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
-    async readComments(device) {
+    async readComments(device, encoding) {
       if (device === "DM250") {
+        assert.equal(encoding, "utf8");
         return "MAIN COMMENT";
       }
       throw new Error(`unexpected readComments ${device}`);
     },
   };
 
-  const snapshot = await readNamed(fakeClient, ["DM100:U", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R010:BIT", "DM250:COMMENT", "DM400:U,3", "R010:BIT,4"]);
+  const snapshot = await readNamed(
+    fakeClient,
+    ["DM100:U", "DM101:S", "DM200:D", "DM300:F", "DM50.3", "R010:BIT", "DM250:COMMENT", "DM400:U,3", "R010:BIT,4"],
+    { commentOutput: "text", commentEncoding: "utf8" },
+  );
   assert.deepEqual(snapshot, {
     "DM100:U": 123,
     "DM101:S": -5,
@@ -730,6 +743,38 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
     "DM400:U,3": [1, 2, 3],
     "R010:BIT,4": [true, false, true, false],
   });
+});
+
+test("readNamed preflights explicit comment mode and supports raw Buffer output", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async readComments() { calls += 1; return "unexpected"; },
+    async readCommentBytes(device) {
+      calls += 1;
+      assert.equal(device, "DM250");
+      return Buffer.from([0xc2, 0xa2, 0x20]);
+    },
+  };
+
+  for (const options of [
+    undefined,
+    {},
+    { commentOutput: "text" },
+    { commentOutput: "text", commentEncoding: "auto" },
+    { commentOutput: "buffer", commentEncoding: "utf8" },
+    { commentOutput: "raw" },
+  ]) {
+    await assert.rejects(() => readNamed(fakeClient, ["DM250:COMMENT"], options), /commentOutput|commentEncoding/i);
+  }
+  assert.equal(calls, 0);
+
+  const snapshot = await readNamed(fakeClient, ["DM250:COMMENT"], { commentOutput: "buffer" });
+  assert.deepEqual(snapshot, { "DM250:COMMENT": Buffer.from([0xc2, 0xa2, 0x20]) });
+  assert.equal(calls, 1);
+  await assert.rejects(
+    () => readNamed(fakeClient, ["DM100:U"], { commentOutput: "text", commentEncoding: "utf8" }),
+    /require at least one :COMMENT/i,
+  );
 });
 
 test("readNamed reads native 32-bit dword arrays as device points", async () => {
@@ -776,6 +821,38 @@ test("poll reuses compiled read plan", async () => {
   assert.deepEqual(first.value, { "DM100:U": 11, "DM101:U": 21 });
   assert.deepEqual(second.value, { "DM100:U": 12, "DM101:U": 22 });
   await iterator.return();
+});
+
+test("poll requires the explicit RDC output contract before the first read", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async readComments(device, encoding) {
+      calls += 1;
+      assert.equal(device, "DM250");
+      assert.equal(encoding, "cp932");
+      return "MAIN COMMENT";
+    },
+    async readCommentBytes(device) {
+      calls += 1;
+      assert.equal(device, "DM250");
+      return Buffer.from([0x82, 0xa0, 0x20]);
+    },
+  };
+
+  for (const options of [undefined, {}, { commentOutput: "text" }, { commentOutput: "buffer", commentEncoding: "cp932" }]) {
+    const invalidIterator = poll(fakeClient, ["DM250:COMMENT"], 0, options);
+    await assert.rejects(() => invalidIterator.next(), /commentOutput|commentEncoding/i);
+  }
+  assert.equal(calls, 0);
+
+  const textIterator = poll(fakeClient, ["DM250:COMMENT"], 0, { commentOutput: "text", commentEncoding: "cp932" });
+  assert.deepEqual((await textIterator.next()).value, { "DM250:COMMENT": "MAIN COMMENT" });
+  await textIterator.return();
+
+  const bufferIterator = poll(fakeClient, ["DM250:COMMENT"], 0, { commentOutput: "buffer" });
+  assert.deepEqual((await bufferIterator.next()).value, { "DM250:COMMENT": Buffer.from([0x82, 0xa0, 0x20]) });
+  await bufferIterator.return();
+  assert.equal(calls, 2);
 });
 
 test("kvhostlink-connection validates runtime options and exposes PLC profile", async () => {

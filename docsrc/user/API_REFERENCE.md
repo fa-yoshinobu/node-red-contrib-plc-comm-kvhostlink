@@ -37,7 +37,7 @@ that deadline. One TCP request owns exactly one non-empty response line.
 | Device access | `read`, `readConsecutive`, `write`, `writeConsecutive` |
 | Force/set values | `forcedSet`, `forcedReset`, `forcedSetConsecutive`, `forcedResetConsecutive`, `writeSetValue`, `writeSetValueConsecutive` |
 | Monitor | `registerMonitorBits`, `registerMonitorWords`, `readMonitorBits`, `readMonitorWords` |
-| Other | `readComments`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
+| Other | `readComments`, `readCommentBytes`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
 
 Every framed request is at most 65,536 bytes including its terminator. The exact
 limit is accepted; a one-byte-larger request fails before traffic counters or
@@ -54,6 +54,18 @@ The former public `writeBitInWord` read-modify-write helper is removed. It could
 not provide an atomic PLC update. Read a word and write a word explicitly only
 when the application owns the required concurrency and partial-failure policy.
 
+`readComments(device, encoding[, options])` requires exact `encoding` `utf8` or
+`cp932`. `cp932` uses the Windows-31J-compatible mapping commonly described by
+KEYENCE as Shift_JIS; there is no separate strict Shift_JIS selection or alias.
+Malformed bytes raise `HostLinkProtocolError` without replacement or fallback.
+`readCommentBytes(device[, options])` returns the exact RDC body `Buffer`
+without CR/LF and preserves trailing padding. At protocol level,
+`decodeCommentResponse(raw, encoding)` and `decodeCommentBytes(raw)` provide the
+same text/raw split. Text decoding does not strip a leading Unicode BOM from
+the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
+`7F` map to the identical ASCII code points, while `80`, `A0`, and `FD` through
+`FF` are invalid; half-width and double-byte code units decode strictly.
+
 ## High-level helpers
 
 | Area | Public API |
@@ -63,7 +75,7 @@ when the application owns the required concurrency and partial-failure policy.
 | Typed access | `readTyped`, `writeTyped`, `readWords`, `readDWords` |
 | Timer/counter | `readTimerCounter`, `readTimer`, `readCounter` |
 | Named access | `readNamed`, `writeNamed`, `poll` |
-| Comments | `readComments` |
+| Comments | `readComments`, `readCommentBytes` |
 
 `readNamed` validates and snapshots the whole input before transport, preserves
 declared input order as wire order, and occupies one FIFO turn. It may combine or
@@ -72,6 +84,12 @@ scalar, dword, float, array, or other declared entry. It stops at the first
 failure and returns no partial result. Multiple requests are not a coherent PLC
 snapshot because the PLC may change between them. Use one protocol request or a
 PLC-side consistency handshake when coherence matters.
+
+When a `readNamed`/`poll` plan contains `:COMMENT`, its options must contain
+`commentOutput: "text"` plus `commentEncoding: "utf8" | "cp932"`, or
+`commentOutput: "buffer"` with no encoding. Missing/contradictory comment
+options reject the complete plan before FIFO admission or send. Comment options
+on a plan without `:COMMENT` are also rejected instead of being ignored.
 
 `writeNamed` validates and snapshots the complete update set. It is accepted only
 when the plan is one wire request. Any state-changing plan that would require two
@@ -102,12 +120,12 @@ reconcile PLC/application state because repeating a change can duplicate it.
 `HostLinkClosedError`, `HostLinkConnectionError`, `HostLinkError`,
 `HostLinkNotConnectedError`, `HostLinkOperationOutcomeUnknownError`,
 `HostLinkProtocolError`, `HostLinkTimeoutError`, `MODEL_CODES`, `PLC_PROFILES`,
-`ValueError`, `availablePlcProfiles`, `buildFrame`, `decodeCommentResponse`,
+`ValueError`, `availablePlcProfiles`, `buildFrame`, `decodeCommentBytes`, `decodeCommentResponse`,
 `decodeResponse`, `deviceToString`, `displayName`, `ensureSuccess`,
 `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList`,
 `normalizePlcProfile`, `normalizeSuffix`, `openAndConnect`, `parseAddress`,
 `parseDataTokens`, `parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
-`profileDescriptors`, `profileFromName`, `readComments`, `readCounter`,
+`profileDescriptors`, `profileFromName`, `readCommentBytes`, `readComments`, `readCounter`,
 `readDWords`, `readNamed`, `readTimer`, `readTimerCounter`, `readTyped`,
 `readWords`, `splitDataTokens`, `writeNamed`, `writeTyped`.
 

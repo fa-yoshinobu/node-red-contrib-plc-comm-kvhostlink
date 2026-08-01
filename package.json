@@ -43,9 +43,6 @@
   "scripts": {
     "pack:dry-run": "npm pack --dry-run"
   },
-  "dependencies": {
-    "iconv-lite": "^0.7.2"
-  },
   "node-red": {
     "version": ">=3.0.0",
     "nodes": {

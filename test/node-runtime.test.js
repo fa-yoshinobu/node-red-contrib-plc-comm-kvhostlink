@@ -59,6 +59,8 @@ function readConfig(overrides = {}) {
     addresses: "DM100:U",
     addressesType: "str",
     outputMode: "object",
+    commentOutput: "",
+    commentEncoding: "",
     metadataMode: "full",
     errorHandling: "throw",
     outputs: 1,
@@ -95,6 +97,20 @@ test("Node-RED HostLink saved-flow contract rejects missing and contradictory mo
   for (const invalidMode of [undefined, null, "", false, 0, "OBJECT", "Value", "unknown", {}, []]) {
     assert.throws(() => runtime.create("kvhostlink-read", readConfig({ outputMode: invalidMode })), /outputMode/);
   }
+  for (const invalidMode of [null, false, 0, "TEXT", "raw", "auto", {}, []]) {
+    assert.throws(() => runtime.create("kvhostlink-read", readConfig({ commentOutput: invalidMode })), /commentOutput/);
+  }
+  for (const invalidEncoding of [null, false, 0, "UTF8", "utf-8", "shift_jis", "windows-31j", "auto", {}, []]) {
+    assert.throws(() => runtime.create("kvhostlink-read", readConfig({ commentEncoding: invalidEncoding })), /commentEncoding/);
+  }
+  assert.throws(
+    () => runtime.create("kvhostlink-read", readConfig({ commentOutput: "text", commentEncoding: "" })),
+    /commentEncoding is required/,
+  );
+  assert.throws(
+    () => runtime.create("kvhostlink-read", readConfig({ commentOutput: "buffer", commentEncoding: "utf8" })),
+    /commentEncoding must be empty/,
+  );
   for (const invalidMode of [undefined, null, "", false, 0, "FULL", "Minimal", "unknown", {}, []]) {
     assert.throws(() => runtime.create("kvhostlink-read", readConfig({ metadataMode: invalidMode })), /metadataMode/);
     assert.throws(() => runtime.create("kvhostlink-write", writeConfig({ metadataMode: invalidMode })), /metadataMode/);
@@ -106,6 +122,10 @@ test("Node-RED HostLink saved-flow contract rejects missing and contradictory mo
   assert.match(readHtml, /addressesType:\s*\{\s*value:\s*"str",\s*required:\s*true\s*\}/);
   assert.match(writeHtml, /updatesType:\s*\{\s*value:\s*"str",\s*required:\s*true\s*\}/);
   assert.match(readHtml, /outputMode:\s*\{\s*value:\s*"object",\s*required:\s*true\s*\}/);
+  assert.match(readHtml, /commentOutput:\s*\{\s*value:\s*""/);
+  assert.match(readHtml, /commentEncoding:\s*\{\s*value:\s*""/);
+  assert.match(readHtml, /new Set\(\["utf8", "cp932"\]\)/);
+  assert.doesNotMatch(readHtml, /commentEncoding[^\n]*(?:auto|shift_jis|windows-31j)/i);
   assert.doesNotMatch(readHtml, /this\.addressesType\s*\|\|\s*"str"/);
   assert.doesNotMatch(writeHtml, /this\.updatesType\s*\|\|\s*"str"/);
   assert.match(readHtml, /RED\.editor\s*&&\s*RED\.editor\.activeNode/);
@@ -292,6 +312,61 @@ test("Node-RED HostLink read output modes have fixed payload types", async () =>
   assert.equal(multipleResult.sent.length, 0);
   assert.equal(emptyResult.sent.length, 0);
   assert.deepEqual({ connectCalls, readCalls }, callsBeforeError);
+});
+
+test("Node-RED RDC comments require explicit text codec or raw Buffer before connect", async () => {
+  const runtime = createRuntime();
+  let connectCalls = 0;
+  let textCalls = 0;
+  let rawCalls = 0;
+  runtime.setNode("connection", {
+    connect: async () => { connectCalls += 1; },
+    getClient: () => ({
+      async readComments(device, encoding) {
+        textCalls += 1;
+        assert.equal(device, "DM145");
+        assert.equal(encoding, "cp932");
+        return "表示";
+      },
+      async readCommentBytes(device) {
+        rawCalls += 1;
+        assert.equal(device, "DM145");
+        return Buffer.from([0x82, 0xa0, 0x20]);
+      },
+    }),
+    getProfile: () => ({ plcProfile: "keyence:kv-x500" }),
+  });
+
+  const missing = runtime.create("kvhostlink-read", readConfig({ addresses: "DM145:COMMENT", outputMode: "value" }));
+  const missingResult = await invoke(missing, {});
+  assert.match(missingResult.error.message, /explicit commentOutput/);
+  assert.equal(connectCalls, 0);
+  assert.equal(textCalls, 0);
+  assert.equal(rawCalls, 0);
+
+  const textNode = runtime.create("kvhostlink-read", readConfig({
+    id: "comment-text",
+    addresses: "DM145:COMMENT",
+    outputMode: "value",
+    commentOutput: "text",
+    commentEncoding: "cp932",
+  }));
+  const textMessage = {};
+  assert.equal((await invoke(textNode, textMessage)).error, undefined);
+  assert.equal(textMessage.payload, "表示");
+
+  const rawNode = runtime.create("kvhostlink-read", readConfig({
+    id: "comment-buffer",
+    addresses: "DM145:COMMENT",
+    outputMode: "value",
+    commentOutput: "buffer",
+  }));
+  const rawMessage = {};
+  assert.equal((await invoke(rawNode, rawMessage)).error, undefined);
+  assert.deepEqual(rawMessage.payload, Buffer.from([0x82, 0xa0, 0x20]));
+  assert.equal(connectCalls, 2);
+  assert.equal(textCalls, 1);
+  assert.equal(rawCalls, 1);
 });
 
 test("Node-RED HostLink metadata modes replace only current owned fields", async () => {

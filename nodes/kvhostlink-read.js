@@ -1,6 +1,6 @@
 "use strict";
 
-const { normalizeAddress, normalizeAddressList, readNamed } = require("../lib/hostlink");
+const { normalizeAddress, normalizeAddressList, parseAddress, readNamed } = require("../lib/hostlink");
 const { hasOwn, normalizeDisplayName, requireEnum, requireSourceType, validateOutputs } = require("./runtime-validation");
 
 module.exports = function registerKvHostLinkRead(RED) {
@@ -12,6 +12,9 @@ module.exports = function registerKvHostLinkRead(RED) {
     this.addresses = config.addresses || "";
     this.addressesType = requireSourceType(config, "addressesType");
     this.outputMode = requireEnum(config, "outputMode", ["object", "array", "value"]);
+    const commentConfig = normalizeCommentConfig(config);
+    this.commentOutput = commentConfig.commentOutput;
+    this.commentEncoding = commentConfig.commentEncoding;
     this.errorHandling = requireEnum(config, "errorHandling", ["throw", "msg", "output2"]);
     this.metadataMode = requireEnum(config, "metadataMode", ["full", "minimal", "off"]);
     this.outputs = validateOutputs(config, this.errorHandling);
@@ -42,10 +45,11 @@ module.exports = function registerKvHostLinkRead(RED) {
         if (this.outputMode === "value" && addresses.length !== 1) {
           throw new Error("outputMode=value requires exactly one address");
         }
+        const commentOptions = resolveCommentOptions(addresses, this.commentOutput, this.commentEncoding);
 
         await this.connection.connect();
         const client = this.connection.getClient();
-        const snapshot = await readNamed(client, addresses);
+        const snapshot = await readNamed(client, addresses, commentOptions);
         const profile = this.connection.getProfile();
         msg.payload = formatPayload(snapshot, addresses, this.outputMode);
         applyMetadata(msg, this.metadataMode, {
@@ -64,6 +68,34 @@ module.exports = function registerKvHostLinkRead(RED) {
 
   RED.nodes.registerType("kvhostlink-read", KvHostLinkReadNode);
 };
+
+function normalizeCommentConfig(config) {
+  const commentOutput = config.commentOutput === undefined ? "" : config.commentOutput;
+  const commentEncoding = config.commentEncoding === undefined ? "" : config.commentEncoding;
+  if (typeof commentOutput !== "string" || !["", "text", "buffer"].includes(commentOutput)) {
+    throw new Error("commentOutput must be empty or one of: text, buffer");
+  }
+  if (typeof commentEncoding !== "string" || !["", "utf8", "cp932"].includes(commentEncoding)) {
+    throw new Error("commentEncoding must be empty or one of: utf8, cp932");
+  }
+  if (commentOutput === "text" && !commentEncoding) {
+    throw new Error("commentEncoding is required when commentOutput is text");
+  }
+  if (commentOutput !== "text" && commentEncoding) {
+    throw new Error("commentEncoding must be empty unless commentOutput is text");
+  }
+  return Object.freeze({ commentOutput, commentEncoding });
+}
+
+function resolveCommentOptions(addresses, commentOutput, commentEncoding) {
+  const hasComment = addresses.some((address) => parseAddress(address).dtype === "COMMENT");
+  if (!hasComment) return undefined;
+  if (!commentOutput) {
+    throw new Error("COMMENT reads require an explicit commentOutput of text or buffer");
+  }
+  if (commentOutput === "buffer") return Object.freeze({ commentOutput: "buffer" });
+  return Object.freeze({ commentOutput: "text", commentEncoding });
+}
 
 async function resolveAddresses(RED, node, msg) {
   if (hasOwn(msg, "addresses")) {

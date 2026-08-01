@@ -81,6 +81,21 @@ Successful output is written to `msg.payload`.
 }
 ```
 
+## Read a device comment
+
+An address such as `DM145:COMMENT` uses the Host Link `RDC` command. The read
+node requires an explicit **RDC comment** selection before it connects:
+
+- Choose **Decoded text**, then select exactly **UTF-8** or
+  **CP932 / Windows-31J**.
+- Choose **Raw Buffer** when the stored encoding is unknown or bytes must be
+  preserved exactly.
+
+KEYENCE material may call Windows-31J-compatible data “Shift_JIS”; this library
+names that selection `cp932` and does not expose a separate strict Shift_JIS
+mode. It never guesses from bytes or PLC profile, retries another codec, or
+inserts replacement characters for malformed input.
+
 ## First write
 
 For a single manual write, configure a `kvhostlink-write` node like this:

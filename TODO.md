@@ -5,18 +5,18 @@ Current active TODOs only.
 ## Current Status
 
 The nine evaluation items and the five approved cross-library protocol items
-are complete in the working tree. The evidence-dependent comment-encoding decision remains open, and no
-comment-decoder implementation change is authorized until `HL-EVAL-TODO-006`
-is approved.
+are complete in the working tree. The Node.js/Node-RED part of
+`HL-EVAL-TODO-006` is also implemented and verified in the working tree; the
+other affected runtime repositories remain independently tracked.
 
 ### Verification evidence — 2026-08-01
 
-- Current-worktree CI and the explicit Node.js 18 run passed 104 tests with zero skips, JavaScript syntax and
+- Current-worktree CI and the explicit Node.js 18 run passed 107 tests with zero skips, JavaScript syntax and
   npm package dry-run checks; the Node-RED editor import/startup smoke passed.
-- The independent npm package-content guard passed with 26 files and excluded
+- The independent npm package-content guard passed with 27 files and excluded
   repository-only tests, scripts, TODOs, and maintainer material.
 - The GitHub source-archive gate passed from the current worktree tree with worktree attributes:
-  56 files, all 6 tracked sample files, all 6 tracked test files, 104 tests,
+  57 files, all 6 tracked sample files, all 6 tracked test files, 107 tests,
   extracted syntax/sample JSON/test/package checks, and cleanup under `D:\APP`.
   The gate must be rerun normally after these working-tree changes are committed.
 - `git diff --check` passed. All five flows were reviewed: basic/typed/array use
@@ -30,13 +30,21 @@ is approved.
   read-only `AT` partial-write preflight, insufficient UDP loopback coverage,
   npm notice handling in the source-archive gate, DNS cancellation cleanup,
   close during DNS resolution, FIFO monitor-state activation, and deadline
-  expiration during error decoding. There are no rejected,
-  duplicate, or deferred self-review findings for the nine completed items.
+  expiration during error decoding. The RDC review additionally corrected raw
+  `E0`-through-`E9` classification to retain string PLC error fields, expanded
+  the packed-consumer check to exercise the new API, and added missing poll and
+  pre-send invalid-codec coverage. Cross-runtime review then found and fixed
+  Node's default BOM removal so leading BOM bytes remain decoded payload data,
+  and its WHATWG Shift_JIS control-byte remapping so CP932 `00` through `7F`
+  remain identical ASCII code points. Strict invalid-single, malformed-pair,
+  unassigned-pair, and Windows-31J extension vectors were added. There are no
+  rejected, duplicate, or deferred self-review findings in this repository.
 - Live PLC verification is not required for these deterministic local input,
   planning, parser, socket-state, editor, and packaging contracts. No PLC
   capability/profile assertion changed and no live PLC communication occurred.
 - README, user guides, API reference, editor help, samples, changelog, release
-  process, and migration notes agree. Comment decoding remains unchanged.
+  process, dependency metadata, and migration notes agree with the explicit
+  RDC text-codec/raw-Buffer contract.
 
 ## HL-EVAL-001 — Reject Float32 writes to direct bit devices before transport
 
@@ -170,7 +178,7 @@ Previously silent response reassignment becomes an explicit connection failure, 
 
 ### User disposition
 
-Deferred by the user on 2026-08-01 for evidence investigation followed by implementation in the next Host Link implementation cycle. The current UTF-8-first/Shift_JIS-fallback behavior is not approved as the final contract. Do not change the decoder in the current implementation batch; investigate the exact profile-specific byte contract first, present the resulting target contract one item at a time, and implement only after explicit approval.
+The target contract was approved by the user on 2026-08-01. An `RDC` comment encoding must not be fixed by the library or PLC profile and must not be guessed by UTF-8-first/Shift_JIS-fallback decoding. Text decoding requires an explicit caller-selected encoding, and exact raw comment payload bytes remain available. The Node.js/Node-RED implementation is complete in this working tree; the other affected runtime repositories are tracked independently.
 
 ### Implementation scope
 
@@ -180,41 +188,62 @@ Deferred by the user on 2026-08-01 for evidence investigation followed by implem
 
 ### Target state
 
-The encoding of `RDC` device-comment response bytes is defined from direct KEYENCE Host Link evidence for every affected PLC profile. The Node-RED implementation does not infer a target contract merely from successful decoding, a general KV string-encoding statement, or existing UTF-8-first/Shift_JIS-fallback behavior.
+An `RDC` response is first treated as an exact byte payload. A caller or node that requests text explicitly selects the supported encoding used for that decode. The Node-RED implementation performs no heuristic UTF-8-first fallback, PLC-profile selection, write-source inference, or silent replacement of malformed bytes. A public raw-byte path exposes the undecoded comment payload.
 
-Until the evidence is complete and the resulting target contract is explicitly approved, the comment-encoding behavior remains undecided and no implementation change is authorized.
+The cross-runtime public selections are exactly `utf8` and `cp932`. `cp932`
+means the Windows-31J-compatible mapping commonly described by KEYENCE as
+Shift_JIS. There is no separate strict Shift_JIS selection or public alias. In
+Node.js, `cp932` maps internally to the WHATWG `shift_jis` decoder in fatal mode.
+The wrapper preserves `00` through `7F` as identical ASCII code points, accepts
+mapped half-width and double-byte Windows-31J code units, and rejects malformed,
+unmapped, or nonportable singleton `80`, `A0`, and `FD` through `FF` bytes.
 
 ### Compatibility impact
 
-Undecided. The investigation must identify whether the approved result preserves the current UTF-8-first/Shift_JIS-fallback behavior, fixes one encoding, selects encoding by PLC profile, or introduces an explicit API or node setting. Any public API, configuration, default, decoding, error, or migration impact must be recorded before implementation.
+This is an intentional breaking change. Existing string APIs and nodes that silently try UTF-8 and then Shift_JIS must require an explicit encoding selection, while callers that cannot assert an encoding use the raw-byte API/output. Migration notes must identify the required selection and the removal of heuristic decoding.
 
 ### Acceptance criteria
 
-1. Official KEYENCE communication documentation is checked for the `RDC` response encoding for KV-NANO, KV-3000/KV-5000, KV-7000/KV-8000, and KV-X500 families; evidence is recorded per profile rather than inferred across families.
-2. The exact codec contract is identified, including whether “Shift_JIS” means strict Shift_JIS, Windows-31J/CP932-compatible decoding, or another defined mapping.
-3. Ambiguous byte sequences that are valid under both UTF-8 and Shift_JIS are included in deterministic decoder vectors, and the expected result follows the approved evidence rather than decoder ordering.
-4. If official documentation does not settle a profile, that profile remains `unverified` until an exact live-PLC evidence plan is written with the PLC/profile, endpoint, address, read intent, registered comment value, purpose, expected raw-byte evidence, and restoration requirement, then separately approved by the user with `OK` before communication.
-5. A maintainer decision record defines the encoding selection mechanism, malformed-byte behavior, connection invalidation behavior, public API or node-setting impact, compatibility impact, and cross-language mapping before source implementation begins.
-6. User documentation, tests, editor help, package contents, and migration notes agree with the approved contract in every affected implementation.
+1. Every public `RDC` text-decoding path and comment-reading node requires an explicit supported encoding and has no automatic or profile-selected codec.
+2. A public raw-byte API/output returns the undecoded `RDC` comment payload.
+3. The exact codec mapping is defined consistently across all four runtimes, including whether Shift_JIS and Windows-31J/CP932 are separate selections.
+4. Ambiguous byte sequences valid under multiple codecs decode only according to the caller's selection; malformed sequences fail without fallback or replacement.
+5. Decoder failure and connection-state behavior are explicit and consistent with the library's protocol-error contract.
+6. User documentation, tests, editor help, package contents, changelog, and migration notes agree with the approved contract in every affected implementation.
 
 ### Evidence and completion checklist
 
-- [ ] Official `RDC` encoding evidence recorded for every affected PLC family/profile.
-- [ ] Shift_JIS versus Windows-31J/CP932 mapping resolved for all four language runtimes.
-- [ ] Ambiguous and malformed byte vectors defined with evidence-backed expected results.
-- [ ] Need for live PLC verification decided; any required exact live batch is separately documented and approved.
-- [ ] Target contract and compatibility impact explicitly approved by the user.
-- [ ] Implementation completed in every affected repository.
-- [ ] Tests added or updated for every acceptance criterion.
-- [ ] Relevant static checks, unit tests, integration tests, examples, and package/build checks passed.
-- [ ] Codex self-review completed against the approved contract and cross-language consistency requirements.
-- [ ] Required live-PLC checks passed, or each unavailable check has an explicit release disposition.
-- [ ] Documentation, migration notes, changelog, editor help, and generated API reference agree with the implementation.
-- [ ] Final acceptance criteria verified and the item marked complete.
+- [x] Evidence sufficient to reject a universal or profile-fixed `RDC` codec is recorded.
+- [x] Shift_JIS versus Windows-31J/CP932 target mapping resolved for all four language runtimes.
+- [x] Ambiguous and malformed byte vectors defined with evidence-backed expected results.
+- [x] Further profile-by-profile live verification is not required to select the explicit-codec/raw-byte contract.
+- [x] Target contract and compatibility impact explicitly approved by the user.
+- [x] Node.js/Node-RED implementation completed in this repository.
+- [x] Node.js/Node-RED tests added or updated for every acceptance criterion.
+- [x] Node.js/Node-RED static checks, unit tests, editor smoke, npm package/consumer, and extracted-source checks passed.
+- [x] Codex actual-diff and public-API self-review completed for this repository against the approved contract and cross-language consistency requirements.
+- [x] Further live-PLC verification is not required for this deterministic decoder/API change; the earlier approved evidence remains recorded below.
+- [x] Node.js/Node-RED documentation, migration notes, changelog, editor help, dependency metadata, and API reference agree with the implementation.
+- [x] Implementation completed in every affected repository; each runtime retains independent evidence.
+- [x] Final cross-runtime acceptance criteria verified and the family item marked complete.
 
 ### Current evidence boundary
 
-The current implementations try UTF-8 first and fall back to Shift_JIS. KEYENCE material stating that KV-series strings use Shift_JIS is relevant but does not by itself establish the byte contract of every Host Link `RDC` response. It is supporting evidence only, not approval of a Shift_JIS-only implementation.
+Before this decision, the located implementations tried UTF-8 first and fell back to Shift_JIS. The Node.js/Node-RED implementation no longer does so. The located KEYENCE material says that KV-8000 strings use Shift_JIS in a specific EtherNet/IP connection-guide context, but it does not define the Host Link `RDC` response encoding: <https://www.keyence.co.jp/support/user/controls/plc/connection_guide/kv_iv4/>.
+
+On 2026-08-01, after the user's explicit `OK`, a read-only live check used KEYENCE KV-X500 / `keyence:kv-x500` at `192.168.250.100:8501`. `RDC R000` returned `E38182E38184E38186E38188E3818A` (UTF-8 `あいうえお`) and `RDC R001` returned `E3818BE3818DE3818FE38191E38193` (UTF-8 `かきくけこ`). Both payloads fail strict Shift_JIS and CP932 decoding. This proves that a universal Shift_JIS assumption is unsafe; it does not prove that all `RDC` comments are UTF-8 or identify how the comment-writing path determines stored bytes. The approved explicit-selection/raw-byte contract therefore does not depend on resolving that mechanism.
+
+The deterministic ambiguity vector `C2 A2` is valid UTF-8 `¢` and CP932 `ﾂ｢`;
+the selected codec alone determines its value. Truncated `C2` under UTF-8 and
+truncated lead byte `82` under CP932 are malformed and must fail. Node 18 and 24
+provide the WHATWG Windows-31J-compatible `shift_jis` decoder with fatal error
+mode, including CP932 extension mappings such as `87 40` to `①`; `cp932` is the
+only public name for that target. UTF-8 `EF BB BF 41` decodes to `U+FEFF A`
+rather than silently stripping the leading BOM; the same bytes selected as
+CP932 fail as an invalid CP932 sequence. CP932 bytes `1A`, `1C`, and `7F`
+preserve those exact ASCII code points; `80`, `A0`, and `FD` through `FF` are
+rejected. Extension pairs `87 90`, `ED 40`, and `FA 4A` decode to `U+2252`,
+`U+7E8A`, and `U+2160`, while malformed and unassigned pairs fail.
 
 ## HL-EVAL-020 — Invalidate Node-RED connections on decoder-originated protocol errors
 

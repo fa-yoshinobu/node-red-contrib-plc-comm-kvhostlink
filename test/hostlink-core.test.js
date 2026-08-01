@@ -15,6 +15,7 @@ const {
   HostLinkOperationOutcomeUnknownError,
   HostLinkTimeoutError,
   buildFrame,
+  decodeCommentBytes,
   decodeCommentResponse,
   decodeResponse,
   deviceToString,
@@ -397,11 +398,35 @@ test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   assert.equal(decodeResponse(Buffer.from("123\r\n", "ascii")), "123");
 });
 
-test("decodeResponse rejects non-ASCII normal responses but comments can be Shift_JIS", () => {
-  const sjisA = Buffer.from([0x82, 0xa0, 0x0d]);
+test("RDC comments require one explicit strict codec and retain exact raw bytes", () => {
+  const cp932A = Buffer.from([0x82, 0xa0, 0x20, 0x0d, 0x0a]);
+  const ambiguous = Buffer.from([0xc2, 0xa2, 0x0d]);
+  const utf8BomA = Buffer.from([0xef, 0xbb, 0xbf, 0x41, 0x0d]);
 
-  assert.throws(() => decodeResponse(sjisA), /Non-ASCII response byte 0x82 at offset 0/);
-  assert.equal(decodeCommentResponse(sjisA), "あ");
+  assert.throws(() => decodeResponse(cp932A), /Non-ASCII response byte 0x82 at offset 0/);
+  assert.deepEqual(decodeCommentBytes(cp932A), Buffer.from([0x82, 0xa0, 0x20]));
+  assert.equal(decodeCommentResponse(cp932A, "cp932"), "あ ");
+  assert.equal(decodeCommentResponse(ambiguous, "utf8"), "¢");
+  assert.equal(decodeCommentResponse(ambiguous, "cp932"), "ﾂ｢");
+  assert.equal(decodeCommentResponse(utf8BomA, "utf8"), "\uFEFFA");
+  assert.throws(() => decodeCommentResponse(utf8BomA, "cp932"), /not valid cp932/i);
+  assert.deepEqual(
+    Array.from(decodeCommentResponse(Buffer.from([0x1a, 0x1c, 0x7f]), "cp932"), (character) => character.codePointAt(0)),
+    [0x1a, 0x1c, 0x7f],
+  );
+  assert.equal(decodeCommentResponse(Buffer.from([0x87, 0x90]), "cp932"), "≒");
+  assert.equal(decodeCommentResponse(Buffer.from([0xed, 0x40]), "cp932"), "纊");
+  assert.equal(decodeCommentResponse(Buffer.from([0xfa, 0x4a]), "cp932"), "Ⅰ");
+  for (const invalidByte of [0x80, 0xa0, 0xfd, 0xfe, 0xff]) {
+    assert.throws(() => decodeCommentResponse(Buffer.from([invalidByte]), "cp932"), /not valid cp932/i);
+  }
+  assert.throws(() => decodeCommentResponse(Buffer.from([0x82, 0x20]), "cp932"), /not valid cp932/i);
+  assert.throws(() => decodeCommentResponse(Buffer.from([0x81, 0xad]), "cp932"), /not valid cp932/i);
+  for (const encoding of [undefined, null, "", "utf-8", "shift_jis", "windows-31j", "auto", "UTF8"]) {
+    assert.throws(() => decodeCommentResponse(ambiguous, encoding), /encoding.*utf8, cp932/i);
+  }
+  assert.throws(() => decodeCommentResponse(Buffer.from([0x82, 0x0d]), "cp932"), /not valid cp932/i);
+  assert.throws(() => decodeCommentResponse(Buffer.from([0xc2, 0x0d]), "utf8"), /not valid utf8/i);
 });
 
 test("splitDataTokens supports timer and counter comma-separated responses", () => {
@@ -791,6 +816,19 @@ test("decoder protocol errors invalidate the exact generation but PLC errors rem
   await assert.rejects(() => raced.checkErrorNo(), /Non-ASCII/);
   assert.equal(raced._socket, replacementSocket);
   assert.equal(replacementSocket.destroyed, false);
+
+  for (const [encoding, invalidPayload] of [
+    ["utf8", Buffer.from([0xc2, 0x0d])],
+    ["cp932", Buffer.from([0x82, 0x0d])],
+  ]) {
+    const commentClient = createTestClient();
+    const commentSocket = { destroyed: false, destroy() { this.destroyed = true; } };
+    commentClient._socket = commentSocket;
+    commentClient._exchange = async () => invalidPayload;
+    await assert.rejects(() => commentClient.readComments("DM0", encoding), /not valid/);
+    assert.equal(commentClient._socket, null);
+    assert.equal(commentSocket.destroyed, true);
+  }
 });
 
 test("TCP assigns one nonempty response to one request and rejects stale or extra data", async () => {
@@ -1048,7 +1086,8 @@ test("non-format commands reject suffix-bearing devices before transport", async
     () => client.forcedSetConsecutive("R0.U", 2),
     () => client.forcedResetConsecutive("R0.U", 2),
     () => client.registerMonitorBits("R0.U"),
-    () => client.readComments("DM0.U"),
+    () => client.readComments("DM0.U", "utf8"),
+    () => client.readCommentBytes("DM0.U"),
   ]) {
     await assert.rejects(invoke, /must not contain.*suffix/i);
   }
@@ -1128,7 +1167,7 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
   ]);
 });
 
-test("readComments accepts XYM alias device types", async () => {
+test("readComments and readCommentBytes accept XYM alias device types", async () => {
   const client = createTestClient();
   const commands = [];
 
@@ -1137,9 +1176,19 @@ test("readComments accepts XYM alias device types", async () => {
     return Buffer.from("MAIN COMMENT                    \r", "ascii");
   };
 
-  assert.equal(await client.readComments("D10"), "MAIN COMMENT");
-  assert.equal(await client.readComments("M20"), "MAIN COMMENT");
-  assert.deepEqual(commands, ["RDC D10", "RDC M20"]);
+  for (const encoding of [undefined, "", "auto", "utf-8", "shift_jis", "windows-31j", "UTF8", "CP932"]) {
+    await assert.rejects(() => client.readComments("D10", encoding), /encoding.*utf8, cp932/i);
+  }
+  assert.deepEqual(commands, []);
+
+  assert.equal(await client.readComments("D10", "utf8"), "MAIN COMMENT");
+  assert.equal(await client.readComments("M20", "cp932"), "MAIN COMMENT");
+  assert.deepEqual(await client.readCommentBytes("D10"), Buffer.from("MAIN COMMENT                    ", "ascii"));
+  assert.deepEqual(commands, ["RDC D10", "RDC M20", "RDC D10"]);
+
+  const plcErrorClient = createTestClient();
+  plcErrorClient._exchange = async () => Buffer.from("E1\r", "ascii");
+  await assert.rejects(() => plcErrorClient.readCommentBytes("D10"), (error) => error.code === "E1" && error.response === "E1");
 });
 
 test("monitor registration accepts XYM bit aliases verified on KV-7500", async () => {
