@@ -77,6 +77,13 @@ the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
 | Named access | `readNamed`, `writeNamed`, `poll` |
 | Comments | `readComments`, `readCommentBytes` |
 
+Float32 `F` uses the canonical device metadata and is available only when the
+device family's normal Host Link shape is one `.U` word with ordinary
+consecutive two-word access. `DM0:F` remains valid. `R0:F`, `T0:F`, `C0:F`,
+and `AT0:F` fail in parsing, normalization, formatting, typed access, named
+access, and polling before FIFO admission or transport. A hand-constructed
+formatter object cannot bypass this check.
+
 `readNamed` validates and snapshots the whole input before transport, preserves
 declared input order as wire order, and occupies one FIFO turn. It may combine or
 split read-only requests only between declared input entries; it never tears a
@@ -84,6 +91,17 @@ scalar, dword, float, array, or other declared entry. It stops at the first
 failure and returns no partial result. Multiple requests are not a coherent PLC
 snapshot because the PLC may change between them. Use one protocol request or a
 PLC-side consistency handshake when coherence matters.
+
+Named keys must be semantically unique after parsing device family, numeric
+address, dtype, bit index, and count. Case, leading zeros, and an explicit
+`,1` do not make a second key; different dtypes, bit indexes, or merely
+overlapping spans remain valid. Successful results retain each original input
+spelling. `normalizeAddressList` validates delimited strings, JavaScript arrays,
+and JSON arrays identically while returning each valid trimmed spelling.
+
+`poll` requires an integer interval from `1` through `2147483647` milliseconds.
+Zero is not a maximum-speed mode, and larger values are outside the native
+Node.js timer range.
 
 When a `readNamed`/`poll` plan contains `:COMMENT`, its options must contain
 `commentOutput: "text"` plus `commentEncoding: "utf8" | "cp932"`, or

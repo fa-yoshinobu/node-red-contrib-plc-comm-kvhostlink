@@ -25,6 +25,7 @@ const {
 const {
   DEFAULT_FORMAT_BY_DEVICE_TYPE,
   DIRECT_BIT_DEVICE_TYPES,
+  FLOAT32_DEVICE_TYPES,
   RDC_DEVICE_TYPES,
   WR_DEVICE_TYPES,
 } = require("../lib/hostlink/device");
@@ -101,6 +102,13 @@ test("normalizeAddress and formatParsedAddress keep one canonical spelling", () 
   assert.throws(() => normalizeAddress("dm100:bogus"), /unsupported dtype/i);
   assert.throws(() => normalizeAddress("dm50.s"), /complete.*grammar/i);
   assert.throws(() => parseAddress("DM50:BIT_IN_WORD"), /no bit index/i);
+  for (const parsed of [
+    { base: "DM0", dtype: "BIT", bitIndex: null, count: 1, hasCount: false, explicitDtype: true },
+    { base: "R0", dtype: "F", bitIndex: null, count: 1, hasCount: false, explicitDtype: true },
+    { base: "AT0", dtype: "COMMENT", bitIndex: null, count: 1, hasCount: false, explicitDtype: true },
+  ]) {
+    assert.throws(() => formatParsedAddress(parsed), /only for|Float32|RDC/i);
+  }
 });
 
 test("runtime and editor apply the same complete address grammar vectors", () => {
@@ -152,7 +160,7 @@ test("editor device and dtype compatibility matches runtime metadata exhaustivel
     }
 
     const floatAddress = `${base}:F`;
-    const floatAllowed = DEFAULT_FORMAT_BY_DEVICE_TYPE[deviceType] === ".U";
+    const floatAllowed = FLOAT32_DEVICE_TYPES.has(deviceType);
     assert.equal(succeeds(() => parseAddress(floatAddress)), floatAllowed, floatAddress);
     assert.equal(readEditor.kvValidateAddressToken(floatAddress, { allowComment: true }), floatAllowed, floatAddress);
     assert.equal(writeEditor.kvValidateWriteAddressToken(floatAddress), floatAllowed && WR_DEVICE_TYPES.has(deviceType), floatAddress);
@@ -174,6 +182,17 @@ test("editor device and dtype compatibility matches runtime metadata exhaustivel
     assert.equal(readEditor.kvValidateAddressToken(wordBitAddress, { allowComment: true }), true, wordBitAddress);
     assert.equal(writeEditor.kvValidateWriteAddressToken(wordBitAddress), WR_DEVICE_TYPES.has(deviceType), wordBitAddress);
   }
+});
+
+test("Float32 eligibility is the complete canonical ordinary-word family set", () => {
+  const expected = ["CM", "D", "DM", "E", "EM", "F", "FM", "TM", "VM", "W", "Z", "ZF"];
+  const derived = Object.entries(DEFAULT_FORMAT_BY_DEVICE_TYPE)
+    .filter(([, defaultFormat]) => defaultFormat === ".U")
+    .map(([deviceType]) => deviceType)
+    .sort();
+
+  assert.deepEqual(Array.from(FLOAT32_DEVICE_TYPES).sort(), expected);
+  assert.deepEqual(derived, expected);
 });
 
 function succeeds(action) {
@@ -267,6 +286,76 @@ test("Float32 writes reject every direct bit family before client send", async (
   assert.equal(calls, 0);
 });
 
+test("Float32 special-response families fail every high-level entry before FIFO or transport", async () => {
+  let admissions = 0;
+  let sends = 0;
+  const fakeClient = {
+    async _runExclusive(action) { admissions += 1; return action(); },
+    async read() { sends += 1; return 0; },
+    async readConsecutive() { sends += 1; return [0, 0]; },
+    async write() { sends += 1; },
+    async writeConsecutive() { sends += 1; },
+    async writeSetValue() { sends += 1; },
+    async writeSetValueConsecutive() { sends += 1; },
+  };
+
+  for (const device of ["R0", "T0", "C0", "AT0"]) {
+    const address = `${device}:F`;
+    assert.throws(() => parseAddress(address), /Float32.*ordinary one-word/i);
+    assert.throws(() => normalizeAddress(address), /Float32.*ordinary one-word/i);
+    assert.throws(() => normalizeAddressList([address]), /Float32.*ordinary one-word/i);
+    assert.throws(
+      () => formatParsedAddress({ base: device, dtype: "F", bitIndex: null, count: 1, hasCount: false, explicitDtype: true }),
+      /Float32.*ordinary one-word/i,
+    );
+    await assert.rejects(() => readTyped(fakeClient, device, "F"), /Float32.*ordinary one-word/i);
+    await assert.rejects(() => writeTyped(fakeClient, device, "F", 1.25), /Float32.*ordinary one-word/i);
+    await assert.rejects(() => readNamed(fakeClient, [address]), /Float32.*ordinary one-word/i);
+    await assert.rejects(() => writeNamed(fakeClient, { [address]: 1.25 }), /Float32.*ordinary one-word/i);
+    const iterator = poll(fakeClient, [address], 1);
+    await assert.rejects(() => iterator.next(), /Float32.*ordinary one-word/i);
+  }
+
+  assert.equal(admissions, 0);
+  assert.equal(sends, 0);
+});
+
+test("DM Float32 remains available through parser, formatter, typed, named, and poll paths", async () => {
+  const buffer = Buffer.alloc(4);
+  buffer.writeFloatLE(1.25, 0);
+  const words = [buffer.readUInt16LE(0), buffer.readUInt16LE(2)];
+  const writes = [];
+  const fakeClient = {
+    async _runExclusive(action) { return action(); },
+    async readConsecutive(device, count, dataFormat) {
+      assert.equal(device, "DM0");
+      assert.equal(count, 2);
+      assert.equal(dataFormat, ".U");
+      return words;
+    },
+    async writeConsecutive(device, values, dataFormat) {
+      writes.push({ device, values, dataFormat });
+    },
+  };
+
+  assert.deepEqual(parseAddress("DM0:F"), {
+    base: "DM0", dtype: "F", bitIndex: null, count: 1, hasCount: false, explicitDtype: true,
+  });
+  assert.equal(normalizeAddress(" dm0:f "), "DM0:F");
+  assert.equal(formatParsedAddress(parseAddress("DM0:F")), "DM0:F");
+  assert.equal(await readTyped(fakeClient, "DM0", "F"), 1.25);
+  assert.deepEqual(await readNamed(fakeClient, ["DM0:F"]), { "DM0:F": 1.25 });
+  const iterator = poll(fakeClient, ["DM0:F"], 1);
+  assert.deepEqual((await iterator.next()).value, { "DM0:F": 1.25 });
+  await iterator.return();
+  await writeTyped(fakeClient, "DM0", "F", 1.25);
+  await writeNamed(fakeClient, { "DM0:F": 1.25 });
+  assert.deepEqual(writes, [
+    { device: "DM0", values: words, dataFormat: ".U" },
+    { device: "DM0", values: words, dataFormat: ".U" },
+  ]);
+});
+
 test("readTyped parses explicit Host Link BIT response tokens", async () => {
   for (const [token, expected] of [["ON", true], ["1", true], ["OFF", false], ["0", false]]) {
     const fakeClient = { async read() { return token; } };
@@ -322,8 +411,13 @@ test("BIT dtype rejects timer and counter devices before client execution", asyn
 test("normalizeAddressList keeps count suffixes intact", () => {
   assert.deepEqual(normalizeAddressList("DM100:U,10 DM200:F DM50.3"), ["DM100:U,10", "DM200:F", "DM50.3"]);
   assert.deepEqual(normalizeAddressList('["DM100:U","DM200:D,2"]'), ["DM100:U", "DM200:D,2"]);
+  assert.deepEqual(normalizeAddressList([" dm100:u ", "R010:BIT"]), ["dm100:u", "R010:BIT"]);
   assert.throws(() => normalizeAddressList("DM100:Ugarbage"), /unsupported dtype/i);
   assert.throws(() => normalizeAddressList("DM100:U @ DM200:U"), /invalid address list/i);
+  for (const invalid of ["garbage", "DM0:BIT", "R0:F", "AT0:COMMENT"]) {
+    assert.throws(() => normalizeAddressList([invalid]), /grammar|only for|Float32|RDC/i);
+    assert.throws(() => normalizeAddressList(JSON.stringify([invalid])), /grammar|only for|Float32|RDC/i);
+  }
 });
 
 test("named operations reject empty inputs and compile every write before transport", async () => {
@@ -556,15 +650,28 @@ test("readNamed splits only before an input entry and keeps a dword whole", asyn
   ]);
 });
 
-test("readNamed preflights the complete aggregate and rejects duplicate or oversized units without send", async () => {
+test("readNamed rejects semantic duplicates but permits distinct and overlapping interpretations", async () => {
   let calls = 0;
   const fakeClient = {
     async read() { calls += 1; return 1; },
-    async readConsecutive() { calls += 1; return []; },
+    async readConsecutive(_device, count) {
+      calls += 1;
+      return Array.from({ length: count }, (_, index) => index + 1);
+    },
   };
   await assert.rejects(() => readNamed(fakeClient, ["DM0:U", "DM1:U,1001"]), /out of range/i);
-  await assert.rejects(() => readNamed(fakeClient, ["DM0:U", "DM0:U"]), /duplicate address/i);
+  for (const addresses of [
+    ["DM0:U", "DM0:U"],
+    ["dm0:u", "DM0000:U"],
+    ["DM0:U", "DM0:U,1"],
+  ]) {
+    await assert.rejects(() => readNamed(fakeClient, addresses), /semantically duplicate address/i);
+  }
   assert.equal(calls, 0);
+
+  const result = await readNamed(fakeClient, ["dm0:u", "DM0:S", "DM0.0", "DM0.1", "DM0:U,2", "DM1:U,2"]);
+  assert.deepEqual(Object.keys(result), ["dm0:u", "DM0:S", "DM0.0", "DM0.1", "DM0:U,2", "DM1:U,2"]);
+  assert.equal(calls > 0, true);
 });
 
 test("readNamed snapshots the admitted address list before FIFO waiting", async () => {
@@ -814,13 +921,36 @@ test("poll reuses compiled read plan", async () => {
     },
   };
 
-  const iterator = poll(fakeClient, ["DM100:U", "DM101:U"], 0);
+  const iterator = poll(fakeClient, ["DM100:U", "DM101:U"], 1);
   const first = await iterator.next();
   const second = await iterator.next();
 
   assert.deepEqual(first.value, { "DM100:U": 11, "DM101:U": 21 });
   assert.deepEqual(second.value, { "DM100:U": 12, "DM101:U": 22 });
   await iterator.return();
+});
+
+test("poll requires one millisecond and rejects values beyond the native timer range before read", async () => {
+  let calls = 0;
+  const fakeClient = {
+    async readConsecutive() {
+      calls += 1;
+      return [1];
+    },
+  };
+
+  for (const interval of [0, -1, 2147483648, Number.MAX_SAFE_INTEGER]) {
+    const iterator = poll(fakeClient, ["DM0:U"], interval);
+    await assert.rejects(() => iterator.next(), /intervalMs.*1\.\.2147483647/i);
+  }
+  assert.equal(calls, 0);
+
+  for (const interval of [1, 2147483647]) {
+    const iterator = poll(fakeClient, ["DM0:U"], interval);
+    assert.deepEqual((await iterator.next()).value, { "DM0:U": 1 });
+    await iterator.return();
+  }
+  assert.equal(calls, 2);
 });
 
 test("poll requires the explicit RDC output contract before the first read", async () => {
@@ -840,16 +970,16 @@ test("poll requires the explicit RDC output contract before the first read", asy
   };
 
   for (const options of [undefined, {}, { commentOutput: "text" }, { commentOutput: "buffer", commentEncoding: "cp932" }]) {
-    const invalidIterator = poll(fakeClient, ["DM250:COMMENT"], 0, options);
+    const invalidIterator = poll(fakeClient, ["DM250:COMMENT"], 1, options);
     await assert.rejects(() => invalidIterator.next(), /commentOutput|commentEncoding/i);
   }
   assert.equal(calls, 0);
 
-  const textIterator = poll(fakeClient, ["DM250:COMMENT"], 0, { commentOutput: "text", commentEncoding: "cp932" });
+  const textIterator = poll(fakeClient, ["DM250:COMMENT"], 1, { commentOutput: "text", commentEncoding: "cp932" });
   assert.deepEqual((await textIterator.next()).value, { "DM250:COMMENT": "MAIN COMMENT" });
   await textIterator.return();
 
-  const bufferIterator = poll(fakeClient, ["DM250:COMMENT"], 0, { commentOutput: "buffer" });
+  const bufferIterator = poll(fakeClient, ["DM250:COMMENT"], 1, { commentOutput: "buffer" });
   assert.deepEqual((await bufferIterator.next()).value, { "DM250:COMMENT": Buffer.from([0x82, 0xa0, 0x20]) });
   await bufferIterator.return();
   assert.equal(calls, 2);

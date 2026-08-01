@@ -1078,6 +1078,24 @@ test("semantic reads require exact command-derived token counts and invalidate t
   assert.deepEqual(unregistered.frames, []);
 });
 
+test("timer and counter reads accept only status zero or one in the shared response parser", async () => {
+  for (const status of [0, 1]) {
+    const { client } = createFrameRecorder(() => `${status},10,20\r`);
+    assert.deepEqual(await client.read("T0", ".D"), [status, 10, 20]);
+  }
+
+  for (const status of [2, -1]) {
+    const client = createTestClient();
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    client._exchange = async () => Buffer.from(`${status},10,20\r`, "ascii");
+    const dataFormat = status < 0 ? ".L" : ".D";
+    await assert.rejects(() => client.read("C0", dataFormat), /status/i);
+    assert.equal(client._socket, null);
+    assert.equal(socket.destroyed, true);
+  }
+});
+
 test("non-format commands reject suffix-bearing devices before transport", async () => {
   const { client, frames } = createFrameRecorder();
   for (const invoke of [
