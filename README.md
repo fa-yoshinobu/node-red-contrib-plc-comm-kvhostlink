@@ -69,12 +69,11 @@ strictly without fallback or replacement characters.
 
 Malformed response bytes, an unknown operating-mode response, and stale or extra
 TCP response lines invalidate the TCP connection that produced them. UDP keeps
-the explicit logical connection while assigning each request its own socket
-generation and local endpoint; the immediately preceding socket remains open
-until the next endpoint is bound, preventing delayed datagrams from becoming a
-later response. Timeout, cancellation, malformed response, and socket failure
-close the active request socket immediately. A failed request is never retried
-or replayed automatically.
+the explicit logical connection and reuses a successful socket, resolved IPv4
+address, and local endpoint across requests. Timeout, cancellation, malformed or
+additional response data, an unowned datagram, and socket failure close that
+physical socket; the next request creates a replacement without repeating DNS
+resolution. A failed request is never retried or replayed automatically.
 
 ## Documentation
 

@@ -63,9 +63,11 @@ work immediately, and callers must explicitly reconnect and submit new work.
 
 Each TCP request exclusively owns one non-empty response line. Stale partial
 data, an unsolicited line, or an additional line invalidates that socket rather
-than becoming a later request's response. UDP work is bound to the socket
-generation on which it was queued. Close rejects active and queued work from
-that generation; it is never resent on a replacement socket. Malformed decoder
+than becoming a later request's response. UDP reuses a successful socket and
+local endpoint. Timeout, cancellation, malformed/additional response data,
+unowned datagrams, close, or socket failure retire it; later work creates a
+replacement from the already resolved IPv4 address and never resends the failed
+request. Malformed decoder
 output and mode responses other than exact `0` or `1` also invalidate the
 supplying generation. PLC command errors `E0` through `E9` remain reusable.
 
@@ -101,14 +103,17 @@ The configured Source type is required. If a `msg`, `flow`, `global`, or `env`
 reference cannot be evaluated, the operation fails before connecting; the
 reference name is never treated as a literal PLC address or update.
 
-A multi-entry read is prevalidated and runs in declared input order; the
-library never sorts addresses into a different wire order. Read-only work may
-be combined or split at protocol limits, but only between complete input
-entries. A scalar, dword, float, array, or other declared entry is never torn
-between requests. The operation stops on first failure and returns no partial
-object. Multiple requests are not an atomic/coherent PLC snapshot because the
-PLC may change between them. Use one protocol request or a PLC-side sequence/
-handshake when values must describe one instant.
+A multi-entry read is completely prevalidated before its one aggregate FIFO
+turn. Compatible device groups run by first input appearance; addresses inside
+each group are sorted ascending, contiguous ranges are merged, and only protocol
+limits split a range. Result keys and values retain input order even though wire
+order is optimized. A scalar, dword, float, array, or other declared entry is
+never torn between requests. The operation stops on first failure and returns no
+partial object. Multiple requests are not an atomic/coherent PLC snapshot
+because the PLC may change between them. Use one protocol request or a PLC-side
+sequence/handshake when values must describe one instant. Polling compiles this
+plan once, holds one FIFO turn per complete cycle, and waits the interval after
+releasing that turn.
 
 ### RDC comment bytes and text
 

@@ -139,6 +139,7 @@ test("HostLinkClient requires port and transport and rejects invalid ports", () 
       /port (is required|out of range)/
     );
   }
+  assert.throws(() => createTestClient({ host: "[127.0.0.1]" }), /IPv4 address without brackets/);
 });
 
 test("HostLinkClient validates timeout and requires PLC profile metadata", () => {
@@ -253,10 +254,13 @@ test("an old TCP write callback cannot destroy or feed a replacement connection"
 
 test("sendRaw returns undecoded response bytes without terminators", async () => {
   const client = createTestClient();
-  client._exchange = async () => Buffer.from("E1\r\n", "ascii");
+  const transportBuffer = Buffer.from("E1\r\n", "ascii");
+  client._exchange = async () => transportBuffer;
   const raw = await client.sendRaw("?E");
   assert.equal(Buffer.isBuffer(raw), true);
   assert.deepEqual(raw, Buffer.from("E1", "ascii"));
+  raw[0] = 0x58;
+  assert.deepEqual(transportBuffer, Buffer.from("E1\r\n", "ascii"));
 });
 
 test("TCP response cap accepts the boundary and discards one-byte overflow state", async () => {
@@ -364,7 +368,6 @@ test("UDP response requires a CR/LF terminator and retires the request socket fr
   await assert.rejects(() => invalid._writeUdpAndRead(Buffer.from("ER\r"), invalidSocket, 0), /missing.*terminator/i);
   assert.deepEqual(invalid.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(invalid._socket, null);
-  assert.equal(invalid._udpSocketUsed, false);
   assert.equal(invalidSocket.closed, true);
   await invalid.close();
   assert.equal(invalidSocket.closed, true);
@@ -385,7 +388,6 @@ test("UDP response requires a CR/LF terminator and retires the request socket fr
   await assert.rejects(() => timedOut._writeUdpAndRead(Buffer.from("ER\r"), timeoutSocket, 0), HostLinkTimeoutError);
   assert.deepEqual(timedOut.trafficStats(), { requestCount: 1, txBytes: 3, rxBytes: 0 });
   assert.equal(timedOut._socket, null);
-  assert.equal(timedOut._udpSocketUsed, false);
   assert.equal(timeoutSocket.closed, true);
   await timedOut.close();
   assert.equal(timeoutSocket.closed, true);
@@ -407,6 +409,9 @@ test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   const frame = buildFrame("RD DM100");
   assert.equal(frame.toString("ascii"), "RD DM100\r");
   assert.equal(decodeResponse(Buffer.from("123\r\n", "ascii")), "123");
+  for (const command of ["RD DM0\rWR DM1.U 1", "RD DM0\nWR DM1.U 1", "RD DM0\r\n"]) {
+    assert.throws(() => buildFrame(command), /must not contain CR or LF/);
+  }
 });
 
 test("RDC comments require one explicit strict codec and retain exact raw bytes", () => {
@@ -416,6 +421,9 @@ test("RDC comments require one explicit strict codec and retain exact raw bytes"
 
   assert.throws(() => decodeResponse(cp932A), /Non-ASCII response byte 0x82 at offset 0/);
   assert.deepEqual(decodeCommentBytes(cp932A), Buffer.from([0x82, 0xa0, 0x20]));
+  const ownedComment = decodeCommentBytes(cp932A);
+  ownedComment[0] = 0x00;
+  assert.deepEqual(cp932A, Buffer.from([0x82, 0xa0, 0x20, 0x0d, 0x0a]));
   assert.equal(decodeCommentResponse(cp932A, "cp932"), "あ ");
   assert.equal(decodeCommentResponse(ambiguous, "utf8"), "¢");
   assert.equal(decodeCommentResponse(ambiguous, "cp932"), "ﾂ｢");
@@ -727,16 +735,73 @@ test("monitor registration and its following read obey FIFO state order", async 
 
 test("single request capacity rejects maximum plus one before request state mutation", async () => {
   const accepted = createFrameRecorder(() => "OK\r");
-  assert.equal((await accepted.client.sendRaw("A".repeat(65535))).toString("ascii"), "OK");
+  assert.equal((await accepted.client.sendRaw("A".repeat(65506))).toString("ascii"), "OK");
   assert.equal(accepted.frames.length, 1);
-  assert.equal(Buffer.byteLength(accepted.frames[0], "ascii"), 65536);
+  assert.equal(Buffer.byteLength(accepted.frames[0], "ascii"), 65507);
 
   const client = createTestClient();
   const before = client.trafficStats();
-  assert.equal(buildFrame("A".repeat(65535)).length, 65536);
-  assert.throws(() => buildFrame("A".repeat(65536)), /exceeds 65536 bytes/);
-  await assert.rejects(() => client.sendRaw("A".repeat(65536)), /exceeds 65536 bytes/);
+  assert.equal(buildFrame("A".repeat(65506)).length, 65507);
+  assert.throws(() => buildFrame("A".repeat(65507)), /exceeds 65507 bytes/);
+  await assert.rejects(() => client.sendRaw("A".repeat(65507)), /exceeds 65507 bytes/);
   assert.deepEqual(client.trafficStats(), before);
+});
+
+test("each active FIFO operation owns one AbortController and removes caller forwarding listeners", async () => {
+  const NativeAbortController = global.AbortController;
+  const caller = new NativeAbortController();
+  let controllers = 0;
+  let additions = 0;
+  let removals = 0;
+  const originalAdd = caller.signal.addEventListener.bind(caller.signal);
+  const originalRemove = caller.signal.removeEventListener.bind(caller.signal);
+  caller.signal.addEventListener = (...args) => {
+    additions += 1;
+    return originalAdd(...args);
+  };
+  caller.signal.removeEventListener = (...args) => {
+    removals += 1;
+    return originalRemove(...args);
+  };
+  global.AbortController = class CountingAbortController extends NativeAbortController {
+    constructor() {
+      super();
+      controllers += 1;
+    }
+  };
+  const client = createTestClient();
+  try {
+    assert.equal(await client._enqueue(async () => "ok", { signal: caller.signal }), "ok");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(controllers, 1);
+    assert.equal(additions, 2);
+    assert.equal(removals, 2);
+  } finally {
+    global.AbortController = NativeAbortController;
+    await client.close().catch(() => undefined);
+  }
+});
+
+test("the first active-operation abort reason wins when caller cancellation races close", async () => {
+  const client = createTestClient();
+  const caller = new AbortController();
+  let release;
+  const operation = client._enqueue(
+    () => new Promise((resolve) => { release = resolve; }),
+    { signal: caller.signal },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+
+  caller.abort(new Error("caller canceled first"));
+  await client.close();
+  release("late result");
+
+  await assert.rejects(
+    operation,
+    (error) => error instanceof HostLinkCanceledError
+      && error.cause instanceof Error
+      && error.cause.message === "caller canceled first",
+  );
 });
 
 test("state-changing multi-request bit-in-word helper is removed", () => {
@@ -933,7 +998,6 @@ test("UDP close invalidates active and queued old-generation work without resend
   const newSocket = new FakeUdpSocket();
   client._socket = newSocket;
   client._udpConnected = true;
-  client._udpSocketUsed = false;
   client._generation += 1;
   const next = client.sendRaw("THIRD");
   await new Promise((resolve) => setImmediate(resolve));
@@ -1205,7 +1269,7 @@ test("typed numeric reads reject response tokens that contradict dataFormat", as
   }
 });
 
-test("UDP keeps logical connection while assigning a fresh local endpoint to each request", async () => {
+test("UDP reuses one successful socket and replaces it after a malformed response", async () => {
   const server = dgram.createSocket("udp4");
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -1232,10 +1296,39 @@ test("UDP keeps logical connection while assigning a fresh local endpoint to eac
     assert.deepEqual(await client.sendRaw("FOUR"), Buffer.from("ACK-FOUR", "ascii"));
     assert.equal(client._udpConnected, true);
     assert.equal(endpoints.length, 5);
-    assert.notEqual(endpoints[0], endpoints[1]);
-    assert.notEqual(endpoints[1], endpoints[2]);
-    assert.notEqual(endpoints[2], endpoints[3]);
+    assert.equal(endpoints[0], endpoints[1]);
+    assert.equal(endpoints[1], endpoints[2]);
+    assert.equal(endpoints[2], endpoints[3]);
     assert.notEqual(endpoints[3], endpoints[4]);
+  } finally {
+    await client.close().catch(() => undefined);
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("UDP retires an idle socket that receives an unowned duplicate datagram", async () => {
+  const server = dgram.createSocket("udp4");
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.bind(0, "127.0.0.1", resolve);
+  });
+  const client = createTestClient({ transport: "udp", port: server.address().port, timeout: 1000 });
+  const endpoints = [];
+  server.on("message", (message, rinfo) => {
+    endpoints.push(`${rinfo.address}:${rinfo.port}`);
+    server.send(Buffer.from(`ACK-${message.toString("ascii").trim()}\r`, "ascii"), rinfo.port, rinfo.address);
+    if (endpoints.length === 1) {
+      setTimeout(() => server.send(Buffer.from("DUPLICATE\r", "ascii"), rinfo.port, rinfo.address), 5);
+    }
+  });
+
+  try {
+    await client.connect();
+    assert.deepEqual(await client.sendRaw("ONE"), Buffer.from("ACK-ONE", "ascii"));
+    await new Promise((resolve) => setTimeout(resolve, 75));
+    assert.equal(client._socket, null);
+    assert.deepEqual(await client.sendRaw("TWO"), Buffer.from("ACK-TWO", "ascii"));
+    assert.notEqual(endpoints[0], endpoints[1]);
   } finally {
     await client.close().catch(() => undefined);
     await new Promise((resolve) => server.close(resolve));

@@ -43,6 +43,14 @@ Every framed request is at most 65,536 bytes including its terminator. The exact
 limit is accepted; a one-byte-larger request fails before traffic counters or
 transport state change.
 
+TCP reuses its connected stream. UDP also reuses a successfully connected
+physical socket, resolved IPv4 address, and local endpoint. Timeout,
+cancellation, socket/protocol failure, malformed or additional response data,
+or a datagram with no owning request retires that UDP socket. A later request
+creates one replacement from the saved IPv4 address without retrying the failed
+operation or repeating DNS resolution. Residual duplicate-datagram ambiguity
+after a subsequent request has already taken ownership remains inherent to UDP.
+
 Low-level numeric operations take a base device plus `.U`, `.S`, `.D`, `.L`, or
 `.H`. Suffix-bearing low-level devices are rejected. Bare direct-bit operations
 use bit semantics. Numeric writes accept only exact finite JavaScript numbers in
@@ -59,7 +67,9 @@ when the application owns the required concurrency and partial-failure policy.
 KEYENCE as Shift_JIS; there is no separate strict Shift_JIS selection or alias.
 Malformed bytes raise `HostLinkProtocolError` without replacement or fallback.
 `readCommentBytes(device[, options])` returns the exact RDC body `Buffer`
-without CR/LF and preserves trailing padding. At protocol level,
+without CR/LF and preserves trailing padding. Raw and comment-byte results are
+independent caller-owned Buffers; mutating one does not alter transport state or
+another result. At protocol level,
 `decodeCommentResponse(raw, encoding)` and `decodeCommentBytes(raw)` provide the
 same text/raw split. Text decoding does not strip a leading Unicode BOM from
 the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
@@ -84,13 +94,15 @@ and `AT0:F` fail in parsing, normalization, formatting, typed access, named
 access, and polling before FIFO admission or transport. A hand-constructed
 formatter object cannot bypass this check.
 
-`readNamed` validates and snapshots the whole input before transport, preserves
-declared input order as wire order, and occupies one FIFO turn. It may combine or
-split read-only requests only between declared input entries; it never tears a
-scalar, dword, float, array, or other declared entry. It stops at the first
-failure and returns no partial result. Multiple requests are not a coherent PLC
-snapshot because the PLC may change between them. Use one protocol request or a
-PLC-side consistency handshake when coherence matters.
+`readNamed` validates and snapshots the whole input before FIFO admission and
+occupies one FIFO turn. Compatible device groups execute in the order each group
+first appears in the input. Within a group, addresses are sorted ascending,
+contiguous ranges are merged, and protocol limits are split at the minimum valid
+boundaries. Public result mapping still follows input order. A scalar, dword,
+float, array, or other declared entry is never torn between requests. The call
+stops at the first failure and returns no partial result. Multiple requests are
+not a coherent PLC snapshot because the PLC may change between them. Use one
+protocol request or a PLC-side consistency handshake when coherence matters.
 
 Named keys must be semantically unique after parsing device family, numeric
 address, dtype, bit index, and count. Case, leading zeros, and an explicit
@@ -101,7 +113,9 @@ and JSON arrays identically while returning each valid trimmed spelling.
 
 `poll` requires an integer interval from `1` through `2147483647` milliseconds.
 Zero is not a maximum-speed mode, and larger values are outside the native
-Node.js timer range.
+Node.js timer range. It compiles the immutable named-read plan once at polling
+start, uses one aggregate FIFO turn per cycle, then waits the interval outside
+that turn. It does not publish a partial cycle.
 
 When a `readNamed`/`poll` plan contains `:COMMENT`, its options must contain
 `commentOutput: "text"` plus `commentEncoding: "utf8" | "cp932"`, or

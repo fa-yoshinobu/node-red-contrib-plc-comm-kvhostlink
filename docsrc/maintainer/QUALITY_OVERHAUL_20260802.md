@@ -105,3 +105,323 @@ Completion evidence recorded 2026-08-02:
 - [x] Documentation, migration notes, changelog, and generated API reference agree with the
       implementation where applicable.
 - [x] Final acceptance criteria verified and this item marked complete.
+
+## PERF-001 — Minimum-request HostLink named reads
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree. This record supersedes the old Node-specific input-order
+wire plan for ordinary named reads without rewriting its historical evidence.
+
+### Implementation scope
+
+Node HostLink `readNamed` plan compilation, compatible device grouping, segment execution, result
+mapping, tests, and user documentation. Writes and other aggregate APIs are excluded.
+
+### Target contract
+
+All inputs are parsed and validated before FIFO admission. Compatible device groups are ordered by
+their first input appearance; entries within each group are sorted by address, contiguous ranges are
+merged, and protocol limits create only the necessary splits. Public results retain input-key order.
+The aggregate holds one FIFO turn, stops on the first failure, publishes no partial result, and does
+not claim a single PLC snapshot across multiple requests.
+
+### Machine-verifiable acceptance criteria
+
+1. `DM10, MR0, DM11` emits one contiguous DM request followed by one MR request.
+2. Descending, overlapping compatible suffix, and split-limit vectors use ascending minimal wire
+   segments without changing input-order value mapping.
+3. Every invalid entry fails before FIFO admission or transport, and an execution failure publishes
+   no partial object.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; grouping, descending/overlapping
+  inputs, mixed entries, limit splits, FIFO, failure, and mapping coverage passed in the 113/113
+  targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, named-read public behavior, plan validation and order,
+  minimal segment construction, FIFO state, failure atomicity, tests, packaging, and applicable
+  cross-library consistency; all accepted findings were corrected and reverified.
+- [x] Live PLC verification is not required for PERF-001: grouping, sorting, merging, split limits,
+  FIFO admission, and result mapping are deterministic client-side planner contracts verified with
+  exact frames and local fake transports; no PLC capability or wire-command contract changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-001 is complete for Node HostLink.
+
+## PERF-002 — Reuse successful Node HostLink UDP sockets
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree. This target supersedes the historical `HL-005`
+per-request endpoint policy for current runtime behavior; the completed `HL-005` evidence remains
+unchanged as history.
+
+### Implementation scope
+
+Node HostLink UDP physical-socket lifecycle, saved IPv4 endpoint, response ownership, replacement,
+close/error handling, tests, and user documentation.
+
+### Target contract
+
+A successful UDP socket, local endpoint, and resolved IPv4 address are reused across requests.
+Timeout, cancellation, transport/protocol failure, malformed/additional response data, or a datagram
+with no owning request retires that socket. The next admitted request creates one replacement using
+the saved IPv4 address without DNS and never retries the failed request. The explicitly accepted
+residual UDP ambiguity applies when a delayed duplicate arrives only after a later request has
+already taken ownership.
+
+### Machine-verifiable acceptance criteria
+
+1. Sequential successful requests use the same physical socket and local endpoint.
+2. Every listed abnormal condition retires the socket, and the next request uses a new socket without
+   another name lookup.
+3. Close destroys the retained socket and no delayed retired-socket event can settle later work.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; UDP reuse, endpoint stability,
+  malformed/error replacement, idle duplicate, close, generation, and no-repeat-DNS coverage passed
+  in the 113/113 targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, UDP lifecycle states, response ownership, abnormal
+  retirement, saved-endpoint replacement, close/error races, tests, packaging, and applicable
+  cross-library consistency; all accepted findings were corrected and reverified.
+- [x] Live PLC verification is not required for PERF-002: socket reuse, local-endpoint preservation,
+  ownership, retirement, replacement, and DNS behavior are deterministic transport-lifecycle
+  contracts verified with local UDP fixtures; no PLC capability or HostLink frame changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-002 is complete for Node HostLink.
+
+## PERF-008B — One FIFO turn for Node HostLink named-read aggregates
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree.
+
+### Implementation scope
+
+Node HostLink `readNamed` compilation, aggregate queue admission, segment response staging, and final
+result materialization.
+
+### Target contract
+
+The complete immutable plan and options are prepared before FIFO admission. One aggregate FIFO turn
+covers every planned PLC request, command response validation, safe decode, and staging. The turn is
+released only after the final segment is staged; pure input-order result construction then occurs
+outside the turn. No other same-client request can interleave, and no partial result is published.
+
+### Machine-verifiable acceptance criteria
+
+1. A multi-segment named read calls `_runExclusive` exactly once and preserves segment wire order.
+2. Preflight failures acquire no FIFO turn and send nothing.
+3. A segment failure stops later sends and exposes no partially materialized result.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; multi-segment aggregate, single
+  admission, preflight, early failure, non-interleaving, and result-order coverage passed in the
+  113/113 targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, plan/preflight boundary, one-turn state transitions,
+  response staging, failure atomicity, post-turn materialization, tests, packaging, and applicable
+  cross-library consistency; all accepted findings were corrected and reverified.
+- [x] Live PLC verification is not required for PERF-008B: FIFO admission count, segment order,
+  staging, non-interleaving, and partial-result suppression are deterministic client-side scheduling
+  contracts verified with exact frames and local fake transports; no PLC capability changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-008B is complete for Node HostLink.
+
+## PERF-008C — Reuse one HostLink poll plan and one FIFO turn per cycle
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree.
+
+### Implementation scope
+
+Node HostLink `poll` plan compilation, per-cycle aggregate admission, staging/materialization, and
+interval wait placement.
+
+### Target contract
+
+Polling compiles and freezes the minimum-request named-read plan once before the first cycle. Every
+cycle uses that same plan and one aggregate FIFO turn across all of its requests. A failed cycle
+publishes no partial result and is not retried. The interval begins only after the turn is released
+and is waited outside FIFO.
+
+### Machine-verifiable acceptance criteria
+
+1. Address validation and plan compilation occur once, not once per cycle.
+2. Each successful cycle acquires one FIFO turn, produces one complete input-order result, releases
+   the turn, and then waits the interval.
+3. Cycle failures do not publish partial data or automatically retry a segment.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; plan reuse, per-cycle admission,
+  interval placement, comment preflight, failure, and result coverage passed in the 113/113 targeted
+  run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, one-time compilation, cycle state transitions,
+  one-turn-per-cycle behavior, error publication, interval cancellation, tests, packaging, and
+  applicable cross-library consistency; all accepted findings were corrected and reverified.
+- [x] Live PLC verification is not required for PERF-008C: compilation count, FIFO turns, cycle
+  staging, interval placement, and failure publication are deterministic client-side polling
+  contracts verified with local fake transports; no PLC capability or frame changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-008C is complete for Node HostLink.
+
+## PERF-010C1 — One active lifecycle AbortController
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree.
+
+### Implementation scope
+
+Node HostLink FIFO activation, caller-signal forwarding, `close()` cancellation, reason selection,
+and listener cleanup.
+
+### Target contract
+
+Each active operation creates exactly one lifecycle `AbortController`. A caller-signal forwarding
+listener exists only when a signal is supplied; `close()` aborts the same controller. The first
+caller-cancel or close reason wins, queued cancellation retains its existing removal path, and every
+active completion path removes the forwarding listener. State-changing outcome-unknown
+classification remains unchanged.
+
+### Machine-verifiable acceptance criteria
+
+1. One active operation creates one controller and no caller listener when no signal is supplied.
+2. Normal completion, error, timeout, cancel, and close remove any forwarding listener exactly once.
+3. Caller-cancel/close races preserve the first reason without double settlement or cross-generation
+   cancellation.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; controller count, listener cleanup,
+  first-reason races, normal/error/timeout/cancel/close completion, and outcome classification passed
+  in the 113/113 targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, controller/listener lifecycle, queued versus active
+  cancellation, first-reason selection, close races, outcome-unknown behavior, tests, packaging, and
+  applicable cross-library consistency; the accepted first-abort-reason finding was corrected and
+  reverified.
+- [x] Live PLC verification is not required for PERF-010C1: controller allocation, signal forwarding,
+  listener cleanup, reason races, and settlement are deterministic local lifecycle contracts verified
+  with controlled signals and fake transports; no PLC capability or frame changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-010C1 is complete for Node HostLink.
+
+## PERF-010C2 — Remove duplicate Node HostLink response Buffer copies
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree.
+
+### Implementation scope
+
+Node HostLink UDP response ownership, TCP line extraction, CR/LF stripping, raw/comment public Buffer
+ownership, additional-response detection, and traffic accounting.
+
+### Target contract
+
+UDP makes exactly one internal ownership copy of each accepted datagram and does not copy again at
+Promise completion. TCP passes an owned receive-buffer line view into decode while retaining the
+microtask boundary used to detect an additional response. Buffer terminator stripping returns a
+view. A public API that returns raw bytes creates one final independent caller-owned Buffer.
+
+### Machine-verifiable acceptance criteria
+
+1. UDP ownership performs one full copy and TCP internal decode performs no additional full line copy.
+2. CR, LF, CRLF, and repeated terminators are stripped without copying Buffer input.
+3. `sendRaw` and comment-byte results are isolated from transport state and other returned values.
+4. Wire bytes, counters, decode values, and additional/unsolicited response retirement remain unchanged.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; UDP/TCP ownership, terminator views,
+  public mutation isolation, traffic accounting, and additional-response coverage passed in the
+  113/113 targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, transport-to-decoder ownership, TCP microtask guard,
+  terminator views, public Buffer isolation, response retirement, tests, packaging, and applicable
+  cross-library consistency; accepted extra-response and mutation-isolation findings were corrected
+  and reverified.
+- [x] Live PLC verification is not required for PERF-010C2: Buffer copy count, ownership isolation,
+  terminator stripping, traffic accounting, and extra-response handling are deterministic local
+  memory/transport contracts verified with TCP/UDP fixtures; no PLC capability or frame changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-010C2 is complete for Node HostLink.
+
+## PERF-010C3 — Parse each Node HostLink named address once
+
+Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
+Node HostLink scope in the overhaul worktree.
+
+### Implementation scope
+
+Node HostLink internal detailed address parser, named-read/poll plan entries, validation, segment
+planning, prepared-device execution, and result mapping. Public parser helpers are unchanged.
+
+### Target contract
+
+Each input address is parsed once at plan compile into immutable private address, dtype, count, bit,
+and device metadata. Validation, semantic duplicate detection, optimization, request generation,
+execution, and decode reuse that entry without high-level reparsing. Poll reuses the same plan across
+cycles. Public `parseAddress` and `normalizeAddressList` signatures and return shapes remain unchanged,
+and compiled entries are not exposed for mutation.
+
+### Machine-verifiable acceptance criteria
+
+1. Scalar, array, COMMENT, BIT, BIT_IN_WORD, bit-bank, native/non-native DWord, mixed, and descending
+   plans preserve their accepted frames, request order under PERF-001, values, and result order.
+2. Invalid grammar, dtype/count/bit, span, and semantic duplicate failures remain pre-FIFO and zero-send.
+3. Poll executes repeated cycles without reparsing or recompiling its address plan.
+4. Public parser/normalizer vectors and return contracts remain unchanged.
+
+### Acceptance tracking
+
+- [x] Implementation completed in `node-red-contrib-plc-comm-kvhostlink` for the full scope above.
+- [x] Tests were added or updated for every acceptance criterion; parser vectors, mixed named reads,
+  prepared-device paths, invalid/duplicate preflight, poll plan reuse, and mapping coverage passed in
+  the 113/113 targeted run and the 128/128 full suite.
+- [x] Relevant full checks passed: no-auto-publish and profile-fixture freshness, unit/runtime tests,
+  example-flow load, package/source-archive checks, `npm pack --dry-run`, and the Node-RED editor smoke
+  test.
+- [x] Codex self-review covered the actual diff, public parser surface, internal parse-once boundary,
+  immutable entry reuse, validation order, planned execution and decode, tests, packaging, and
+  applicable cross-library consistency; the accepted internal-reparse finding was corrected and
+  reverified.
+- [x] Live PLC verification is not required for PERF-010C3: parse counts, immutable metadata reuse,
+  validation, planning, and result mapping are deterministic client-side contracts verified with
+  exact parser vectors and fake transports; no PLC capability or wire behavior changed.
+- [x] `CHANGELOG.md`, `README.md`, user usage and API references, locally collected docs,
+  package-symbol checks, and the strict docs-site build agree with the implementation; no migration
+  note is required because no public signature changed.
+- [x] All numbered acceptance criteria were verified and PERF-010C3 is complete for Node HostLink.

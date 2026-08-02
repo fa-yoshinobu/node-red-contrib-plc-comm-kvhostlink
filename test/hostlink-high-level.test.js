@@ -621,7 +621,7 @@ test("readNamed splits contiguous plans at the RDS point limit", async () => {
   ]);
 });
 
-test("readNamed preserves declared wire order and never sorts descending entries", async () => {
+test("readNamed sorts compatible wire groups ascending while preserving public result order", async () => {
   const calls = [];
   const fakeClient = {
     async readConsecutive(device, count, dataFormat) {
@@ -632,8 +632,28 @@ test("readNamed preserves declared wire order and never sorts descending entries
   const result = await readNamed(fakeClient, ["DM10:U", "DM2:U", "DM3:U"]);
   assert.deepEqual(result, { "DM10:U": 10, "DM2:U": 2, "DM3:U": 2 });
   assert.deepEqual(calls, [
-    { device: "DM10", count: 1, dataFormat: ".U" },
     { device: "DM2", count: 2, dataFormat: ".U" },
+    { device: "DM10", count: 1, dataFormat: ".U" },
+  ]);
+});
+
+test("readNamed groups interleaved compatible devices by first group appearance", async () => {
+  const calls = [];
+  const fakeClient = {
+    async readConsecutive(device, count, dataFormat) {
+      calls.push({ device, count, dataFormat: dataFormat || "" });
+      if (device === "DM10") return [10, 11];
+      if (device === "MR000") return [1];
+      throw new Error(`unexpected readConsecutive ${device}`);
+    },
+  };
+
+  const snapshot = await readNamed(fakeClient, ["DM10:U", "MR0:BIT", "DM11:U"]);
+
+  assert.deepEqual(snapshot, { "DM10:U": 10, "MR0:BIT": true, "DM11:U": 11 });
+  assert.deepEqual(calls, [
+    { device: "DM10", count: 2, dataFormat: ".U" },
+    { device: "MR000", count: 1, dataFormat: "" },
   ]);
 });
 
@@ -797,7 +817,7 @@ test("readNamed batches bit-bank direct bits across display bank boundary", asyn
   assert.deepEqual(calls, [{ device: "CR3614", count: 4, dataFormat: "" }]);
 });
 
-test("readNamed falls back for mixed scalar, dword, float, bit, and array reads", async () => {
+test("readNamed optimizes compatible members of mixed scalar, dword, float, bit, comment, and array reads", async () => {
   const fakeClient = {
     async read(device, dataFormat) {
       if (device === "DM100" && dataFormat === ".U") {
@@ -818,6 +838,15 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       throw new Error(`unexpected read ${device} ${dataFormat || ""}`);
     },
     async readConsecutive(device, count, dataFormat) {
+      if (device === "DM50" && count === 1 && dataFormat === ".U") {
+        return [8];
+      }
+      if (device === "DM100" && count === 2 && dataFormat === ".U") {
+        return [123, 65531];
+      }
+      if (device === "DM200" && count === 2 && dataFormat === ".U") {
+        return [0x5678, 0x1234];
+      }
       if (device === "DM300" && count === 2 && dataFormat === ".U") {
         const buffer = Buffer.alloc(4);
         buffer.writeFloatLE(3.5, 0);
@@ -828,6 +857,9 @@ test("readNamed falls back for mixed scalar, dword, float, bit, and array reads"
       }
       if (device === "R010" && count === 4) {
         return [1, 0, 1, 0];
+      }
+      if (device === "R010" && count === 1) {
+        return [1];
       }
       throw new Error(`unexpected readConsecutive ${device} ${count} ${dataFormat || ""}`);
     },
@@ -917,7 +949,12 @@ test("readNamed reads native 32-bit dword arrays as device points", async () => 
 
 test("poll reuses compiled read plan", async () => {
   let callCount = 0;
+  let admissions = 0;
   const fakeClient = {
+    async _runExclusive(action) {
+      admissions += 1;
+      return action();
+    },
     async readConsecutive(device, count, dataFormat) {
       assert.equal(device, "DM100");
       assert.equal(count, 2);
@@ -933,6 +970,7 @@ test("poll reuses compiled read plan", async () => {
 
   assert.deepEqual(first.value, { "DM100:U": 11, "DM101:U": 21 });
   assert.deepEqual(second.value, { "DM100:U": 12, "DM101:U": 22 });
+  assert.equal(admissions, 2, "each cycle must use one aggregate FIFO turn");
   await iterator.return();
 });
 
