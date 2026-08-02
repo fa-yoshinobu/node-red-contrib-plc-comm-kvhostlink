@@ -201,6 +201,61 @@ already taken ownership.
   note is required because no public signature changed.
 - [x] All numbered acceptance criteria were verified and PERF-002 is complete for Node HostLink.
 
+### Additional live acceptance — `HL-KVX500-02`
+
+The separately approved read-only Node.js UDP row passed against
+`keyence:kv-x500` at `192.168.250.100:8501`. The retained artifact
+`D:\APP\live-kvx500-20260802\node_hl_kvx500_02_udp_accepted_result.json`
+has SHA-256
+`1F99417F66C513C828EC0F163926A21EF6A3EBD4184318104C3312F3F5ED1A88`
+and records `status=pass`, `writes=false`, start
+`2026-08-02T11:47:23.035Z`, finish `2026-08-02T11:47:23.105Z`, repository
+HEAD `7996716927d0187763541696b118415aae0799df`, and working-tree diff
+SHA-256 `342a5b90377b5dc3177208d6f5a7515ab2eb3009e7c211018f268dc9dbbe602b`.
+
+Both 11-request cycles used one socket generation and the same local endpoint
+`192.168.250.110:64917`. All 22 requests completed with 44 raw trace frames,
+316 transmitted bytes, and 246 received bytes. Direct and monitor-word values
+were `[0, 0, "0000", 0, 0, 13]` in both cycles; consecutive and monitored
+bits were `[1, 0, 1]`. Node routed initial numeric IPv4 bind/connect setup
+through two `dns.lookup` API calls (`0.0.0.0` and `192.168.250.100`), but the
+recorded non-numeric hostname DNS count was zero and no lookup, socket create,
+bind/connect, or close counter increased between successful requests. Close
+removed the active socket. The later same-client `DM120.U` read was rejected
+as `HostLinkNotConnectedError` before send with raw-frame, traffic, and network
+counters unchanged.
+
+The two earlier Node.js NG artifacts retained by the central evidence set are
+runner-preflight defects, not PLC results: both stopped with zero PLC requests
+and zero raw frames. The first incorrectly required the numeric-IP
+`dns.lookup` API-call count to be zero; the second compared the boolean
+`net.isIPv4` result with numeric `4`. The accepted artifact above supersedes
+them for this live row.
+
+- [x] The `HL-KVX500-02` Node.js live row passed and its final artifact, lifecycle evidence, and runner-only NG classifications were verified.
+
+### Controlled UDP failure acceptance — `HL-KVX500-02B`
+
+The read-only Node.js anomaly row passed against `keyence:kv-x500` at
+`192.168.250.100:8501`. The controlled failure path physically unplugged and
+reconnected the PLC cable between externally gated phases. The retained
+artifact
+`D:\APP\live-kvx500-20260802\node_hl_kvx500_02b_udp_result.json` has
+SHA-256
+`06DF08596C6B4D5707DBF76C764C0AE3CA64C87977908E9E80F350557F35A079`
+and records `status=pass` and `writes=false`.
+
+Phase A returned `DM120.U=0` on the original UDP socket. Phase B made exactly
+one request, timed out after 2003 ms, performed no retry, and retired that
+physical socket while retaining the logical numeric endpoint. Phase C created
+exactly one replacement socket and returned `DM120.U=0`. Across all phases the
+artifact records exactly three requests, 33 transmitted bytes, and 14 received
+bytes. Final close left zero active sockets after two socket creates and two
+socket closes. All lookup API inputs remained numeric IPv4 values and the
+non-numeric hostname DNS count remained zero.
+
+- [x] The `HL-KVX500-02B` Node.js controlled UDP timeout, retirement, one-shot replacement, and final-close live row passed.
+
 ## PERF-008B — One FIFO turn for Node HostLink named-read aggregates
 
 Decision status: approved on 2026-08-02; implementation and final acceptance are complete for the
@@ -425,3 +480,133 @@ and compiled entries are not exposed for mutation.
   package-symbol checks, and the strict docs-site build agree with the implementation; no migration
   note is required because no public signature changed.
 - [x] All numbered acceptance criteria were verified and PERF-010C3 is complete for Node HostLink.
+
+## REAUDIT-001 — TCP ownership acceptance revalidation
+
+Decision status: accepted documentation and monitor-lifecycle findings were corrected on
+2026-08-02. Runtime/public API behavior is unchanged.
+
+The persistent TCP implementation already serializes operations, rejects observable stale or extra
+input before reuse, retires ambiguous generations, and never retries state-changing work whose
+outcome may be unknown. The accepted documentation finding was that the user guide did not explain
+the absence of a Host Link TCP request identifier, the narrow residual race after the pre-send input
+check, or why one-request-per-connection was rejected. That policy would repeat TCP connection setup
+and teardown latency without adding response identity, so healthy streams remain reusable.
+
+Acceptance evidence:
+
+- [x] Existing FIFO, TCP surplus/pre-send-stale, timeout/cancel/close, outcome-unknown, DNS, and UDP reuse/retirement tests cover the transport and error contract.
+- [x] A direct reconnect regression proves `MBS` registration and `MBR` work on the owning connection, close clears the registration, a post-reconnect `MBR` sends nothing, and re-registration restores monitor reads.
+- [x] `run_ci.bat` passed profile/no-publish checks, 135 tests, npm audit, and package-content validation on the final source state.
+- [x] Codex self-review covered the test socket lifecycle, zero-send rejection after reconnect, request ownership wording, public behavior, changelog, and cross-language contract.
+- [x] Live PLC verification is not required: FIFO, monitor-state reset, response ownership, and transport retirement are deterministic local lifecycle behavior; no command frame or PLC/profile capability changed.
+- [x] The usage guide, changelog, maintainer record, tests, and implementation agree. Accepted findings are fixed; rejected, duplicate, and deferred findings are none.
+
+## REAUDIT-005 — Empty raw cross-language acceptance
+
+Decision status: accepted test-evidence and documentation findings were corrected on 2026-08-02.
+Runtime and public API behavior are unchanged.
+
+`buildFrame` already rejected an empty body and `sendRaw` called it before FIFO admission. The
+accepted finding was that the cross-language suite did not prove that order through the public Node
+API and the user documentation did not state the boundary. The new test installs FIFO, connect, and
+exchange spies, calls `sendRaw("")`, and requires the existing protocol input error with zero spy
+calls, no socket, and unchanged traffic counters.
+
+- [x] Public raw empty input is rejected before FIFO, connection state, DNS, socket creation, connect, or send.
+- [x] The usage guide and changelog state the non-empty raw contract and pre-transport boundary.
+- [x] The targeted public API regression and final 135-test suite passed.
+- [x] `run_ci.bat`, package validation, `git diff --check`, and Codex diff review passed after this correction.
+- [x] Live PLC verification is not required because the failure is deterministic before network or protocol traffic.
+- [x] Accepted findings are fixed; rejected, duplicate, and deferred findings are none.
+
+## REAUDIT-002 — Public raw CR/LF rejection
+
+Decision status: approved contract was already implemented; missing direct public-API evidence and
+documentation were added on 2026-08-02. Runtime/public API behavior is unchanged.
+
+Target contract: one `sendRaw` call represents exactly one Host Link command. CR, LF, and CRLF in
+the body are protocol input errors rejected during frame construction before FIFO admission,
+connection state, DNS, socket creation, exchange, send, or traffic/state mutation. A valid command
+still receives exactly one library-appended CR.
+
+Compatibility and migration: this is breaking only for invalid multi-command raw strings. Replace
+each embedded line with a separate `sendRaw` call and preserve application ordering explicitly.
+
+- [x] Direct CR, LF, and CRLF public `sendRaw` preflight tests passed with every FIFO/network/send spy at zero.
+- [x] Existing valid single-command framing tests passed unchanged.
+- [x] Full static, test, package, and diff gates passed.
+- [x] Codex self-review covered validation order, error type, state/traffic preservation, PERF2 FIFO consistency, and cross-language behavior.
+- [x] Live PLC verification disposition recorded.
+- [x] Usage guide, API reference, changelog, and maintainer record agree.
+- [x] Final acceptance criteria verified and REAUDIT-002 marked complete.
+
+Verification evidence: the targeted test passed all CR/LF/CRLF cases. `run_ci.bat` passed all 135
+tests, dependency audit, and `npm pack --dry-run`. Live PLC verification is not required because
+frame validation rejects locally before FIFO admission, DNS, socket creation, exchange, or send.
+
+## REAUDIT-004 — Bracketed IPv4 constructor rejection
+
+Decision status: approved contract was already implemented; missing complete direct evidence and
+breaking migration documentation were added on 2026-08-02. Runtime/public API behavior is unchanged.
+
+Target contract: constructor input such as `[127.0.0.1]` and any other bracketed IPv4 literal fails
+as an invalid host before DNS, TCP/UDP socket creation, connect, or send. Unbracketed IPv4 remains
+valid; existing hostname and IPv6 policy is unchanged.
+
+Compatibility and migration: remove IPv4 URI brackets, for example `[127.0.0.1]` becomes
+`127.0.0.1`.
+
+- [x] Two bracketed IPv4 variants fail during constructor validation with DNS/TCP/UDP socket spies at zero.
+- [x] Unbracketed IPv4 and existing hostname/IPv6 regressions pass.
+- [x] Full static, test, package, and diff gates passed.
+- [x] Codex self-review covered public construction, validation order, network isolation, documentation, and cross-language behavior.
+- [x] Live PLC verification disposition recorded.
+- [x] Usage guide, API reference, changelog, and maintainer record agree.
+- [x] Final acceptance criteria verified and REAUDIT-004 marked complete for Node HostLink.
+
+Verification evidence: `[127.0.0.1]` and `[192.0.2.10]` both fail during construction while DNS,
+TCP socket, and UDP socket call counts remain zero; unbracketed IPv4 remains constructible. The
+135-test/package gate passed. Live PLC verification is not required for constructor-only validation.
+
+## REAUDIT-008 — Unified public raw request capacity
+
+Decision status: approved contract was already implemented; TCP/UDP public-boundary evidence and
+documentation were completed on 2026-08-02. Runtime/public API behavior is unchanged.
+
+Target contract: public TCP and UDP raw bodies accept at most 65,506 ASCII bytes. One appended CR
+produces a maximum 65,507-byte request frame. A 65,507-byte body fails before FIFO, connection state,
+DNS, socket creation, exchange, send, state mutation, or traffic accounting. Smaller command-specific
+limits remain authoritative.
+
+Compatibility and migration: split an oversized operation according to its command-specific point
+limit; changing TCP to UDP or UDP to TCP does not change this absolute frame boundary.
+
+- [x] TCP and UDP each accept a 65,506-byte body as one exact 65,507-byte CR-terminated frame.
+- [x] TCP and UDP each reject a 65,507-byte body with FIFO/connect/exchange and DNS/socket spies at zero.
+- [x] Existing command-specific limits remain covered by the complete regression suite.
+- [x] Full static, test, package, and diff gates passed.
+- [x] Codex self-review covered byte units, off-by-one boundaries, both transports, state/traffic preservation, and performance-contract consistency.
+- [x] Live PLC verification disposition recorded.
+- [x] Usage guide, API reference, breaking changelog, and maintainer record agree.
+- [x] Final acceptance criteria verified and REAUDIT-008 marked complete for Node HostLink.
+
+Verification evidence: the direct TCP/UDP test accepts 65,506 body bytes, observes an exact 65,507
+byte frame ending in CR, and rejects 65,507 body bytes before every FIFO/network/exchange spy and
+without state or traffic change. The complete 135-test/package gate passed. Live PLC verification is
+not required because this is deterministic pre-transport byte-length validation.
+
+Cross-contract self-review classification:
+
+- Accepted and corrected: REAUDIT-002 lacked public `sendRaw` spies proving all three line-separator
+  forms fail before FIFO and network work.
+- Accepted and corrected: REAUDIT-004 covered only one bracketed literal and did not directly prove
+  DNS/TCP/UDP socket call counts remain zero.
+- Accepted and corrected: REAUDIT-008 had a shared builder boundary test but not explicit TCP/UDP
+  public-client parity with rejected-input preflight spies; the API reference also retained the old
+  65,536-byte total.
+- Rejected: no product-code change is required. `buildFrame`, constructor normalization, and
+  `sendRaw` already execute these validations before `_enqueue`; changing them would add no safety.
+- Rejected: the contracts do not conflict with PERF2-001 incremental receive assembly or PERF2-006
+  O(1) FIFO maintenance because all three reject before either receive storage or FIFO admission.
+- Duplicate findings: none. Deferred findings: none.

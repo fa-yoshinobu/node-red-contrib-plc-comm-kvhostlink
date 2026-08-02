@@ -251,6 +251,12 @@ Acceptance criteria:
 - [x] README, changelog, and implementation agree.
 - [x] Final acceptance criteria verified.
 
+Final-source non-live disposition recheck (2026-08-02): PASS. The exact targeted command
+`node --test --test-name-pattern="TCP rejects both|TCP rejects a second" test/hostlink-core.test.js`
+passed both adversarial response-ownership tests. They prove that a coalesced second nonempty line,
+including arrival before the write callback, fails the owned request, retires the transport, sends
+only once, and cannot be reassigned to a later request. No live PLC is required for `HL-001`.
+
 ## HL-002 — Preserve monitor-word formats
 
 Implementation scope: Node.js `registerMonitorWords`, `readMonitorWords`, typed token decoding,
@@ -275,6 +281,48 @@ Acceptance criteria:
 - [x] README/changelog and implementation agree; no generated API literal required an update.
 - [x] Final acceptance criteria verified.
 
+## LIVE-HL-004 — Decode bare direct-bit MWR as packed unsigned 16-bit
+
+Implementation scope: Node.js `registerMonitorWords`, saved monitor metadata,
+MWR token decoding, lifecycle invalidation, tests, user documentation, and
+changelog.
+
+Target contract: a bare direct-bit MWS target remains bare on the wire, but its
+MWR field is the unsigned 16-bit packed word beginning at that bit. The complete
+`0` through `65535` range is valid in one through five ASCII decimal digits;
+leading zeroes are permitted but not required because the manual does not
+guarantee fixed-width padding. Bare scalar RD and MBS/MBR retain strict
+single-bit response semantics.
+
+Compatibility impact: valid PLC responses such as `00000`, `00002`, and the
+maintainer-prepared live vector `00013` no longer fail as invalid bit tokens;
+they return JavaScript numbers. Public method signatures are unchanged.
+
+Acceptance criteria:
+
+1. `registerMonitorWords(["R5000"])` emits exact `MWS R5000` and saves unsigned
+   16-bit decoder metadata.
+2. `0`, `2`, `13`, `00000`, `00002`, `00013`, and `65535` decode successfully;
+   negative, overflow, non-decimal, more-than-five-digit, and token-count errors
+   retire the supplying transport and clear registration metadata.
+3. Mixed registrations preserve wire order and select each field decoder
+   independently.
+4. Bare RD and MBS/MBR do not inherit packed-word behavior.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover every local acceptance criterion.
+- [x] Relevant static checks, all 141 tests, package/build checks, and dependency audit passed.
+- [x] Codex self-review completed against the approved contract; the accepted documentation-section placement finding was corrected before the final gate.
+- [x] Live PLC evidence passed with independently prepared bit pattern and `MWR -> 00013`.
+- [x] User documentation, migration note, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified.
+
+Final semantic live acceptance: after the exact guarded program was completed,
+compiled, reviewed, and separately approved, the Node.js public API read
+`R5000`–`R5015` as `1 0 1 1` followed by twelve zeroes, calculated `13`, sent
+bare `MWS R5000`, and returned numeric monitor value `13`. Evidence:
+`D:\APP\live-kvx500-20260802\node_mwr_semantic_acceptance_result.json`.
+
 ## HL-003 — Reject `Z:F` before admission
 
 Implementation scope: runtime and editor semantic address validation, typed/named read and write
@@ -298,6 +346,12 @@ Acceptance criteria:
 - [x] Live PLC is not required because rejection occurs before communication.
 - [x] README, editor help, changelog, and implementation agree.
 - [x] Final acceptance criteria verified.
+
+Final-source non-live disposition recheck (2026-08-02): PASS. The exact targeted command
+`node --test --test-name-pattern="Z Float32|Float32 special-response" test/hostlink-core.test.js test/hostlink-high-level.test.js`
+passed both tests. Low-level numeric entrances emit zero frames, and every parser, normalizer,
+formatter, typed/named read/write, and polling entrance rejects the invalid special-family Float32
+shape before FIFO admission or transport. No live PLC is required for `HL-003`.
 
 ## HL-004 — Canonical semantic hexadecimal reads
 
@@ -780,3 +834,86 @@ Machine-verifiable acceptance criteria:
   pre-transport planner-coordinate correction and the lower wire encoder is
   unchanged.
 - [x] Final acceptance criteria verified and the item marked complete.
+
+## LIVE-HL-003 — Structural timer/counter status decoding
+
+Decision status: the target contract was approved on 2026-08-02. Node.js
+implementation, deterministic tests, documentation, package checks, Codex
+self-review, and the separately approved Node.js representative live row are
+complete. Family-level final acceptance passed in the root live-verification
+record after all five implementation rows completed.
+
+Implementation scope: `HostLinkClient.read` decoding for the three-field `T` and
+`C` response, shared numeric token parsing for current and preset, direct
+low-level regressions, the user guide, API reference, changelog, and this
+migration record. Public method signatures, high-level result types, request
+frames, profile data, timer/counter routes, and write behavior are unchanged.
+
+Target contract: the first timer/counter response token is structural status.
+It is validated before numeric-format parsing and accepts only the exact raw
+token `0` or `1`; the low-level result exposes numeric `0` or `1` for every
+format. Only current and preset use the requested `.U`, `.S`, `.H`, `.D`, or
+`.L` parser and bounds. A composite response contains exactly three tokens.
+Missing or additional tokens, non-exact status, malformed current or preset,
+and numeric overflow are `HostLinkProtocolError` failures that retire the
+transport generation which supplied them.
+
+Compatibility impact: public signatures and supported high-level return types
+do not change. The correction accepts the real KV-X500 `.H` response
+`0,270F,270F`, producing `[0, "270F", "270F"]`. Code could not successfully
+consume this response under the former all-token `.H` decoding, so preserving
+the synthesized status `"0000"` is not a supported compatibility constraint.
+
+Machine-verifiable acceptance criteria:
+
+1. For `.U`, `.S`, `.H`, `.D`, and `.L`, raw status `0` and `1` remain numeric
+   status while current and preset alone receive the selected parser and bounds.
+2. The exact live vector `0,270F,270F` under `.H` returns
+   `[0, "270F", "270F"]`.
+3. Missing and additional fields fail before value publication.
+4. Non-exact statuses including signed, padded, bit-token, and other numeric
+   forms fail as protocol errors.
+5. Invalid current and invalid preset fields are each rejected, and range
+   overflow is covered for `.U`, `.S`, `.H`, `.D`, and `.L`.
+6. Every malformed composite response retires the supplying transport, while
+   successful reads preserve the existing client and high-level containers.
+7. Targeted core/high-level tests, the complete local CI gate, dependency audit,
+   and npm package dry-run pass on the final source state.
+
+Verification evidence and self-review disposition:
+
+- The direct success matrix covers both raw statuses across all five formats,
+  including signed leading-plus inputs and the exact hexadecimal PLC vector.
+- The direct failure matrix covers field count, non-exact status, invalid
+  current and preset positions, every numeric-format overflow boundary,
+  `HostLinkProtocolError` identity, and transport destruction/removal.
+- Targeted core/high-level tests passed 122/122. The final `run_ci.bat` passed
+  137/137 tests, dependency audit with zero vulnerabilities, and the 27-file
+  npm package dry-run.
+- Codex review covered token-count validation order, raw status validation,
+  current/preset-only format dispatch, range errors, generation retirement,
+  high-level compatibility, documentation, and package contents. Accepted and
+  corrected findings were the missing direct format/error matrices and missing
+  structural-status documentation. Rejected, duplicate, and locally deferred
+  implementation findings are none.
+- Live PLC communication was not performed during the implementation correction.
+  After the exact guarded runner was completed and reviewed, the maintainer
+  separately approved the representative Node.js row. The retained result
+  `D:\APP\live-kvx500-20260802\node_hl_kvx500_01_final_result.json` records
+  `status=pass`, `writes=false`, start `2026-08-02T11:11:09.062Z`, finish
+  `2026-08-02T11:11:09.121Z`, repository HEAD
+  `7996716927d0187763541696b118415aae0799df`, and working-tree diff SHA-256
+  `6673f6ce11c55de06d9e0e993d2fba7934921a18889689b4b54f7fc188effa69`.
+- The live row completed 12 requests (`163` transmitted and `139` received
+  bytes) on one stable TCP connection: generation `1` and the same local and
+  remote socket endpoints were recorded before and after the batch. `R000.H`
+  returned `0000`; `T0.H` returned `[0, "270F", "270F"]`; direct reads and
+  MWR both produced `[0, 0, "0000", 0, 0, 13]` in the approved mixed order.
+
+- [x] Node.js implementation completed for the approved target contract.
+- [x] Deterministic tests directly cover every non-live acceptance criterion.
+- [x] Relevant targeted, full-suite, dependency, and package checks passed.
+- [x] Codex self-review completed against the actual diff and cross-language target.
+- [x] The Node.js row of the representative cross-language live batch passed after new explicit approval.
+- [x] User documentation, changelog, and migration record agree with the implementation.
+- [x] Root cross-language acceptance and `LIVE-HL-003` final completion were verified.

@@ -373,13 +373,14 @@ test("readTyped parses explicit Host Link BIT response tokens", async () => {
   );
 });
 
-test("direct-bit typed and bit-in-word reads pack all sixteen response tokens", async () => {
+test("direct-bit typed reads accept one PLC numeric token while bit-in-word reads retain word packing", async () => {
   const calls = [];
   const fakeClient = {
     async read(device, dataFormat) {
       calls.push({ kind: "read", device, dataFormat });
-      const setBits = device === "M100" ? [0, 3, 15] : [3, 8];
-      return Array.from({ length: 16 }, (_, bit) => setBits.includes(bit) ? 1 : 0);
+      if (device === "M100" && dataFormat === ".U") return 0x8009;
+      if (device === "R010" && dataFormat === ".U") return 0x0108;
+      return 0;
     },
     async readConsecutive(device, count, dataFormat) {
       calls.push({ kind: "readConsecutive", device, count, dataFormat });

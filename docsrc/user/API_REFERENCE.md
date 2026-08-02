@@ -7,10 +7,12 @@ ordinary low-level client; there is no separate queued-client wrapper.
 
 `new HostLinkClient({ host, port, transport, timeout, plcProfile })` performs no
 network I/O. `host` is an IPv4 literal or a hostname with an IPv4 DNS result;
-IPv6 literals and IPv6-only names are unsupported. `port` and `timeout` are
-safe integers, `transport` is `tcp` or `udp`, and `plcProfile` must be one exact
-canonical value from `PLC_PROFILES`. Endpoint, timeout, transport, and profile
-are immutable snapshots for the lifetime of the client.
+IPv6 literals and IPv6-only names are unsupported. Bracketed IPv4 such as
+`[127.0.0.1]` is rejected before DNS or socket work; pass `127.0.0.1` instead.
+`port` and `timeout` are safe integers, `transport` is `tcp` or `udp`, and
+`plcProfile` must be one exact canonical value from `PLC_PROFILES`. Endpoint,
+timeout, transport, and profile are immutable snapshots for the lifetime of the
+client.
 
 Call `connect()` before commands and again after `close()`, timeout, cancellation
 of active I/O, protocol/framing failure, or transport failure. Commands do not
@@ -39,9 +41,12 @@ that deadline. One TCP request owns exactly one non-empty response line.
 | Monitor | `registerMonitorBits`, `registerMonitorWords`, `readMonitorBits`, `readMonitorWords` |
 | Other | `readComments`, `readCommentBytes`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
 
-Every framed request is at most 65,536 bytes including its terminator. The exact
-limit is accepted; a one-byte-larger request fails before traffic counters or
-transport state change.
+`sendRaw` accepts one non-empty ASCII command body without CR or LF. The body is
+at most 65,506 bytes and the library appends one CR, producing a complete frame
+of at most 65,507 bytes for both TCP and UDP. An empty, CR/LF-containing, or
+65,507-byte body fails before FIFO admission, connection state, DNS, socket
+work, traffic counters, or transport state change. Command-specific limits that
+are smaller than this absolute frame boundary still apply.
 
 TCP reuses its connected stream. UDP also reuses a successfully connected
 physical socket, resolved IPv4 address, and local endpoint. Timeout,
@@ -57,6 +62,31 @@ use bit semantics. Numeric writes accept only exact finite JavaScript numbers in
 range. Direct-bit writes accept only JavaScript `true` or `false`; numbers and
 strings such as `1`, `0`, `ON`, and `OFF` are invalid write values. Response
 decoding may still recognize the documented PLC bit tokens.
+
+For a formatted single read of a direct-bit device, the PLC returns one packed
+numeric token: `.U`, `.S`, and `.H` represent 16 bits, while `.D` and `.L`
+represent 32 bits. Signed `.S` and `.L` responses may include an explicit
+leading `+`. Bare direct-bit reads remain one bit token. A formatted response
+containing multiple tokens is a protocol error and retires the supplying
+transport generation.
+
+A formatted `T` or `C` single read returns `[status, current, preset]`. The raw
+first token is structural status and must be exactly `0` or `1`; the low-level
+result keeps it as numeric `0` or `1` for every format. Only current and preset
+are decoded and range-checked as `.U`, `.S`, `.H`, `.D`, or `.L`. Consequently,
+`0,270F,270F` for `.H` becomes `[0, "270F", "270F"]`, not a formatted status
+such as `"0000"`. Missing or additional fields, a non-exact status, malformed
+current or preset, and numeric overflow are protocol errors that retire the
+supplying transport generation.
+
+`registerMonitorWords` treats a bare direct-bit target specially because this
+is an MWS/MWR word-monitor operation. For example, `"R5000"` is transmitted as
+the exact bare token `MWS R5000`, while the matching MWR field is decoded as the
+unsigned 16-bit packed value for `R5000` through `R5015`. Thus a response of
+`00013` returns JavaScript number `13`. The field accepts one through five ASCII
+decimal digits with optional leading zeroes; the manual does not guarantee a
+fixed five-character width. This does not change bare scalar `RD` or
+`MBS`/`MBR`; those operations still accept only one bit token per target.
 
 The former public `writeBitInWord` read-modify-write helper is removed. It could
 not provide an atomic PLC update. Read a word and write a word explicitly only

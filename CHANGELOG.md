@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: Bare direct-bit MWS registrations now keep the exact unsuffixed wire target while decoding the corresponding MWR field as the PLC's packed unsigned 16-bit word. The decoder accepts one through five ASCII decimal digits because the manual does not guarantee fixed-width padding. Bare scalar reads and bit monitors remain strict single-bit operations.
+- Tests: Added the maintainer-confirmed `00013` packed-word vector, zero/nonzero/maximum boundaries, mixed monitor ordering, malformed-value transport retirement, and isolation from scalar/bit-monitor semantics.
+- Library: Correct formatted single reads of direct-bit devices to accept the PLC's one packed scalar response token instead of expecting 16 or 32 separate bit tokens. Signed `.S` and `.L` responses accept the PLC's explicit leading `+`; bare bit reads remain strict `0`/`1`/`ON`/`OFF` reads. Public signatures are unchanged.
+- BREAKING: Public `sendRaw` rejects CR, LF, and CRLF in the command body before FIFO or network work. Send each Host Link command with a separate call instead of embedding line separators.
+- BREAKING: Bracketed IPv4 client hosts such as `[127.0.0.1]` are rejected during construction before DNS/socket work; remove the brackets and pass `127.0.0.1`.
+- BREAKING: TCP and UDP public raw command bodies share a 65,506-byte maximum, producing a 65,507-byte frame with the appended CR; split larger operations according to their smaller command-specific limit.
+- Tests: Added direct public-API preflight spies for CR/LF/CRLF, two bracketed IPv4 variants, and TCP/UDP raw request boundary parity with zero rejected-input FIFO, DNS, socket, exchange, send, state, or traffic activity.
+- Docs: Documented that Host Link TCP has no request identifier, the residual pre-send-check-to-response association race, and the decision to preserve healthy connection reuse instead of adding per-request connection latency without improving correlation.
+- Tests: Prove monitor registration works on its owning TCP connection and is cleared across close/reconnect so `MBR` requires a new `MBS` registration.
+- Docs: Clarified that the maintainer raw API requires one non-empty ASCII command and rejects an empty body before FIFO, connection state, DNS, socket work, or send.
+- Tests: Added public `sendRaw("")` preflight spies proving zero FIFO admission, connection, network, exchange, state, and traffic activity.
 - Library: TCP response framing now uses a reusable growable accumulator with an incremental scan cursor, and queued request admission uses an O(1) linked FIFO. Trace callbacks receive an owned snapshot without adding a transport-buffer copy when tracing is disabled.
 - Tests: Added maximum-size one-byte-fragment response bounds, linked-FIFO source-contract checks, and trace-buffer ownership coverage.
 - Library: `readNamed` now groups compatible device families by first appearance, sorts each group by address, merges contiguous ranges, and splits only at protocol limits to use the minimum valid read requests. Public result keys and values remain in input order, the aggregate holds one FIFO turn, and failures publish no partial result. `poll` compiles the same immutable plan once and uses one aggregate FIFO turn per cycle.
@@ -56,7 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Library: `writeNamed` now recognizes `R`, `MR`, `LR`, and `CR` direct `BIT` addresses as consecutive by their sixteen-bit bank logical numbers. Valid boundary pairs such as `R115` then `R200` use one request starting at the caller's first display address; gaps, duplicates, reverse order, mixed dtypes/families, and the existing 1000-bit limit remain atomic pre-send checks. Applications that previously split a valid boundary pair may remove that workaround.
-- Library: Timer/counter composite reads now accept only status `0` or `1` in the shared client response parser used by typed, named, and composite helpers; existing exact token-count and numeric validation remains centralized.
+- Library: Timer/counter composite reads now treat the first raw token as structural status and
+  accept only exact `0` or `1`; the requested `.U`, `.S`, `.H`, `.D`, or `.L` format applies only to
+  current and preset. This accepts real hexadecimal responses such as `0,270F,270F` without
+  synthesizing a formatted status, while malformed fields still retire the supplying transport.
 - Library: Added `readCommentBytes` and `decodeCommentBytes` as exact RDC body-byte paths. Strict UTF-8/CP932 decoding rejects malformed bytes with `HostLinkProtocolError`, invalidates the supplying connection generation, and never falls back or emits replacement characters; the replacement-decoding `iconv-lite` dependency was removed.
 - Library: CP932 decoding now preserves bytes `00` through `7F` as the identical ASCII code points instead of accepting WHATWG Shift_JIS control-byte remapping. Half-width and double-byte code units remain strict, and CP932-invalid single bytes `80`, `A0`, and `FD` through `FF` are rejected.
 - Library: One monotonic transaction deadline now spans request sending, complete response framing/receive, and decoding. Partial writes or trickled response bytes cannot restart it; timeout or active cancellation retires the exact transport generation.

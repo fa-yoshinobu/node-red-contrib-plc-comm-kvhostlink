@@ -31,6 +31,20 @@ The profile must equal one canonical lowercase identifier exactly; aliases,
 case changes, surrounding whitespace, and object/string coercion are rejected.
 IPv6 literals and host names without an IPv4 result are rejected. When a host
 name has several IPv4 results, the first resolver result is used.
+Bracketed IPv4 input such as `[127.0.0.1]` is invalid and is rejected during
+client construction before DNS or socket work. Remove the brackets and pass
+`127.0.0.1`; host strings are not URI authority syntax.
+
+The direct client's maintainer `sendRaw` API represents exactly one non-empty
+ASCII command. A body containing CR, LF, or CRLF would represent more than one
+frame and is therefore a protocol input error. The body is limited to 65,506
+ASCII bytes, producing at most a 65,507-byte frame after the library appends its
+single terminating CR. Empty, newline-containing, and oversized bodies are
+rejected before FIFO admission, connection-state checks, DNS, socket creation,
+connect, or send. Migrate bracketed IPv4 by removing the brackets; split a
+multi-command raw string into separate `sendRaw` calls; and split an oversized
+operation according to the PLC command's smaller command-specific limit rather
+than bypassing this absolute frame boundary.
 
 ## Performance notes
 
@@ -70,6 +84,16 @@ replacement from the already resolved IPv4 address and never resends the failed
 request. Malformed decoder
 output and mode responses other than exact `0` or `1` also invalidate the
 supplying generation. PLC command errors `E0` through `E9` remain reusable.
+
+Host Link TCP responses contain no request identifier. The client checks for
+already visible input before sending, but a non-conforming peer can still
+deliver an unrelated line after that check and before the current response; the
+library cannot prove that such a line belongs to another request. Opening and
+closing TCP for every healthy request would not add an identifier, but would
+repeat connection setup and teardown latency. The supported contract therefore
+reuses a healthy TCP stream, serializes requests, and retires it immediately
+when stale, additional, malformed, timed-out, cancelled, or failed input becomes
+observable.
 
 ## kvhostlink-read node
 
@@ -245,11 +269,29 @@ milliseconds; use at least `1`, never zero.
 
 `T10:D` and `C10:D` use the high-level timer/counter behavior.
 Reads return the preset value for compatibility with ordinary scalar reads.
-Composite responses require exactly three numeric fields and status `0` or `1`.
+Composite responses require exactly three fields: status, current, and preset.
+Status is a structural field validated from the raw first token as exact `0` or
+`1`; it remains numeric `0` or `1` and is never interpreted using the selected
+numeric format. The requested `.U`, `.S`, `.H`, `.D`, or `.L` parser and bounds
+apply only to current and preset. For example, `T0.H` may return
+`0,270F,270F`, which decodes as `[0, "270F", "270F"]`. A non-exact status,
+wrong field count, malformed current or preset, or out-of-range value is a
+protocol error that retires the supplying transport generation.
 Timer/counter preset writes use Host Link `WS` and `WSS`, which are supported only on KV-8000/7000-series CPU units.
 Other CPU units may return PLC error `E1`.
 
 Use `TC`, `TS`, `CC`, and `CS` when you want the timer/counter current/contact device families directly.
+
+## Low-level monitor words
+
+The low-level `registerMonitorWords` API accepts a bare direct-bit target such
+as `"R5000"`. It sends the exact registration `MWS R5000`; the matching MWR
+field is the unsigned 16-bit value packed from `R5000` through `R5015`.
+One through five ASCII decimal digits are accepted because the manual does not
+guarantee fixed-width padding. `00013`, for example, is returned as JavaScript
+number `13`. This special word
+monitor behavior does not apply to bare scalar `RD` or `MBS`/`MBR`, whose
+responses remain strict individual bits.
 
 ## Node status and diagnosis
 

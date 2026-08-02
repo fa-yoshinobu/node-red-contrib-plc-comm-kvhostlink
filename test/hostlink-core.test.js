@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const dns = require("node:dns");
+const net = require("node:net");
 const dgram = require("node:dgram");
 const { EventEmitter } = require("node:events");
 const canonicalKvProfiles = require("./fixtures/kv_device_ranges.json");
@@ -14,6 +16,7 @@ const {
   HostLinkClosedError,
   HostLinkConnectionError,
   HostLinkOperationOutcomeUnknownError,
+  HostLinkProtocolError,
   HostLinkTimeoutError,
   buildFrame,
   decodeCommentBytes,
@@ -140,6 +143,26 @@ test("HostLinkClient requires port and transport and rejects invalid ports", () 
     );
   }
   assert.throws(() => createTestClient({ host: "[127.0.0.1]" }), /IPv4 address without brackets/);
+});
+
+test("HostLinkClient rejects bracketed IPv4 variants before DNS or socket creation", (t) => {
+  const dnsLookup = t.mock.method(dns, "lookup", () => {
+    throw new Error("DNS must not be reached");
+  });
+  const tcpSocket = t.mock.method(net, "createConnection", () => {
+    throw new Error("TCP socket creation must not be reached");
+  });
+  const udpSocket = t.mock.method(dgram, "createSocket", () => {
+    throw new Error("UDP socket creation must not be reached");
+  });
+
+  for (const host of ["[127.0.0.1]", "[192.0.2.10]"]) {
+    assert.throws(() => createTestClient({ host }), /IPv4 address without brackets/);
+  }
+  assert.doesNotThrow(() => createTestClient({ host: "127.0.0.1" }));
+  assert.equal(dnsLookup.mock.callCount(), 0);
+  assert.equal(tcpSocket.mock.callCount(), 0);
+  assert.equal(udpSocket.mock.callCount(), 0);
 });
 
 test("HostLinkClient validates timeout and requires PLC profile metadata", () => {
@@ -417,6 +440,80 @@ test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   for (const command of ["RD DM0\rWR DM1.U 1", "RD DM0\nWR DM1.U 1", "RD DM0\r\n"]) {
     assert.throws(() => buildFrame(command), /must not contain CR or LF/);
   }
+});
+
+test("sendRaw rejects an empty command before FIFO state network or send", async () => {
+  const client = createTestClient({ host: "invalid.invalid" });
+  let enqueueCalls = 0;
+  let connectCalls = 0;
+  let exchangeCalls = 0;
+  client._enqueue = async () => {
+    enqueueCalls += 1;
+    throw new Error("FIFO must not be reached");
+  };
+  client._connectTcp = async () => {
+    connectCalls += 1;
+    throw new Error("network must not be reached");
+  };
+  client._exchange = async () => {
+    exchangeCalls += 1;
+    throw new Error("send must not be reached");
+  };
+  const before = client.trafficStats();
+
+  await assert.rejects(() => client.sendRaw(""), /must not be empty/);
+
+  assert.equal(enqueueCalls, 0);
+  assert.equal(connectCalls, 0);
+  assert.equal(exchangeCalls, 0);
+  assert.equal(client._socket, null);
+  assert.deepEqual(client.trafficStats(), before);
+});
+
+test("sendRaw rejects CR LF and CRLF before FIFO DNS socket exchange or send", async (t) => {
+  const dnsLookup = t.mock.method(dns, "lookup", () => {
+    throw new Error("DNS must not be reached");
+  });
+  const tcpSocket = t.mock.method(net, "createConnection", () => {
+    throw new Error("TCP socket creation must not be reached");
+  });
+  const udpSocket = t.mock.method(dgram, "createSocket", () => {
+    throw new Error("UDP socket creation must not be reached");
+  });
+  const client = createTestClient({ host: "invalid.invalid" });
+  let enqueueCalls = 0;
+  let connectCalls = 0;
+  let exchangeCalls = 0;
+  client._enqueue = async () => {
+    enqueueCalls += 1;
+    throw new Error("FIFO must not be reached");
+  };
+  client._connectTcp = async () => {
+    connectCalls += 1;
+    throw new Error("connect must not be reached");
+  };
+  client._connectUdp = async () => {
+    connectCalls += 1;
+    throw new Error("connect must not be reached");
+  };
+  client._exchange = async () => {
+    exchangeCalls += 1;
+    throw new Error("exchange must not be reached");
+  };
+  const before = client.trafficStats();
+
+  for (const body of ["ER\r?K", "ER\n?K", "ER\r\n?K"]) {
+    await assert.rejects(() => client.sendRaw(body), /must not contain CR or LF/);
+  }
+
+  assert.equal(enqueueCalls, 0);
+  assert.equal(connectCalls, 0);
+  assert.equal(exchangeCalls, 0);
+  assert.equal(dnsLookup.mock.callCount(), 0);
+  assert.equal(tcpSocket.mock.callCount(), 0);
+  assert.equal(udpSocket.mock.callCount(), 0);
+  assert.equal(client._socket, null);
+  assert.deepEqual(client.trafficStats(), before);
 });
 
 test("TCP maximum response in one-byte fragments uses linear scan and copy work", async () => {
@@ -770,6 +867,39 @@ test("monitor registration and its following read obey FIFO state order", async 
   assert.deepEqual(frames, ["MBS R000 R001\r", "MBR\r"]);
 });
 
+test("monitor registration is connection-local and must be repeated after reconnect", async () => {
+  const { client, frames } = createFrameRecorder((command) => command === "MBR" ? "1 0\r" : "OK\r");
+  let connectionCount = 0;
+  client._connectTcp = async () => {
+    connectionCount += 1;
+    const socket = new EventEmitter();
+    socket.destroyed = false;
+    socket.destroy = () => {
+      if (socket.destroyed) return;
+      socket.destroyed = true;
+      queueMicrotask(() => socket.emit("close"));
+    };
+    client._socket = socket;
+  };
+
+  await client.connect();
+  await client.registerMonitorBits("R0", "R1");
+  assert.deepEqual(await client.readMonitorBits(), [1, 0]);
+  assert.deepEqual(frames, ["MBS R000 R001\r", "MBR\r"]);
+
+  await client.close();
+  await client.connect();
+  const beforeRejectedRead = frames.length;
+  await assert.rejects(() => client.readMonitorBits(), /must be registered before MBR/);
+  assert.equal(frames.length, beforeRejectedRead);
+
+  await client.registerMonitorBits("R0", "R1");
+  assert.deepEqual(await client.readMonitorBits(), [1, 0]);
+  assert.equal(connectionCount, 2);
+  assert.deepEqual(frames, ["MBS R000 R001\r", "MBR\r", "MBS R000 R001\r", "MBR\r"]);
+  await client.close();
+});
+
 test("single request capacity rejects maximum plus one before request state mutation", async () => {
   const accepted = createFrameRecorder(() => "OK\r");
   assert.equal((await accepted.client.sendRaw("A".repeat(65506))).toString("ascii"), "OK");
@@ -782,6 +912,65 @@ test("single request capacity rejects maximum plus one before request state muta
   assert.throws(() => buildFrame("A".repeat(65507)), /exceeds 65507 bytes/);
   await assert.rejects(() => client.sendRaw("A".repeat(65507)), /exceeds 65507 bytes/);
   assert.deepEqual(client.trafficStats(), before);
+});
+
+test("raw request capacity is identical for TCP and UDP and rejects overflow before network", async (t) => {
+  const dnsLookup = t.mock.method(dns, "lookup", () => {
+    throw new Error("DNS must not be reached");
+  });
+  const tcpSocket = t.mock.method(net, "createConnection", () => {
+    throw new Error("TCP socket creation must not be reached");
+  });
+  const udpSocket = t.mock.method(dgram, "createSocket", () => {
+    throw new Error("UDP socket creation must not be reached");
+  });
+
+  for (const transport of ["tcp", "udp"]) {
+    const accepted = createTestClient({ host: "invalid.invalid", transport });
+    const acceptedFrames = [];
+    accepted._exchange = async (payload) => {
+      acceptedFrames.push(Buffer.from(payload));
+      return Buffer.from("OK\r", "ascii");
+    };
+    assert.equal((await accepted.sendRaw("A".repeat(65506))).toString("ascii"), "OK");
+    assert.equal(acceptedFrames.length, 1);
+    assert.equal(acceptedFrames[0].length, 65507);
+    assert.equal(acceptedFrames[0][65506], 0x0d);
+
+    const rejected = createTestClient({ host: "invalid.invalid", transport });
+    let enqueueCalls = 0;
+    let connectCalls = 0;
+    let exchangeCalls = 0;
+    rejected._enqueue = async () => {
+      enqueueCalls += 1;
+      throw new Error("FIFO must not be reached");
+    };
+    rejected._connectTcp = async () => {
+      connectCalls += 1;
+      throw new Error("connect must not be reached");
+    };
+    rejected._connectUdp = async () => {
+      connectCalls += 1;
+      throw new Error("connect must not be reached");
+    };
+    rejected._exchange = async () => {
+      exchangeCalls += 1;
+      throw new Error("exchange must not be reached");
+    };
+    const before = rejected.trafficStats();
+
+    await assert.rejects(() => rejected.sendRaw("A".repeat(65507)), /exceeds 65507 bytes/);
+
+    assert.equal(enqueueCalls, 0, transport);
+    assert.equal(connectCalls, 0, transport);
+    assert.equal(exchangeCalls, 0, transport);
+    assert.equal(rejected._socket, null, transport);
+    assert.deepEqual(rejected.trafficStats(), before, transport);
+  }
+
+  assert.equal(dnsLookup.mock.callCount(), 0);
+  assert.equal(tcpSocket.mock.callCount(), 0);
+  assert.equal(udpSocket.mock.callCount(), 0);
 });
 
 test("each active FIFO operation owns one AbortController and removes caller forwarding listeners", async () => {
@@ -1190,6 +1379,11 @@ test("semantic reads require exact command-derived token counts and invalidate t
       expected: /RD response token count mismatch: expected 1, received 2/,
     },
     {
+      invoke: (client) => client.read("R000", ".H"),
+      response: "0 0 0 0\r",
+      expected: /RD response token count mismatch: expected 1, received 4/,
+    },
+    {
       invoke: (client) => client.readConsecutive("DM0", 2, ".U"),
       response: "1\r",
       expected: /RDS response token count mismatch: expected 2, received 1/,
@@ -1228,19 +1422,61 @@ test("semantic reads require exact command-derived token counts and invalidate t
   assert.deepEqual(unregistered.frames, []);
 });
 
-test("timer and counter reads accept only status zero or one in the shared response parser", async () => {
-  for (const status of [0, 1]) {
-    const { client } = createFrameRecorder(() => `${status},10,20\r`);
-    assert.deepEqual(await client.read("T0", ".D"), [status, 10, 20]);
-  }
+test("timer and counter composite reads keep raw status structural across numeric formats", async () => {
+  const formatCases = [
+    { format: ".U", responseValues: "65535,1", expectedValues: [65535, 1] },
+    { format: ".S", responseValues: "+32767,-32768", expectedValues: [32767, -32768] },
+    { format: ".H", responseValues: "270F,270F", expectedValues: ["270F", "270F"] },
+    { format: ".D", responseValues: "4294967295,0", expectedValues: [4294967295, 0] },
+    { format: ".L", responseValues: "+2147483647,-2147483648", expectedValues: [2147483647, -2147483648] },
+  ];
 
-  for (const status of [2, -1]) {
+  for (const { format, responseValues, expectedValues } of formatCases) {
+    for (const status of ["0", "1"]) {
+      const { client } = createFrameRecorder(() => `${status},${responseValues}\r`);
+      assert.deepEqual(
+        await client.read("T0", format),
+        [Number(status), ...expectedValues],
+        `${format} status ${status}`,
+      );
+    }
+  }
+});
+
+test("malformed timer and counter composite fields are protocol errors that retire transport", async () => {
+  const malformedCases = [
+    { response: "0,10", format: ".D", expected: /token count mismatch: expected 3, received 2/ },
+    { response: "0,10,20,30", format: ".D", expected: /token count mismatch: expected 3, received 4/ },
+    { response: "2,10,20", format: ".D", expected: /invalid status/ },
+    { response: "-1,10,20", format: ".L", expected: /invalid status/ },
+    { response: "+0,10,20", format: ".S", expected: /invalid status/ },
+    { response: "0000,10,20", format: ".H", expected: /invalid status/ },
+    { response: "ON,10,20", format: ".H", expected: /invalid status/ },
+    { response: "0,invalid,20", format: ".U", expected: /Invalid numeric response token/ },
+    { response: "0,10,invalid", format: ".S", expected: /Invalid numeric response token/ },
+    { response: "0,GGGG,20", format: ".H", expected: /Invalid hexadecimal response token/ },
+    { response: "0,10,GGGG", format: ".H", expected: /Invalid hexadecimal response token/ },
+    { response: "0,65536,1", format: ".U", expected: /outside the range/ },
+    { response: "0,1,32768", format: ".S", expected: /outside the range/ },
+    { response: "0,10000,1", format: ".H", expected: /Invalid hexadecimal response token/ },
+    { response: "0,4294967296,1", format: ".D", expected: /outside the range/ },
+    { response: "0,1,2147483648", format: ".L", expected: /outside the range/ },
+  ];
+
+  for (const { response, format, expected } of malformedCases) {
     const client = createTestClient();
     const socket = { destroyed: false, destroy() { this.destroyed = true; } };
     client._socket = socket;
-    client._exchange = async () => Buffer.from(`${status},10,20\r`, "ascii");
-    const dataFormat = status < 0 ? ".L" : ".D";
-    await assert.rejects(() => client.read("C0", dataFormat), /status/i);
+    client._exchange = async () => Buffer.from(`${response}\r`, "ascii");
+
+    await assert.rejects(
+      () => client.read("C0", format),
+      (error) => {
+        assert.ok(error instanceof HostLinkProtocolError, response);
+        assert.match(error.message, expected, response);
+        return true;
+      },
+    );
     assert.equal(client._socket, null);
     assert.equal(socket.destroyed, true);
   }
@@ -1297,7 +1533,7 @@ test("typed numeric reads reject response tokens that contradict dataFormat", as
   await assert.rejects(() => client.read("DM0", ".U"), /Invalid numeric response token/);
   await assert.rejects(() => client.read("DM0", ".H"), /Invalid hexadecimal response token/);
   const { client: negativeUnsigned } = createFrameRecorder(() => "-1\r");
-  await assert.rejects(() => negativeUnsigned.read("DM0", ".U"), /outside the range/);
+  await assert.rejects(() => negativeUnsigned.read("DM0", ".U"), /Invalid numeric response token/);
   const { client: wideHex } = createFrameRecorder(() => "10000\r");
   await assert.rejects(() => wideHex.read("DM0", ".H"), /Invalid hexadecimal response token/);
   for (const token of ["TRUE", "FALSE", "2", "GARBAGE"]) {
@@ -1380,6 +1616,30 @@ test("semantic H reads return exactly four uppercase digits while raw reads and 
   assert.deepEqual(frames, ["RD DM0.H\r", "?RAW\r", "WR DM1.H A\r"]);
 });
 
+test("direct-bit numeric RD accepts the single scalar response shape observed on KV-X500", async () => {
+  const responses = new Map([
+    ["RD R000.U", "00000\r"],
+    ["RD R000.S", "+00000\r"],
+    ["RD R000.H", "0000\r"],
+    ["RD R000.D", "0000000000\r"],
+    ["RD R000.L", "+0000000000\r"],
+  ]);
+  const { client, frames } = createFrameRecorder((command) => responses.get(command));
+
+  assert.equal(await client.read("R000", ".U"), 0);
+  assert.equal(await client.read("R000", ".S"), 0);
+  assert.equal(await client.read("R000", ".H"), "0000");
+  assert.equal(await client.read("R000", ".D"), 0);
+  assert.equal(await client.read("R000", ".L"), 0);
+  assert.deepEqual(frames, [
+    "RD R000.U\r",
+    "RD R000.S\r",
+    "RD R000.H\r",
+    "RD R000.D\r",
+    "RD R000.L\r",
+  ]);
+});
+
 test("UDP request-endpoint setup failure is definitive before a state-changing send", async () => {
   const client = createTestClient({ transport: "udp", timeout: 100 });
   client._udpConnected = true;
@@ -1455,6 +1715,66 @@ test("monitor word reads validate every token with its registered format", async
   }
 });
 
+test("bare direct-bit MWS decodes MWR as a packed unsigned 16-bit word", async () => {
+  let response = "00013\r";
+  const { client, frames } = createFrameRecorder((command) => command === "MWR" ? response : "OK\r");
+
+  await client.registerMonitorWords(["R5000"]);
+  assert.deepEqual(await client.readMonitorWords(), [13]);
+  assert.deepEqual(frames, ["MWS R5000\r", "MWR\r"]);
+
+  for (const [wireValue, expected] of [
+    ["0\r", 0],
+    ["2\r", 2],
+    ["13\r", 13],
+    ["00000\r", 0],
+    ["00002\r", 2],
+    ["00013\r", 13],
+    ["65535\r", 65535],
+  ]) {
+    response = wireValue;
+    assert.deepEqual(await client.readMonitorWords(), [expected]);
+  }
+});
+
+test("mixed MWS registration applies packed direct-bit metadata in wire order", async () => {
+  const { client, frames } = createFrameRecorder((command) => command === "MWR" ? "1 00013 ABC\r" : "OK\r");
+  await client.registerMonitorWords([
+    { device: "DM0", dataFormat: ".U" },
+    "R5000",
+    { device: "DM1", dataFormat: ".H" },
+  ]);
+  assert.deepEqual(await client.readMonitorWords(), [1, 13, "0ABC"]);
+  assert.deepEqual(frames, ["MWS DM0.U R5000 DM1.H\r", "MWR\r"]);
+});
+
+test("bare direct-bit MWR rejects invalid packed values and retires monitor metadata", async () => {
+  for (const response of ["-1\r", "65536\r", "000000\r", "NOPE\r", "1 0\r"]) {
+    const { client } = createFrameRecorder((command) => command === "MWR" ? response : "OK\r");
+    const socket = { destroyed: false, destroy() { this.destroyed = true; } };
+    client._socket = socket;
+    await client.registerMonitorWords(["R5000"]);
+    await assert.rejects(() => client.readMonitorWords(), /Invalid|outside.*range|token count mismatch/i);
+    assert.equal(client._socket, null);
+    assert.equal(socket.destroyed, true);
+    assert.equal(client._monitorWordCount, null);
+    assert.equal(client._monitorWordFormats, null);
+  }
+});
+
+test("bare direct-bit packed monitor decoding does not change scalar or bit-monitor semantics", async () => {
+  const { client } = createFrameRecorder((command) => {
+    if (command === "RD R5000") return "2\r";
+    if (command === "MBR") return "2\r";
+    return "OK\r";
+  });
+  await assert.rejects(() => client.read("R5000"), /Invalid direct bit response token/);
+
+  const bits = createFrameRecorder((command) => command === "MBR" ? "2\r" : "OK\r");
+  await bits.client.registerMonitorBits("R5000");
+  await assert.rejects(() => bits.client.readMonitorBits(), /Invalid direct bit response token/);
+});
+
 test("readComments and readCommentBytes accept XYM alias device types", async () => {
   const client = createTestClient();
   const commands = [];
@@ -1512,13 +1832,9 @@ test("client sends addresses beyond catalog bounds while retaining command limit
   client._exchange = async (payload) => {
     const command = payload.toString("ascii").trim();
     commands.push(command);
-    const count = command.startsWith("RD R") && command.endsWith(".D")
-      ? 32
-      : command.startsWith("RD R") && command.endsWith(".U")
-        ? 16
-        : command.startsWith("RDS ")
-          ? Number(command.split(" ").at(-1))
-          : 1;
+    const count = command.startsWith("RDS ")
+      ? Number(command.split(" ").at(-1))
+      : 1;
     return Buffer.from(`${Array(count).fill("0").join(" ")}\r`, "ascii");
   };
 
@@ -1529,8 +1845,8 @@ test("client sends addresses beyond catalog bounds while retaining command limit
   await client.read("R199900", ".D");
   await client.readConsecutive("CR7900", 2, ".U");
   assert.equal((await client.readConsecutive("CR7900", 16)).length, 16);
-  assert.equal((await client.read("R199900", ".U")).length, 16);
-  assert.equal((await client.read("R199800", ".D")).length, 32);
+  assert.equal(await client.read("R199900", ".U"), 0);
+  assert.equal(await client.read("R199800", ".D"), 0);
   assert.equal((await client.readConsecutive("CR7900", 17)).length, 17);
   assert.deepEqual(commands, [
     "RD DM65534.D", "RDS DM65535.U 2", "RDS Y1999F 2", "RDS R199900.U 2",
