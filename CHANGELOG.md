@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: TCP response framing now uses a reusable growable accumulator with an incremental scan cursor, and queued request admission uses an O(1) linked FIFO. Trace callbacks receive an owned snapshot without adding a transport-buffer copy when tracing is disabled.
+- Tests: Added maximum-size one-byte-fragment response bounds, linked-FIFO source-contract checks, and trace-buffer ownership coverage.
 - Library: `readNamed` now groups compatible device families by first appearance, sorts each group by address, merges contiguous ranges, and splits only at protocol limits to use the minimum valid read requests. Public result keys and values remain in input order, the aggregate holds one FIFO turn, and failures publish no partial result. `poll` compiles the same immutable plan once and uses one aggregate FIFO turn per cycle.
 - Library: A successful UDP socket is now reused with the same resolved IPv4 address and local endpoint. Timeout, cancellation, transport/protocol failure, malformed or additional response data, and unowned datagrams retire it; the next request creates one replacement without repeating DNS resolution. No failed request is retried.
 - Library: Active operations now use one lifecycle `AbortController`, preserve the first caller-cancel/close reason, and remove forwarding listeners on completion. Internal TCP response lines use receive-buffer views, UDP makes one ownership copy, terminator removal uses views, and public raw/comment Buffer results retain an independent caller-owned copy.

@@ -174,9 +174,14 @@ test("HostLinkClient removes public buffer/trace overrides and requires an expli
   assert.equal(client._socket, null);
   const events = [];
   const traced = createTestClient({ _maintainerTraceHook: (event) => events.push(event) });
-  traced._emitTrace("send", Buffer.from("ER\r", "ascii"));
+  const tracedSource = Buffer.from("ER\r", "ascii");
+  traced._emitTrace("send", tracedSource);
   assert.equal(events.length, 1);
   assert.equal(events[0].direction, "send");
+  events[0].data[0] = 0x58;
+  assert.deepEqual(tracedSource, Buffer.from("ER\r", "ascii"));
+  tracedSource[1] = 0x59;
+  assert.deepEqual(events[0].data, Buffer.from("XR\r", "ascii"));
   assert.doesNotThrow(() => {
     createTestClient({ _maintainerTraceHook: () => { throw new Error("diagnostic failure"); } })
       ._emitTrace("receive", Buffer.from("OK", "ascii"));
@@ -411,6 +416,38 @@ test("buildFrame and decodeResponse handle Host Link CR framing", () => {
   assert.equal(decodeResponse(Buffer.from("123\r\n", "ascii")), "123");
   for (const command of ["RD DM0\rWR DM1.U 1", "RD DM0\nWR DM1.U 1", "RD DM0\r\n"]) {
     assert.throws(() => buildFrame(command), /must not contain CR or LF/);
+  }
+});
+
+test("TCP maximum response in one-byte fragments uses linear scan and copy work", async () => {
+  const client = createTestClient({ timeout: 1000 });
+  client._socket = { destroyed: false, destroy() { this.destroyed = true; } };
+  const response = client._readTcpLine();
+  const byte = Buffer.from("A", "ascii");
+  for (let index = 0; index < 65536; index += 1) {
+    client._handleTcpData(byte);
+  }
+  client._handleTcpData(Buffer.from("\r", "ascii"));
+
+  assert.equal((await response).length, 65536);
+  assert.equal(client._receiveBuffer.scanByteCount, 65537);
+  assert.ok(client._receiveBuffer.copyByteCount <= 65537 * 3);
+});
+
+test("operation FIFO uses constant-time linked dequeue and known-entry cancellation", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "lib", "hostlink", "client.js"), "utf8");
+  const start = source.indexOf("class LinkedFifo");
+  const end = source.indexOf("class TcpReceiveAccumulator");
+  const queueSource = source.slice(start, end);
+  const enqueueStart = source.indexOf("  _enqueue(");
+  const enqueueEnd = source.indexOf("  _throwIfContextUnavailable", enqueueStart);
+  const admissionSource = source.slice(enqueueStart, enqueueEnd);
+
+  assert.ok(queueSource.includes("entry.queueNode"));
+  assert.ok(admissionSource.includes("this._operationQueue.remove(entry)"));
+  assert.ok(admissionSource.includes("this._operationQueue.takeFirst()"));
+  for (const forbidden of [".shift(", ".indexOf(", ".splice("]) {
+    assert.equal(admissionSource.includes(forbidden), false);
   }
 });
 
@@ -934,7 +971,7 @@ test("TCP rejects both the request and transport when one chunk contains two non
   const staleSocket = { destroyed: false, writes: 0, write(_payload, callback) { this.writes += 1; callback(null); }, destroy() { this.destroyed = true; } };
   const stale = createTestClient();
   stale._socket = staleSocket;
-  stale._receiveBuffer = Buffer.from("PARTIAL", "ascii");
+  stale._receiveBuffer.append(Buffer.from("PARTIAL", "ascii"));
   await assert.rejects(() => stale.sendRaw("?K"), /Stale TCP response data/);
   assert.equal(staleSocket.writes, 0);
   assert.equal(stale._socket, null);
