@@ -203,8 +203,38 @@ connecting. It is accepted only when it can be sent as one wire request within
 the applicable limit: 1000 word points, 500 dword/Float32 points, or 120
 timer/counter points. A plan requiring multiple requests fails as a whole before
 transport. State-changing operations are never auto-split or auto-retried.
-Bit-in-word writing is unsupported because a client-side read-modify-write is
-not atomic against PLC logic or another connection.
+`writeNamed` never selects a bit-in-word read-modify-write implicitly. Library
+consumers that deliberately require that policy can call the explicit helper:
+
+```javascript
+await writeBitInWord(client, "DM150", 3, true);
+```
+
+The value must be a JavaScript Boolean, the index is `0..15`, and the target
+must be an ordinary 16-bit word device. Invalid plans fail before FIFO
+admission. After activation, one absolute transaction deadline covers exactly
+one word read followed by one word write in one FIFO turn; queue wait is outside
+that deadline. The write is sent even if the requested state is unchanged.
+There is no fallback, resend, success readback, or automatic retry.
+
+The helper is not PLC-atomic. PLC logic or another connection can update the
+word between requests and its change can be lost. Use PLC-side coordination, a
+handshake, or exclusive complete-word ownership for stronger guarantees.
+Cancellation before the write begins sends no write; failure after write
+transmission may have started is outcome-unknown and requires deliberate reopen
+and PLC-state reconciliation. A complete PLC error is definitive and does not
+by itself retire a healthy connection.
+
+Expansion-unit buffer memory uses a separate explicit route helper:
+
+```javascript
+await writeBitInExpansionUnitBuffer(client, 1, 100, 3, true);
+```
+
+The unit/address and one `.U` word remain fixed across exactly one `URD` point
+and one `UWR` point. Ordinary-device and expansion-unit routes never fall back
+to one another. The shared-deadline, cancellation, outcome-unknown,
+no-readback, and non-PLC-atomic rules are otherwise identical.
 
 For `R`, `MR`, `LR`, and `CR` direct `BIT` updates, consecutive planning uses
 the logical sixteen-bit bank order rather than the displayed decimal number.
@@ -237,7 +267,7 @@ match the selected mode exactly; conflicting old flows are rejected for review.
 | Float32 | `DM130:F` | Interpret two words as a 32-bit float. |
 | Hex word | `DM140:H` | Read or write a word as uppercase hexadecimal text. |
 | Comment read | `DM145:COMMENT` | Read explicit-codec text or the exact raw RDC body Buffer. |
-| Bit in word | `DM150.3` | Read bit 3 in `DM150`; bit-in-word writing is unsupported. |
+| Bit in word | `DM150.3` | Read bit 3 in `DM150`; writing requires the explicit `writeBitInWord(client, "DM150", 3, bool)` API. |
 | Word array | `DM160:U,4` | Read or write four consecutive unsigned word values. |
 | Bit array | `R200:BIT,4` | Read or write four consecutive relay bits. |
 | Timer preset | `T10:D` | Read timer preset value. |

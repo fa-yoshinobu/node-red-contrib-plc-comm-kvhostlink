@@ -20,6 +20,8 @@ const {
   readTimerCounter,
   readTyped,
   writeNamed,
+  writeBitInWord,
+  writeBitInExpansionUnitBuffer,
   writeTyped,
 } = require("../lib/hostlink");
 const {
@@ -269,6 +271,34 @@ test("writeTyped and writeNamed accept Boolean-only BIT values", async () => {
   }
   await assert.rejects(() => writeNamed(fakeClient, { "R10:BIT,2": [true, 0] }), /invalid BIT value/i);
   await assert.rejects(() => writeNamed(fakeClient, { "DM50.3": true }), /multi-request/i);
+});
+
+test("writeBitInWord delegates only to explicit compound client support", async () => {
+  const calls = [];
+  const client = {
+    async writeBitInWord(...args) { calls.push(args); },
+  };
+  await writeBitInWord(client, "DM100", 3, true, { signal: null });
+  assert.deepEqual(calls, [["DM100", 3, true, { signal: null }]]);
+  await assert.rejects(() => writeBitInWord({}, "DM100", 3, true), /explicit compound-write support/);
+  await assert.rejects(() => writeBitInWord(client, "DM100", 3, 1), /Boolean values/);
+});
+
+test("writeBitInExpansionUnitBuffer delegates only native Boolean expansion routes", async () => {
+  const calls = [];
+  const client = {
+    async writeBitInExpansionUnitBuffer(...args) { calls.push(args); },
+  };
+  await writeBitInExpansionUnitBuffer(client, 1, 100, 3, true, { signal: null });
+  assert.deepEqual(calls, [[1, 100, 3, true, { signal: null }]]);
+  await assert.rejects(
+    () => writeBitInExpansionUnitBuffer({}, 1, 100, 3, true),
+    /explicit compound-write support/,
+  );
+  await assert.rejects(
+    () => writeBitInExpansionUnitBuffer(client, 1, 100, 3, 1),
+    /Boolean values/,
+  );
 });
 
 test("Float32 writes reject every direct bit family before client send", async () => {

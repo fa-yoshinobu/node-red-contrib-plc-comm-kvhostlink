@@ -88,9 +88,17 @@ decimal digits with optional leading zeroes; the manual does not guarantee a
 fixed five-character width. This does not change bare scalar `RD` or
 `MBS`/`MBR`; those operations still accept only one bit token per target.
 
-The former public `writeBitInWord` read-modify-write helper is removed. It could
-not provide an atomic PLC update. Read a word and write a word explicitly only
-when the application owns the required concurrency and partial-failure policy.
+`HostLinkClient.writeBitInWord` and high-level `writeBitInWord` expose the same
+explicit Boolean-only, 16-bit word read-modify-write. The complete plan is
+validated before FIFO admission. One absolute deadline covers exactly one word
+read and one word write after activation in one client turn, even when the bit
+already has the requested value. The operation performs no fallback, retry, or
+success readback and is not PLC-atomic against PLC logic or another connection.
+
+`HostLinkClient.writeBitInExpansionUnitBuffer` and high-level
+`writeBitInExpansionUnitBuffer` apply the same contract to one `.U` word on the
+existing URD/UWR unit/address route. The selected route remains immutable
+across both requests and never falls back to an ordinary device.
 
 `readComments(device, encoding[, options])` requires exact `encoding` `utf8` or
 `cp932`. `cp932` uses the Windows-31J-compatible mapping commonly described by
@@ -113,6 +121,8 @@ the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
 | Address syntax | `parseAddress`, `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList` |
 | Device syntax | `parseDevice`, `deviceToString`, `parseDeviceText`, `normalizeSuffix` |
 | Typed access | `readTyped`, `writeTyped`, `readWords`, `readDWords` |
+| Explicit bit-in-word write | `HostLinkClient.writeBitInWord`, `writeBitInWord` |
+| Expansion-buffer bit write | `HostLinkClient.writeBitInExpansionUnitBuffer`, `writeBitInExpansionUnitBuffer` |
 | Timer/counter | `readTimerCounter`, `readTimer`, `readCounter` |
 | Named access | `readNamed`, `writeNamed`, `poll` |
 | Comments | `readComments`, `readCommentBytes` |
@@ -155,7 +165,7 @@ on a plan without `:COMMENT` are also rejected instead of being ignored.
 
 `writeNamed` validates and snapshots the complete update set. It is accepted only
 when the plan is one wire request. Any state-changing plan that would require two
-or more requests, including a bit-in-word read-modify-write, fails before
+or more requests, including an implicit bit-in-word read-modify-write, fails before
 connection or transport. The library never auto-splits or retries writes.
 
 Direct `BIT` entries for the decimal sixteen-bit bank families `R`, `MR`, `LR`,

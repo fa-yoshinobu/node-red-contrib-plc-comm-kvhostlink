@@ -2,6 +2,22 @@
 
 This maintainer record preserves the approved target contracts, breaking-change scope, acceptance criteria, and verification evidence. User documentation contains only the resulting supported behavior.
 
+## Superseding decision: explicit word-bit write (2026-08-07)
+
+Earlier removal decisions below remain historical evidence but no longer
+describe the target library surface. `HostLinkClient.writeBitInWord` and the
+high-level `writeBitInWord` helper are restored for every Host Link device
+family whose canonical default representation and `WR` command both provide
+one complete 16-bit `.U` word. The device text is immutable across the read and
+write; there is no alternate route, fallback, resend, or readback. Named writes
+remain single-request-only and never invoke the helper implicitly. GOAL-BIT-002
+in `D:\APP\cross_library_bit_write_contract_goal_20260807.md` is authoritative.
+
+GOAL-HOSTLINK-EXPANSION-RMW-001 extends that contract to the existing URD/UWR
+route through the client and high-level `writeBitInExpansionUnitBuffer`
+helpers. Unit, address, and `.U` format are immutable across both requests;
+ordinary and expansion routes never fall back to one another.
+
 ## NR-KV-OH-001 — Explicit endpoint and lifecycle
 
 Scope: `HostLinkClient`, `openAndConnect`, and `kvhostlink-connection`.

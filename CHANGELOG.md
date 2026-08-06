@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-08-07
+
+- Release: Bumped npm package metadata to `4.0.0` for the approved breaking-contract release.
+- Library: Restored the explicit Boolean-only client and high-level `writeBitInWord` operation for ordinary 16-bit word devices. It validates the complete plan before FIFO admission, always performs one word read followed by one word write in one client turn, and uses one absolute deadline for both requests after activation. The operation is intentionally not PLC-atomic and performs no write fallback, retry, or success readback.
+- Library: Added client and high-level `writeBitInExpansionUnitBuffer` operations for the existing URD/UWR route. They fix the route to one unit/address and `.U` word, use the same Boolean-only preflight, FIFO, absolute-deadline, non-PLC-atomic, and outcome-unknown contract, and never fall back to another route.
+- Library: Made FIFO activation strongly exception-safe: a failure while installing an active operation's cancellation signal now rejects and cleans up only that entry, releases active state, and advances later queued operations.
+- Docs: Documented the bit-in-word write concurrency, cancellation, timeout, and outcome-unknown contract and the required migration from manual read/write sequences.
+
 - Library: Bare direct-bit MWS registrations now keep the exact unsuffixed wire target while decoding the corresponding MWR field as the PLC's packed unsigned 16-bit word. The decoder accepts one through five ASCII decimal digits because the manual does not guarantee fixed-width padding. Bare scalar reads and bit monitors remain strict single-bit operations.
 - Tests: Added the maintainer-confirmed `00013` packed-word vector, zero/nonzero/maximum boundaries, mixed monitor ordering, malformed-value transport retirement, and isolation from scalar/bit-monitor semantics.
 - Library: Correct formatted single reads of direct-bit devices to accept the PLC's one packed scalar response token instead of expecting 16 or 32 separate bit tokens. Signed `.S` and `.L` responses accept the PLC's explicit leading `+`; bare bit reads remain strict `0`/`1`/`ON`/`OFF` reads. Public signatures are unchanged.

@@ -53,7 +53,10 @@ port and timeout text is converted explicitly at the Node-RED boundary.
 Connections are IPv4-only. The ordinary client serializes admitted operations
 in strict FIFO order, uses one absolute active transaction deadline, and never
 automatically reconnects or retries. Direct-bit writes require JavaScript
-Booleans; bit-in-word writes are intentionally unsupported.
+Booleans. The library's explicit Boolean-only `writeBitInWord` API performs a
+two-request, non-PLC-atomic word update; it is never selected implicitly by a
+Node-RED named write. `writeBitInExpansionUnitBuffer` applies the same explicit
+contract to one `.U` word on an immutable expansion-unit URD/UWR route.
 
 Float32 selectors require ordinary one-word device families; native 32-bit `Z`
 devices reject `:F` before FIFO admission or transport. Semantic `.H` reads

@@ -548,6 +548,121 @@ test("operation FIFO uses constant-time linked dequeue and known-entry cancellat
   }
 });
 
+test("post-admission signal setup failure rejects one entry and advances the FIFO", async () => {
+  const client = createTestClient();
+  let releaseHolder;
+  const holder = client._runExclusive(() => new Promise((resolve) => {
+    releaseHolder = resolve;
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  let addCount = 0;
+  let removeCount = 0;
+  const signal = {
+    aborted: false,
+    reason: undefined,
+    addEventListener() {
+      addCount += 1;
+      if (addCount === 2) throw new Error("second listener registration failed");
+    },
+    removeEventListener() {
+      removeCount += 1;
+    },
+  };
+  let failedTaskRan = false;
+  const failed = client._runExclusive(() => {
+    failedTaskRan = true;
+  }, { signal });
+  const failedAssertion = assert.rejects(failed, /second listener registration failed/);
+  const following = client._runExclusive(() => "following operation completed");
+
+  releaseHolder();
+  await holder;
+  await failedAssertion;
+  assert.equal(await following, "following operation completed");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(failedTaskRan, false);
+  assert.equal(addCount, 2);
+  assert.ok(removeCount >= 2);
+  assert.equal(client._activeOperation, null);
+  assert.equal(client._operationQueue.length, 0);
+});
+
+test("active signal cleanup failure does not change results or create an unhandled rejection", async () => {
+  const client = createTestClient();
+  let removeCount = 0;
+  const signal = {
+    aborted: false,
+    reason: undefined,
+    addEventListener() {},
+    removeEventListener() {
+      removeCount += 1;
+      if (removeCount === 2) throw new Error("active listener cleanup failed");
+    },
+  };
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const current = client._runExclusive(() => "current operation completed", { signal });
+    const following = client._runExclusive(() => "following operation completed");
+
+    assert.equal(await current, "current operation completed");
+    assert.equal(await following, "following operation completed");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(removeCount, 2);
+    assert.deepEqual(unhandled, []);
+    assert.equal(client._activeOperation, null);
+    assert.equal(client._operationQueue.length, 0);
+  } finally {
+    process.removeListener("unhandledRejection", onUnhandled);
+  }
+});
+
+test("queued cancellation cleanup failure still settles and preserves later FIFO work", async () => {
+  const client = createTestClient();
+  let releaseHolder;
+  const holder = client._runExclusive(() => new Promise((resolve) => {
+    releaseHolder = resolve;
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  let abortHandler;
+  let removeCount = 0;
+  const signal = {
+    aborted: false,
+    reason: undefined,
+    addEventListener(_event, handler) {
+      abortHandler = handler;
+    },
+    removeEventListener() {
+      removeCount += 1;
+      throw new Error("queued listener cleanup failed");
+    },
+  };
+  let cancelledTaskRan = false;
+  const cancelled = client._runExclusive(() => {
+    cancelledTaskRan = true;
+  }, { signal });
+  const cancelledAssertion = assert.rejects(cancelled, HostLinkCanceledError);
+  const following = client._runExclusive(() => "following operation completed");
+
+  signal.aborted = true;
+  signal.reason = new Error("caller cancelled");
+  abortHandler();
+  await cancelledAssertion;
+  releaseHolder();
+  await holder;
+  assert.equal(await following, "following operation completed");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(cancelledTaskRan, false);
+  assert.equal(removeCount, 1);
+  assert.equal(client._activeOperation, null);
+  assert.equal(client._operationQueue.length, 0);
+});
+
 test("RDC comments require one explicit strict codec and retain exact raw bytes", () => {
   const cp932A = Buffer.from([0x82, 0xa0, 0x20, 0x0d, 0x0a]);
   const ambiguous = Buffer.from([0xc2, 0xa2, 0x0d]);
@@ -1030,11 +1145,99 @@ test("the first active-operation abort reason wins when caller cancellation race
   );
 });
 
-test("state-changing multi-request bit-in-word helper is removed", () => {
+test("explicit state-changing bit-in-word helper is present", () => {
   const client = createTestClient();
   assert.equal(require("../lib/hostlink").QueuedKvHostLinkClient, undefined);
-  assert.equal(Object.prototype.hasOwnProperty.call(HostLinkClient.prototype, "writeBitInWord"), false);
-  assert.equal(client.writeBitInWord, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(HostLinkClient.prototype, "writeBitInWord"), true);
+  assert.equal(typeof client.writeBitInWord, "function");
+});
+
+test("writeBitInWord always reads then writes one ordinary word", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command === "RD DM100.U") return "8\r";
+    if (command === "WR DM100.U 8") return "OK\r";
+    return "E1\r";
+  });
+
+  await client.writeBitInWord("DM100", 3, true);
+
+  assert.deepEqual(frames, ["RD DM100.U\r", "WR DM100.U 8\r"]);
+});
+
+test("writeBitInWord covers every existing complete-word route without fallback", async () => {
+  const { client, frames } = createFrameRecorder((command) => (
+    command.startsWith("RD ") ? "0\r" : "OK\r"
+  ));
+  const devices = ["DM0", "EM0", "FM0", "ZF0", "W0", "TM0", "Z0", "CM0", "VM0", "D0", "E0", "F0"];
+
+  for (const device of devices) {
+    await client.writeBitInWord(device, 0, false);
+  }
+
+  assert.deepEqual(
+    frames,
+    devices.flatMap((device) => [`RD ${device}.U\r`, `WR ${device}.U 0\r`]),
+  );
+});
+
+test("writeBitInWord rejects invalid inputs before transport", async () => {
+  const { client, frames } = createFrameRecorder();
+  await assert.rejects(() => client.writeBitInWord("R0", 0, true), /ordinary 16-bit word/);
+  await assert.rejects(() => client.writeBitInWord("T0", 0, true), /ordinary 16-bit word/);
+  await assert.rejects(() => client.writeBitInWord("AT0", 0, true), /ordinary 16-bit word/);
+  await assert.rejects(() => client.writeBitInWord("DM100", 16, true), /bitIndex/);
+  await assert.rejects(() => client.writeBitInWord("DM100", 0, 1), /Boolean/);
+  assert.deepEqual(frames, []);
+});
+
+test("writeBitInExpansionUnitBuffer always uses one immutable URD UWR route", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command === "URD 01 100.U 1") return "8\r";
+    if (command === "UWR 01 100.U 1 8") return "OK\r";
+    return "E1\r";
+  });
+
+  await client.writeBitInExpansionUnitBuffer(1, 100, 3, true);
+
+  assert.deepEqual(frames, ["URD 01 100.U 1\r", "UWR 01 100.U 1 8\r"]);
+});
+
+test("writeBitInExpansionUnitBuffer rejects invalid plan before transport", async () => {
+  const { client, frames } = createFrameRecorder();
+  await assert.rejects(() => client.writeBitInExpansionUnitBuffer(49, 0, 0, true), /unitNo/);
+  await assert.rejects(() => client.writeBitInExpansionUnitBuffer(0, 60000, 0, true), /address/);
+  await assert.rejects(() => client.writeBitInExpansionUnitBuffer(0, 0, 16, true), /bitIndex/);
+  await assert.rejects(() => client.writeBitInExpansionUnitBuffer(0, 0, 0, 1), /Boolean/);
+  assert.deepEqual(frames, []);
+});
+
+test("writeBitInExpansionUnitBuffer malformed read sends no write and retires", async () => {
+  const { client, frames } = createFrameRecorder(() => "NOT_A_WORD\r");
+  client._socket = { destroy() {} };
+
+  await assert.rejects(
+    () => client.writeBitInExpansionUnitBuffer(1, 100, 3, true),
+    /unsigned|Invalid/i,
+  );
+
+  assert.deepEqual(frames, ["URD 01 100.U 1\r"]);
+  assert.equal(client._socket, null);
+});
+
+test("writeBitInExpansionUnitBuffer PLC write error is definitive and reusable", async () => {
+  const { client, frames } = createFrameRecorder((command) => {
+    if (command === "URD 01 100.U 1") return "0\r";
+    if (command === "UWR 01 100.U 1 1") return "E1\r";
+    if (command === "RD DM1.U") return "7\r";
+    return "E2\r";
+  });
+
+  await assert.rejects(
+    () => client.writeBitInExpansionUnitBuffer(1, 100, 0, true),
+    (error) => error.code === "E1" && !(error instanceof HostLinkOperationOutcomeUnknownError),
+  );
+  assert.equal(await client.read("DM1", ".U"), 7);
+  assert.deepEqual(frames, ["URD 01 100.U 1\r", "UWR 01 100.U 1 1\r", "RD DM1.U\r"]);
 });
 
 test("low-level command helpers preserve exact CR-terminated frames", async () => {
