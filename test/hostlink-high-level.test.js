@@ -14,15 +14,20 @@ const {
   normalizeAddressList,
   parseAddress,
   poll,
+  readBitsSingleRequest,
   readCommentBytes,
   readComments,
   readNamed,
   readTimerCounter,
   readTyped,
+  readWords,
+  readWordsSingleRequest,
+  writeBitsSingleRequest,
   writeNamed,
   writeBitInWord,
   writeBitInExpansionUnitBuffer,
   writeTyped,
+  writeWordsSingleRequest,
 } = require("../lib/hostlink");
 const {
   DEFAULT_FORMAT_BY_DEVICE_TYPE,
@@ -31,6 +36,47 @@ const {
   RDC_DEVICE_TYPES,
   WR_DEVICE_TYPES,
 } = require("../lib/hostlink/device");
+
+test("single-request bit and word helpers send once or reject before send", async () => {
+  const calls = [];
+  const client = {
+    async readConsecutive(...args) {
+      calls.push(["read", ...args]);
+      return args[2] === ".U" ? [1, 2, 3] : [0, 1, 1];
+    },
+    async writeConsecutive(...args) {
+      calls.push(["write", ...args]);
+    },
+  };
+  const options = { timeoutMs: 1000 };
+
+  assert.deepEqual(await readBitsSingleRequest(client, "R5000", 3, options), [false, true, true]);
+  await writeBitsSingleRequest(client, "R5000", [false, true, true], options);
+  assert.deepEqual(await readWordsSingleRequest(client, "DM0", 3, options), [1, 2, 3]);
+  await writeWordsSingleRequest(client, "DM0", [1, 2, 3], options);
+  assert.deepEqual(await readWords(client, "DM0", 3, options), [1, 2, 3]);
+
+  assert.deepEqual(calls, [
+    ["read", "R5000", 3, undefined, options],
+    ["write", "R5000", [false, true, true], undefined, options],
+    ["read", "DM0", 3, ".U", options],
+    ["write", "DM0", [1, 2, 3], ".U", options],
+    ["read", "DM0", 3, ".U", options],
+  ]);
+
+  for (const operation of [
+    () => readBitsSingleRequest(client, "DM0", 1),
+    () => readBitsSingleRequest(client, "R5000.U", 1),
+    () => readBitsSingleRequest(client, "R5000", 1001),
+    () => writeBitsSingleRequest(client, "DM0", [true]),
+    () => writeBitsSingleRequest(client, "R5000", [1]),
+    () => writeBitsSingleRequest(client, "R5000", []),
+    () => writeWordsSingleRequest(client, "DM0", [65536]),
+  ]) {
+    await assert.rejects(operation);
+  }
+  assert.equal(calls.length, 5);
+});
 
 test("parseAddress supports dtype, count, and bit-in-word", () => {
   assert.deepEqual(parseAddress("DM100:U"), {

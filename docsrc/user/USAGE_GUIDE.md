@@ -8,6 +8,14 @@
 | `kvhostlink-read` | Reads one or more high-level addresses into `msg.payload`. |
 | `kvhostlink-write` | Writes one or more high-level address/value updates. |
 
+Programmatic callers use `readBitsSingleRequest` and
+`writeBitsSingleRequest` for contiguous direct-bit Boolean values, and
+`readWordsSingleRequest` and `writeWordsSingleRequest` for contiguous unsigned
+words. Each helper sends exactly one PLC request or rejects the complete input
+before send. Bit and Word requests accept 1 through 1,000 points subject to the
+device range. `readWords` is a deprecated compatibility alias; migrate to
+`readWordsSingleRequest`. Node names and editor labels are unchanged.
+
 ## kvhostlink-connection config node
 
 | Field | Required | Default | Description |

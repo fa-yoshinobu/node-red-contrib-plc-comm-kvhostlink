@@ -120,7 +120,9 @@ the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
 | --- | --- |
 | Address syntax | `parseAddress`, `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList` |
 | Device syntax | `parseDevice`, `deviceToString`, `parseDeviceText`, `normalizeSuffix` |
-| Typed access | `readTyped`, `writeTyped`, `readWords`, `readDWords` |
+| Typed access | `readTyped`, `writeTyped`, `readDWords` |
+| Single-request bit access | `readBitsSingleRequest`, `writeBitsSingleRequest` |
+| Single-request word access | `readWordsSingleRequest`, `writeWordsSingleRequest` (`readWords` is deprecated) |
 | Explicit bit-in-word write | `HostLinkClient.writeBitInWord`, `writeBitInWord` |
 | Expansion-buffer bit write | `HostLinkClient.writeBitInExpansionUnitBuffer`, `writeBitInExpansionUnitBuffer` |
 | Timer/counter | `readTimerCounter`, `readTimer`, `readCounter` |
@@ -205,9 +207,10 @@ reconcile PLC/application state because repeating a change can duplicate it.
 `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList`,
 `normalizePlcProfile`, `normalizeSuffix`, `openAndConnect`, `parseAddress`,
 `parseDataTokens`, `parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
-`profileDescriptors`, `profileFromName`, `readCommentBytes`, `readComments`, `readCounter`,
+`profileDescriptors`, `profileFromName`, `readBitsSingleRequest`, `readCommentBytes`, `readComments`, `readCounter`,
 `readDWords`, `readNamed`, `readTimer`, `readTimerCounter`, `readTyped`,
-`readWords`, `splitDataTokens`, `writeNamed`, `writeTyped`.
+`readWords`, `readWordsSingleRequest`, `splitDataTokens`, `writeBitsSingleRequest`,
+`writeNamed`, `writeTyped`, `writeWordsSingleRequest`.
 
 ## Traffic statistics
 
