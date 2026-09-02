@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-02
+
+- Release: Bumped npm package and lockfile metadata to `4.2.0` for the approved additive API unification release.
+- Library: Added canonical `readDWordsSingleRequest`, `readComment`, `readErrorNumber`, `writeTimerCounterPreset`, `writeTimerCounterPresetConsecutive`, and `formatAddress` names. The previous names remain deprecated direct aliases for this compatibility release and keep the same validation, result, error, and wire behavior.
+- Library: Added `writeDWordsSingleRequest` as the explicit one-request DWord wrapper over the existing WRS word path. It validates the complete DWord array before sending and never splits the write.
+- Tests: Added exact canonical/compatibility identity and one-request DWord read/write coverage.
+
 ## [4.1.0] - 2026-08-27
 
 - Release: Bumped npm package and lockfile metadata to `4.1.0`.

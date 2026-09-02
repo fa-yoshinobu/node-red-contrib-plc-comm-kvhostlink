@@ -9,6 +9,7 @@ const assert = require("node:assert/strict");
 
 const {
   HostLinkClient,
+  formatAddress,
   formatParsedAddress,
   normalizeAddress,
   normalizeAddressList,
@@ -16,13 +17,17 @@ const {
   poll,
   readBitsSingleRequest,
   readCommentBytes,
+  readComment,
   readComments,
+  readDWords,
+  readDWordsSingleRequest,
   readNamed,
   readTimerCounter,
   readTyped,
   readWords,
   readWordsSingleRequest,
   writeBitsSingleRequest,
+  writeDWordsSingleRequest,
   writeNamed,
   writeBitInWord,
   writeBitInExpansionUnitBuffer,
@@ -76,6 +81,65 @@ test("single-request bit and word helpers send once or reject before send", asyn
     await assert.rejects(operation);
   }
   assert.equal(calls.length, 5);
+});
+
+test("canonical dword helpers use one request and compatibility read alias delegates", async () => {
+  const calls = [];
+  const client = {
+    async readConsecutive(...args) {
+      calls.push(["read", ...args]);
+      return [1, 0, 65535, 65535];
+    },
+    async writeConsecutive(...args) {
+      calls.push(["write", ...args]);
+    },
+  };
+
+  assert.deepEqual(await readDWordsSingleRequest(client, "DM0", 2), [1, 0xffffffff]);
+  assert.deepEqual(await readDWords(client, "DM0", 2), [1, 0xffffffff]);
+  await writeDWordsSingleRequest(client, "DM0", [1, 0xffffffff]);
+
+  assert.deepEqual(calls, [
+    ["read", "DM0", 4, ".U", undefined],
+    ["read", "DM0", 4, ".U", undefined],
+    ["write", "DM0", [1, 0, 65535, 65535], ".U", undefined],
+  ]);
+  await assert.rejects(() => writeDWordsSingleRequest(client, "DM0", []));
+  await assert.rejects(() => writeDWordsSingleRequest(client, "DM0", [0x100000000]));
+  await assert.rejects(() => writeDWordsSingleRequest(client, "DM0", Array(501).fill(0)));
+  assert.equal(calls.length, 3);
+
+  const strictClient = new HostLinkClient({
+    host: "127.0.0.1",
+    port: 8501,
+    transport: "tcp",
+    plcProfile: "keyence:kv-x500",
+  });
+  strictClient._socket = {};
+  strictClient._generation = 1;
+  const frames = [];
+  strictClient._exchange = async (payload) => {
+    frames.push(payload);
+    return Buffer.from("OK", "ascii");
+  };
+  await assert.rejects(() => writeDWordsSingleRequest(strictClient, "AT0", [1]));
+  assert.deepEqual(frames, []);
+});
+
+test("canonical address and comment names match compatibility aliases", async () => {
+  const parsed = parseAddress("R10:BIT,4");
+  assert.equal(formatAddress(parsed), formatParsedAddress(parsed));
+  const client = {
+    async readComment(device, encoding, options) {
+      assert.equal(device, "DM250");
+      assert.equal(encoding, "cp932");
+      assert.deepEqual(options, { signal: null });
+      return "MAIN COMMENT";
+    },
+  };
+  const options = { signal: null };
+  assert.equal(await readComment(client, "DM250", "cp932", options), "MAIN COMMENT");
+  assert.equal(await readComments(client, "DM250", "cp932", options), "MAIN COMMENT");
 });
 
 test("parseAddress supports dtype, count, and bit-in-word", () => {
@@ -369,8 +433,8 @@ test("Float32 special-response families fail every high-level entry before FIFO 
     async readConsecutive() { sends += 1; return [0, 0]; },
     async write() { sends += 1; },
     async writeConsecutive() { sends += 1; },
-    async writeSetValue() { sends += 1; },
-    async writeSetValueConsecutive() { sends += 1; },
+    async writeTimerCounterPreset() { sends += 1; },
+    async writeTimerCounterPresetConsecutive() { sends += 1; },
   };
 
   for (const device of ["R0", "T0", "C0", "Z1", "AT0"]) {
@@ -527,8 +591,8 @@ test("numeric writes reject coercion, fractions, wrapping, and float32 overflow 
   const fakeClient = {
     async write() { calls += 1; },
     async writeConsecutive() { calls += 1; },
-    async writeSetValue() { calls += 1; },
-    async writeSetValueConsecutive() { calls += 1; },
+    async writeTimerCounterPreset() { calls += 1; },
+    async writeTimerCounterPresetConsecutive() { calls += 1; },
   };
   const invalid = [
     ["DM100:U", null], ["DM100:U", false], ["DM100:U", "1"], ["DM100:U", []],
@@ -1197,8 +1261,8 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     async writeConsecutive(device, values, dataFormat) {
       calls.push({ kind: "writeConsecutive", device, values: Array.from(values), dataFormat: dataFormat || "" });
     },
-    async writeSetValueConsecutive(device, values, dataFormat) {
-      calls.push({ kind: "writeSetValueConsecutive", device, values: Array.from(values), dataFormat: dataFormat || "" });
+    async writeTimerCounterPresetConsecutive(device, values, dataFormat) {
+      calls.push({ kind: "writeTimerCounterPresetConsecutive", device, values: Array.from(values), dataFormat: dataFormat || "" });
     },
   };
 
@@ -1224,11 +1288,11 @@ test("writeNamed batches consecutive writes and keeps special cases correct", as
     { kind: "writeConsecutive", device: "DM300", values: [1, 2, 3], dataFormat: ".U" },
     { kind: "writeConsecutive", device: "R010", values: [true, false], dataFormat: "" },
     { kind: "writeConsecutive", device: "R100", values: [true, false, true, false], dataFormat: "" },
-    { kind: "writeSetValueConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
-    { kind: "writeSetValueConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
+    { kind: "writeTimerCounterPresetConsecutive", device: "T10", values: [111, 222], dataFormat: ".D" },
+    { kind: "writeTimerCounterPresetConsecutive", device: "C10", values: [333, 444], dataFormat: ".D" },
     { kind: "writeConsecutive", device: "Z1", values: [70000, 80000], dataFormat: ".D" },
     { kind: "writeConsecutive", device: "TC0", values: [90000, 100000], dataFormat: ".D" },
-    { kind: "writeSetValueConsecutive", device: "T20", values: [555, 666], dataFormat: ".D" },
+    { kind: "writeTimerCounterPresetConsecutive", device: "T20", values: [555, 666], dataFormat: ".D" },
   ]);
 });
 
@@ -1269,7 +1333,7 @@ test("writeNamed rejects bit-bank gaps duplicates reverse order and mixed batche
   const fakeClient = {
     async write() { sends += 1; },
     async writeConsecutive() { sends += 1; },
-    async writeSetValueConsecutive() { sends += 1; },
+    async writeTimerCounterPresetConsecutive() { sends += 1; },
   };
   const rejectedUpdates = [
     { "R115:BIT": true, "R201:BIT": false },
@@ -1326,7 +1390,7 @@ test("writeNamed preflights complete word dword and timer groups before any send
   let calls = 0;
   const fakeClient = {
     async writeConsecutive() { calls += 1; },
-    async writeSetValueConsecutive() { calls += 1; },
+    async writeTimerCounterPresetConsecutive() { calls += 1; },
   };
   const wordTooLarge = Object.fromEntries(Array.from({ length: 1001 }, (_, index) => [`DM${index}:U`, index & 0xffff]));
   const dwordTooLarge = Object.fromEntries(Array.from({ length: 501 }, (_, index) => [`DM${index * 2}:D`, index]));

@@ -1251,6 +1251,7 @@ test("low-level command helpers preserve exact CR-terminated frames", async () =
   await client.changeMode("RUN");
   await client.changeMode("PROGRAM");
   await client.clearError();
+  assert.equal(await client.readErrorNumber(), "0");
   assert.equal(await client.checkErrorNo(), "0");
   assert.equal(await client.confirmOperatingMode(), 1);
   await assert.rejects(() => client.changeMode("STOP"), /mode must be 0\/1 or PROGRAM\/RUN/);
@@ -1258,7 +1259,7 @@ test("low-level command helpers preserve exact CR-terminated frames", async () =
     await assert.rejects(() => client.changeMode(invalid), /mode must be 0\/1 or PROGRAM\/RUN/);
   }
 
-  assert.deepEqual(frames, ["ER\r", "M1\r", "M0\r", "ER\r", "?E\r", "?M\r"]);
+  assert.deepEqual(frames, ["ER\r", "M1\r", "M0\r", "ER\r", "?E\r", "?E\r", "?M\r"]);
 });
 
 test("confirmOperatingMode rejects unknown mode values", async () => {
@@ -1881,8 +1882,10 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
     return "OK\r";
   });
 
-  await client.writeSetValue("T10", 123, ".D");
-  await client.writeSetValueConsecutive("C20", [111, 222], ".D");
+  await client.writeTimerCounterPreset("T10", 123, ".D");
+  await client.writeSetValue("T11", 124, ".D");
+  await client.writeTimerCounterPresetConsecutive("C20", [111, 222], ".D");
+  await client.writeSetValueConsecutive("C22", [333, 444], ".D");
   await client.registerMonitorBits("R0", "R1", "R2");
   await client.registerMonitorWords([
     { device: "DM0", dataFormat: ".U" },
@@ -1895,7 +1898,9 @@ test("set-value and monitor read helpers preserve exact CR-terminated frames", a
 
   assert.deepEqual(frames, [
     "WS T10.D 123\r",
+    "WS T11.D 124\r",
     "WSS C20.D 2 111 222\r",
+    "WSS C22.D 2 333 444\r",
     "MBS R000 R001 R002\r",
     "MWS DM0.U DM1.H DM2.U\r",
     "MBR\r",
@@ -1992,7 +1997,7 @@ test("readComments and readCommentBytes accept XYM alias device types", async ()
   }
   assert.deepEqual(commands, []);
 
-  assert.equal(await client.readComments("D10", "utf8"), "MAIN COMMENT");
+  assert.equal(await client.readComment("D10", "utf8"), "MAIN COMMENT");
   assert.equal(await client.readComments("M20", "cp932"), "MAIN COMMENT");
   assert.deepEqual(await client.readCommentBytes("D10"), Buffer.from("MAIN COMMENT                    ", "ascii"));
   assert.deepEqual(commands, ["RDC D10", "RDC M20", "RDC D10"]);

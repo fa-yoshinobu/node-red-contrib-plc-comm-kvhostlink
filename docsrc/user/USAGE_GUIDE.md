@@ -151,6 +151,10 @@ releasing that turn.
 
 Every RDC response is first an exact byte body without CR/LF. Raw `buffer`
 output returns those bytes unchanged, including trailing ASCII padding spaces.
+The KEYENCE Host Link manual does not specify the `RDC` character encoding, and
+there is no PLC-project encoding setting. The library does not infer a codec
+from a profile or model name; inspect raw `buffer` output when the exact payload
+must be examined before choosing how to decode it.
 Text output requires the exact saved encoding `utf8` or `cp932`; `cp932` is the
 Windows-31J-compatible mapping commonly described by KEYENCE as Shift_JIS.
 There is no separate strict Shift_JIS selection and aliases such as `utf-8`,

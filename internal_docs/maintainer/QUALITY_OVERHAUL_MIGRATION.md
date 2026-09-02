@@ -933,3 +933,15 @@ Verification evidence and self-review disposition:
 - [x] The Node.js row of the representative cross-language live batch passed after new explicit approval.
 - [x] User documentation, changelog, and migration record agree with the implementation.
 - [x] Root cross-language acceptance and `LIVE-HL-003` final completion were verified.
+
+## HostLink cross-library canonical API migration (2026-09-02)
+
+The canonical Node-RED names are `readDWordsSingleRequest`, `readComment`,
+`readErrorNumber`, `writeTimerCounterPreset`,
+`writeTimerCounterPresetConsecutive`, and `formatAddress`. The previous names
+remain deprecated direct aliases for this compatibility release and are planned
+for removal in the next major release. New code must use the canonical names.
+
+`writeDWordsSingleRequest` is a new explicit high-level wrapper over the
+existing one-request WRS path. It validates and snapshots the complete DWord
+array before sending and never automatically splits the write.

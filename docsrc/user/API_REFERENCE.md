@@ -35,11 +35,11 @@ that deadline. One TCP request owns exactly one non-empty response line.
 | Area | Operations |
 | --- | --- |
 | Lifecycle | `connect`, `close`, `trafficStats` |
-| Raw/control | `sendRaw`, `changeMode`, `clearError`, `checkErrorNo`, `confirmOperatingMode`, `queryModel`, `setTime` |
+| Raw/control | `sendRaw`, `changeMode`, `clearError`, `readErrorNumber`, `confirmOperatingMode`, `queryModel`, `setTime` |
 | Device access | `read`, `readConsecutive`, `write`, `writeConsecutive` |
-| Force/set values | `forcedSet`, `forcedReset`, `forcedSetConsecutive`, `forcedResetConsecutive`, `writeSetValue`, `writeSetValueConsecutive` |
+| Force/set values | `forcedSet`, `forcedReset`, `forcedSetConsecutive`, `forcedResetConsecutive`, `writeTimerCounterPreset`, `writeTimerCounterPresetConsecutive` |
 | Monitor | `registerMonitorBits`, `registerMonitorWords`, `readMonitorBits`, `readMonitorWords` |
-| Other | `readComments`, `readCommentBytes`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
+| Other | `readComment`, `readCommentBytes`, `switchBank`, `readExpansionUnitBuffer`, `writeExpansionUnitBuffer` |
 
 `sendRaw` accepts one non-empty ASCII command body without CR or LF. The body is
 at most 65,506 bytes and the library appends one CR, producing a complete frame
@@ -100,9 +100,12 @@ success readback and is not PLC-atomic against PLC logic or another connection.
 existing URD/UWR unit/address route. The selected route remains immutable
 across both requests and never falls back to an ordinary device.
 
-`readComments(device, encoding[, options])` requires exact `encoding` `utf8` or
+`readComment(device, encoding[, options])` requires exact `encoding` `utf8` or
 `cp932`. `cp932` uses the Windows-31J-compatible mapping commonly described by
 KEYENCE as Shift_JIS; there is no separate strict Shift_JIS selection or alias.
+The KEYENCE Host Link manual does not specify the `RDC` character encoding, and
+there is no PLC-project encoding setting. The caller supplies `utf8` or `cp932`;
+the library does not infer it from a profile or model name.
 Malformed bytes raise `HostLinkProtocolError` without replacement or fallback.
 `readCommentBytes(device[, options])` returns the exact RDC body `Buffer`
 without CR/LF and preserves trailing padding. Raw and comment-byte results are
@@ -118,16 +121,16 @@ the payload; UTF-8 `EF BB BF` decodes as `U+FEFF`. CP932 bytes `00` through
 
 | Area | Public API |
 | --- | --- |
-| Address syntax | `parseAddress`, `formatParsedAddress`, `normalizeAddress`, `normalizeAddressList` |
+| Address syntax | `parseAddress`, `formatAddress`, `normalizeAddress`, `normalizeAddressList` |
 | Device syntax | `parseDevice`, `deviceToString`, `parseDeviceText`, `normalizeSuffix` |
-| Typed access | `readTyped`, `writeTyped`, `readDWords` |
+| Typed access | `readTyped`, `writeTyped` |
 | Single-request bit access | `readBitsSingleRequest`, `writeBitsSingleRequest` |
-| Single-request word access | `readWordsSingleRequest`, `writeWordsSingleRequest` (`readWords` is deprecated) |
+| Single-request word/DWord access | `readWordsSingleRequest`, `writeWordsSingleRequest`, `readDWordsSingleRequest`, `writeDWordsSingleRequest` |
 | Explicit bit-in-word write | `HostLinkClient.writeBitInWord`, `writeBitInWord` |
 | Expansion-buffer bit write | `HostLinkClient.writeBitInExpansionUnitBuffer`, `writeBitInExpansionUnitBuffer` |
 | Timer/counter | `readTimerCounter`, `readTimer`, `readCounter` |
 | Named access | `readNamed`, `writeNamed`, `poll` |
-| Comments | `readComments`, `readCommentBytes` |
+| Comments | `readComment`, `readCommentBytes` |
 
 Float32 `F` uses the canonical device metadata and is available only when the
 device family's normal Host Link shape is one `.U` word with ordinary
@@ -204,13 +207,13 @@ reconcile PLC/application state because repeating a change can duplicate it.
 `HostLinkProtocolError`, `HostLinkTimeoutError`, `MODEL_CODES`, `PLC_PROFILES`,
 `ValueError`, `availablePlcProfiles`, `buildFrame`, `decodeCommentBytes`, `decodeCommentResponse`,
 `decodeResponse`, `deviceToString`, `displayName`, `ensureSuccess`,
-`formatParsedAddress`, `normalizeAddress`, `normalizeAddressList`,
+`formatAddress`, `normalizeAddress`, `normalizeAddressList`,
 `normalizePlcProfile`, `normalizeSuffix`, `openAndConnect`, `parseAddress`,
 `parseDataTokens`, `parseDevice`, `parseDeviceText`, `parseScalarToken`, `poll`,
-`profileDescriptors`, `profileFromName`, `readBitsSingleRequest`, `readCommentBytes`, `readComments`, `readCounter`,
-`readDWords`, `readNamed`, `readTimer`, `readTimerCounter`, `readTyped`,
+`profileDescriptors`, `profileFromName`, `readBitsSingleRequest`, `readComment`, `readCommentBytes`, `readCounter`,
+`readDWordsSingleRequest`, `readNamed`, `readTimer`, `readTimerCounter`, `readTyped`,
 `readWords`, `readWordsSingleRequest`, `splitDataTokens`, `writeBitsSingleRequest`,
-`writeNamed`, `writeTyped`, `writeWordsSingleRequest`.
+`writeDWordsSingleRequest`, `writeNamed`, `writeTyped`, `writeWordsSingleRequest`.
 
 ## Traffic statistics
 
