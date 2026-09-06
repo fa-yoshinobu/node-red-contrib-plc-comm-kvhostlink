@@ -8,15 +8,15 @@ Node-RED nodes for KEYENCE KV PLC communication via Host Link.
 
 ## PLC Comm Family
 
-This library is part of the plc-comm family. See the [package matrix](https://fa-yoshinobu.github.io/plc-comm-docs-site/package-matrix/) for protocol, language, registry, and install-command mapping.
+This library is part of the plc-comm family. See the [package matrix](https://plc-comm-docs-site.fa-labo.com/package-matrix/) for protocol, language, registry, and install-command mapping.
 
 ## Supported PLC profiles
 
-The maintained profile table is in [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/PROFILES/). Choose one exact canonical PLC profile from that table.
+The maintained profile table is in [PLC profiles](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/PROFILES/). Choose one exact canonical PLC profile from that table.
 
 ## Supported device types
 
-The shared device and range tables are in the [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) page. Use that page for supported device families, address syntax, and profile-specific notes.
+The shared device and range tables are in the [KV Host Link Device Ranges](https://plc-comm-docs-site.fa-labo.com/plc-setup/kv/device-ranges/) page. Use that page for supported device families, address syntax, and profile-specific notes.
 
 ## Installation
 
@@ -82,16 +82,16 @@ resolution. A failed request is never retried or replayed automatically.
 
 | Page | Use it for |
 | --- | --- |
-| [Full documentation site](https://fa-yoshinobu.github.io/plc-comm-docs-site/) | Unified docs for all PLC communication libraries. |
-| [Getting started](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/GETTING_STARTED/) | Install the nodes, configure a connection, and run your first flow. |
-| [Usage guide](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/USAGE_GUIDE/) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
-| [API reference](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/API_REFERENCE/) | Find public client methods, helpers, profile APIs, and error types. |
-| [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/PROFILES/) | Choose the canonical profile for the target KV family. |
-| [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
-| [KV Host Link Troubleshooting & Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
-| [Gotchas](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/nodered/GOTCHAS/) | Check whether this library has any current library-specific caveats. |
-| [Performance](https://fa-yoshinobu.github.io/plc-comm-docs-site/performance/) | See measured latency, throughput, and long-run soak results from real PLC hardware. |
-| [Choosing a Language](https://fa-yoshinobu.github.io/plc-comm-docs-site/choosing-a-language/) | Compare the .NET, Python, Rust, C++, and Node-RED implementations before you pick one. |
+| [Full documentation site](https://plc-comm-docs-site.fa-labo.com/) | Unified docs for all PLC communication libraries. |
+| [Getting started](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/GETTING_STARTED/) | Install the nodes, configure a connection, and run your first flow. |
+| [Usage guide](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/USAGE_GUIDE/) | Use read/write nodes, metadata modes, connection control, and flow patterns. |
+| [API reference](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/API_REFERENCE/) | Find public client methods, helpers, profile APIs, and error types. |
+| [PLC profiles](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/PROFILES/) | Choose the canonical profile for the target KV family. |
+| [KV Host Link Device Ranges](https://plc-comm-docs-site.fa-labo.com/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
+| [KV Host Link Troubleshooting & Codes](https://plc-comm-docs-site.fa-labo.com/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
+| [Gotchas](https://plc-comm-docs-site.fa-labo.com/hostlink/nodered/GOTCHAS/) | Check whether this library has any current library-specific caveats. |
+| [Performance](https://plc-comm-docs-site.fa-labo.com/performance/) | See measured latency, throughput, and long-run soak results from real PLC hardware. |
+| [Choosing a Language](https://plc-comm-docs-site.fa-labo.com/choosing-a-language/) | Compare the .NET, Python, Rust, C++, and Node-RED implementations before you pick one. |
 | [Example flows](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/README.md) | Import maintained Node-RED example flows. |
 
 For a zero-code connectivity check, see [PLC Scope](https://github.com/fa-yoshinobu/plc-scope-dotnet) (Windows).

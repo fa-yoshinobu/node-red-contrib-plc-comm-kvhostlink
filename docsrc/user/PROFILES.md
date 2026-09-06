@@ -16,7 +16,7 @@ shared [KEYENCE KV Host Link profile catalog](https://github.com/fa-yoshinobu/pl
 
 ## Device families and ranges
 
-Device-family notation, type suffixes, XYM aliases, and static range tables are shared across the KV Host Link libraries. Use the common [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) page for those details.
+Device-family notation, type suffixes, XYM aliases, and static range tables are shared across the KV Host Link libraries. Use the common [KV Host Link Device Ranges](https://plc-comm-docs-site.fa-labo.com/plc-setup/kv/device-ranges/) page for those details.
 
 The table below identifies the canonical profile names, intended hardware, and
 address notation. Device ranges remain in the shared reference above.
