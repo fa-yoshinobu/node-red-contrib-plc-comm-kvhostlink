@@ -30,14 +30,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check release workflows do not auto-publish
+        if: matrix.node-version == '18'
         shell: pwsh
         run: ./scripts/check_no_auto_publish.ps1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -53,6 +54,7 @@ jobs:
         run: node test/run-tests.js
 
       - name: Validate package contents
+        if: matrix.node-version == '18'
         shell: pwsh
         run: ./scripts/check_package_contents.ps1
 
@@ -62,10 +64,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -93,10 +95,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
