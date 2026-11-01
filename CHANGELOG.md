@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-01
+
+- Release: Bump package and lockfile versions to `4.3.0`.
+- Fix: Restore saved PLC profile selection when reopening connection settings.
+- Feature: Add `kvhostlink-set-time` with explicit clock input and Catch error handling.
+- Samples: Add manual clock setting with delayed CM700..CM706 readback and host-time comparison.
+- Tests: Verify the new node and clock example in package-consumer and editor smoke checks.
+
 ## [4.2.0] - 2026-09-02
 
 - Release: Bumped npm package and lockfile metadata to `4.2.0` for the approved additive API unification release.

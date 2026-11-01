@@ -220,3 +220,9 @@ reconcile PLC/application state because repeating a change can duplicate it.
 `trafficStats()` returns a frozen lifetime `{ requestCount, txBytes, rxBytes }`
 snapshot. TCP receive bytes include the body and first terminator; UDP counts the
 accepted datagram. Close/reconnect does not reset the counters.
+
+## PLC clock setting
+
+The `kvhostlink-set-time` node exposes `HostLinkClient.setTime(value)`. Pass a local `Date` (2000..2099) or `[YY, month, day, hour, minute, second, weekday]` in `msg.payload`; Sunday is 0. Errors are reported to Catch nodes. The output preserves the message after the WRT acknowledgement.
+
+The node opens the shared connection before writing, including after a disconnect. Clock-register readback can lag the WRT acknowledgement; wait for the PLC clock data to refresh when verifying the result.

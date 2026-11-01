@@ -2,7 +2,7 @@
 
 ## What is in this directory
 
-This directory contains importable Node-RED JSON flows for `kvhostlink-read`, `kvhostlink-write`, and the shared `kvhostlink-connection` node.
+This directory contains importable Node-RED JSON flows for `kvhostlink-read`, `kvhostlink-write`, `kvhostlink-set-time`, and the shared `kvhostlink-connection` node.
 Start with the basic flow, then move through typed and array examples before using the device matrix.
 Read each selected address first. The basic, typed, and array write buttons are
 manual controlled-test paths: each saves the original value or snapshot,
@@ -47,4 +47,15 @@ To persist CSV-equivalent rows, route the long-form row messages through a CSV n
 | `kvhostlink-multi-plc-monitor.json` | Read-only multi-PLC monitor with long-form row output and reconnect backoff. | 1 after connection settings are known |
 | `kvhostlink-typed-read-write.json` | Reads `:S`, `:D`, `:L`, `:F`, and `.bit`; its optional random write restores the saved snapshot. | 2 |
 | `kvhostlink-array-read-write.json` | Reads `,count` forms; its optional random write restores both arrays. | 3 |
+| [`kvhostlink-set-time.json`](kvhostlink-set-time.json) | Manual host-local clock setting (WRT), delayed CM700..CM706 readback, and comparison; tested on KV-X500. | After connection settings are known |
 | `kvhostlink-device-matrix.json` | Runs read-only one-by-one checks across device families and records JSONL results. | After the first three flows work |
+
+## Clock setting and readback
+
+Import `kvhostlink-set-time.json`, configure the endpoint and PLC profile (the file defaults
+to loopback and KV-X500), and deploy. Click **Set host local time (manual)** once to send WRT.
+The flow waits 1.5 seconds for the clock registers to refresh, reads `CM700:U,7`, and compares
+the PLC clock with the Node-RED host. **Read clock (no writes)** reads the clock independently.
+The debug output separates WRT acknowledgement from the readback result: `PASS` requires
+a difference below 3 seconds and a matching weekday. This readback was tested on KV-X500.
+Errors go to Catch/Debug; there is no automatic injection, retry, or restoration of the old clock.

@@ -58,7 +58,7 @@
     },
     oneditprepare: function () {
       const select = $("#node-config-input-plcProfile");
-      const current = select.val();
+      const current = this.plcProfile;
       $.getJSON("plc-comm/kvhostlink/profiles", function (profiles) {
         select.find("option:not(:first)").remove();
         profiles.filter(function (profile) { return profile.connectable; }).forEach(function (profile) {
@@ -67,7 +67,7 @@
             .text(profile.displayName)
             .appendTo(select);
         });
-        select.val(current);
+        select.val(current).trigger("change");
       });
     }
   });

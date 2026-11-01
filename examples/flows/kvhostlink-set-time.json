@@ -1,0 +1,237 @@
+[
+  {
+    "id": "kvhostlink-clock-kv-x500",
+    "type": "tab",
+    "label": "kvhostlink Set PLC Time (KV-X500 readback)",
+    "disabled": false,
+    "info": "Configure the connection before manual use. Set host local time once (WRT), wait 1.5 s, then read CM700..CM706 and compare with the host clock. Tested on KV-X500. No automatic injection, retry, or rollback of the clock."
+  },
+  {
+    "id": "kvhostlink-clock-kv-cfg",
+    "type": "kvhostlink-connection",
+    "name": "KV-X500 (configure endpoint)",
+    "host": "127.0.0.1",
+    "port": "8501",
+    "transport": "tcp",
+    "timeout": "3000",
+    "plcProfile": "keyence:kv-x500"
+  },
+  {
+    "id": "kvhostlink-clock-comment",
+    "type": "comment",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "KV-X500 clock / manual / configure connection first",
+    "x": 410,
+    "y": 40,
+    "wires": [],
+    "info": "Configure the connection before manual use. Set host local time once (WRT), wait 1.5 s, then read CM700..CM706 and compare with the host clock. Tested on KV-X500. No automatic injection, retry, or rollback of the clock."
+  },
+  {
+    "id": "kvhostlink-clock-set",
+    "type": "inject",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Set host local time (manual)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "payloadType": "date",
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "x": 160,
+    "y": 120,
+    "wires": [
+      [
+        "kvhostlink-clock-date"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-date",
+    "type": "function",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Explicit local Date",
+    "func": "msg.payload = new Date(msg.payload);\nmsg.requestedLocal = msg.payload.toLocaleString(\"ja-JP\", {hour12:false});\nreturn msg;",
+    "outputs": 1,
+    "x": 400,
+    "y": 120,
+    "wires": [
+      [
+        "kvhostlink-clock-settime"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-settime",
+    "type": "kvhostlink-set-time",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Set PLC time",
+    "connection": "kvhostlink-clock-kv-cfg",
+    "x": 650,
+    "y": 120,
+    "wires": [
+      [
+        "kvhostlink-clock-ack-format",
+        "kvhostlink-clock-delay"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-ack-format",
+    "type": "function",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "WRT acknowledgement",
+    "func": "msg.payload = {status:\"WRT acknowledged\", requested:msg.requestedLocal}; return msg;",
+    "outputs": 1,
+    "x": 890,
+    "y": 100,
+    "wires": [
+      [
+        "kvhostlink-clock-ack"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-ack",
+    "type": "debug",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Clock request acknowledged",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 1090,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "kvhostlink-clock-delay",
+    "type": "delay",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Wait for clock update (1.5 s)",
+    "pauseType": "delay",
+    "timeout": "1.5",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "x": 650,
+    "y": 220,
+    "wires": [
+      [
+        "kvhostlink-clock-read"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-read-button",
+    "type": "inject",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Read clock (no writes)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "payloadType": "date",
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "x": 160,
+    "y": 300,
+    "wires": [
+      [
+        "kvhostlink-clock-read"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-read",
+    "type": "kvhostlink-read",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "PLC clock CM700..CM706",
+    "connection": "kvhostlink-clock-kv-cfg",
+    "addresses": "CM700:U,7",
+    "addressesType": "str",
+    "outputMode": "value",
+    "commentOutput": "",
+    "commentEncoding": "",
+    "metadataMode": "minimal",
+    "errorHandling": "throw",
+    "outputs": 1,
+    "x": 420,
+    "y": 300,
+    "wires": [
+      [
+        "kvhostlink-clock-check"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-check",
+    "type": "function",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Compare PLC and host time",
+    "func": "const v = msg.payload;\nif (!Array.isArray(v) || v.length !== 7) { node.error(\"Unexpected clock readback\",msg); return null; }\nconst [y,m,d,h,min,s,week] = v;\nconst plc = new Date(2000+y,m-1,d,h,min,s);\nconst pc = new Date();\nconst delta = plc.getTime()-pc.getTime();\nmsg.payload = {result:Math.abs(delta)<3000 && plc.getDay()===week ? \"PASS\" : \"CHECK\", plc:plc.toLocaleString(\"ja-JP\", {hour12:false}), pc:pc.toLocaleString(\"ja-JP\", {hour12:false}), deltaMs:delta, clock:v, requested:msg.requestedLocal||\"read only\"};\nreturn msg;",
+    "outputs": 1,
+    "x": 710,
+    "y": 300,
+    "wires": [
+      [
+        "kvhostlink-clock-result"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-result",
+    "type": "debug",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Clock readback result",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 990,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "kvhostlink-clock-catch",
+    "type": "catch",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Clock error (no retry)",
+    "scope": [
+      "kvhostlink-clock-settime",
+      "kvhostlink-clock-read",
+      "kvhostlink-clock-check"
+    ],
+    "uncaught": false,
+    "x": 390,
+    "y": 400,
+    "wires": [
+      [
+        "kvhostlink-clock-error"
+      ]
+    ]
+  },
+  {
+    "id": "kvhostlink-clock-error",
+    "type": "debug",
+    "z": "kvhostlink-clock-kv-x500",
+    "name": "Clock error",
+    "active": true,
+    "tosidebar": true,
+    "complete": "true",
+    "targetType": "full",
+    "x": 680,
+    "y": 400,
+    "wires": []
+  }
+]

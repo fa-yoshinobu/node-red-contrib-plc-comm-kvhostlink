@@ -9,7 +9,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const repoRoot = path.resolve(__dirname, "..");
 const packageJson = require(path.join(repoRoot, "package.json"));
 const flowPath = path.join(repoRoot, "examples", "flows", "kvhostlink-basic-read-write.json");
-const expectedTypes = new Set(["kvhostlink-connection", "kvhostlink-read", "kvhostlink-write"]);
+const expectedTypes = new Set(["kvhostlink-connection", "kvhostlink-read", "kvhostlink-write", "kvhostlink-set-time"]);
 const smokeDir = path.resolve(
   repoRoot,
   "..",
@@ -26,7 +26,10 @@ main().catch((error) => {
 
 async function main() {
   const port = await getFreePort();
-  const flowJson = JSON.parse(fs.readFileSync(flowPath, "utf8"));
+  const flowJson = [
+    ...JSON.parse(fs.readFileSync(flowPath, "utf8")),
+    ...JSON.parse(fs.readFileSync(path.join(repoRoot, "examples", "flows", "kvhostlink-set-time.json"), "utf8")),
+  ];
 
   cleanDirectory(smokeDir);
   fs.mkdirSync(smokeDir, { recursive: true });

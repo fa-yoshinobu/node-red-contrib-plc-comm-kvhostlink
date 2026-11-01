@@ -1,0 +1,35 @@
+<script type="text/javascript">
+  RED.nodes.registerType("kvhostlink-set-time", {
+    category: "KV Host Link",
+    color: "#D9EAD3",
+    defaults: {
+      name: { value: "" },
+      connection: { value: "", type: "kvhostlink-connection", required: true }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-clock-o",
+    label: function () { return this.name || "KV Host Link Set Time"; }
+  });
+</script>
+
+<script type="text/html" data-template-name="kvhostlink-set-time">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection" />
+  </div>
+  <p>Input: msg.payload = Date or [YY, month, day, hour, minute, second, weekday].</p>
+</script>
+
+<script type="text/html" data-help-name="kvhostlink-set-time">
+  <p>Sets the PLC clock using an explicit <code>msg.payload</code>.</p>
+  <p>Use a Function node with <code>msg.payload = new Date(); return msg;</code> for the Node-RED host's current local time, or an Inject JSON array such as <code>[26, 10, 31, 12, 34, 56, 6]</code>. YY is the year minus 2000. Weekday is 0 (Sunday) through 6 (Saturday). All seven array fields must be integers and match a real calendar date.</p>
+  <p>Dates use the Node-RED host's local timezone. Arrays represent the desired PLC wall-clock time without timezone conversion. Strings, timestamps, missing values, and invalid dates are rejected; no implicit current-time default is used.</p>
+  <p>Uses HostLinkClient.setTime() (WRT). Years 2000..2099.</p>
+  <p>The shared connection is opened before writing. The PLC clock registers may still show the previous value immediately after an acknowledgement; allow the clock data to refresh before checking the result.</p>
+  <p>The original message is sent on the single output after all write requests are acknowledged. This does not verify that the PLC clock has changed. On failure, use a Catch node. Do not automatically retry a failed clock write; part of the operation may already have reached the PLC.</p>
+</script>

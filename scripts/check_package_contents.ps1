@@ -40,7 +40,10 @@ try {
         "package.json",
         "lib/index.js",
         "examples/flows/README.md",
-        "examples/flows/kvhostlink-basic-read-write.json"
+        "examples/flows/kvhostlink-basic-read-write.json",
+        "examples/flows/kvhostlink-set-time.json",
+        "nodes/kvhostlink-set-time.js",
+        "nodes/kvhostlink-set-time.html"
     )
     $missing = @($required | Where-Object { $_ -notin $files })
     if ($missing.Count -ne 0) { throw "npm package is missing required files: $($missing -join ', ')" }
@@ -68,6 +71,14 @@ try {
         $smoke = @'
 const assert = require("node:assert/strict");
 const hostlink = require("@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink");
+const manifest = require("@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink/package.json");
+assert.equal(manifest["node-red"].nodes["kvhostlink-set-time"], "nodes/kvhostlink-set-time.js");
+assert.equal(typeof hostlink.HostLinkClient.prototype.setTime, "function");
+const registeredNodeTypes = [];
+require("@fa_yoshinobu/node-red-contrib-plc-comm-kvhostlink/nodes/kvhostlink-set-time.js")({
+  nodes: { registerType: name => registeredNodeTypes.push(name) },
+});
+assert.deepEqual(registeredNodeTypes, ["kvhostlink-set-time"]);
 assert.equal(typeof hostlink.HostLinkClient.prototype.readComments, "function");
 assert.equal(typeof hostlink.HostLinkClient.prototype.readCommentBytes, "function");
 assert.equal(typeof hostlink.readComments, "function");
