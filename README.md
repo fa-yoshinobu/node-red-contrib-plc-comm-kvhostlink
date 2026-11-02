@@ -109,13 +109,3 @@ For a zero-code connectivity check, see [PLC Scope](https://github.com/fa-yoshin
 If you plan to embed this library in a paid or commercial product, please consider a separate support agreement or supporting the project as a sponsor.
 
 Contact: <https://fa-labo.com/contact.html>
-
-### PLC clock setting
-
-Use `kvhostlink-set-time` with the shared `kvhostlink-connection`. Send a Date in `msg.payload` (for example `msg.payload = new Date(); return msg;` in a Function node), or a JSON array `[26, 10, 31, 12, 34, 56, 6]` (`YY, month, day, hour, minute, second, weekday`; Sunday = 0). Date inputs use the Node-RED host local timezone; arrays specify PLC wall-clock time. Invalid or missing input is rejected.
-
-Uses HostLinkClient.setTime() (WRT). Years 2000..2099.
-
-The output preserves the input message and indicates write acknowledgements only, not a verified clock change. Use a Catch node for errors; do not automatically retry partial/uncertain writes.
-
-Import [`examples/flows/kvhostlink-set-time.json`](examples/flows/kvhostlink-set-time.json) for manual current-time setting with Catch handling and delayed CM700..CM706 readback (tested on KV-X500). It separates WRT acknowledgement from the clock comparison and includes a read-only clock button. Configure the endpoint and PLC profile before use; see the [sample instructions](examples/flows/README.md#clock-setting-and-readback).

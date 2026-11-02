@@ -223,6 +223,22 @@ accepted datagram. Close/reconnect does not reset the counters.
 
 ## PLC clock setting
 
-The `kvhostlink-set-time` node exposes `HostLinkClient.setTime(value)`. Pass a local `Date` (2000..2099) or `[YY, month, day, hour, minute, second, weekday]` in `msg.payload`; Sunday is 0. Errors are reported to Catch nodes. The output preserves the message after the WRT acknowledgement.
+`HostLinkClient.setTime(value, options)` sends the Host Link `WRT` command.
+The optional operation options support cancellation with `{ signal }`.
 
-The node opens the shared connection before writing, including after a disconnect. Clock-register readback can lag the WRT acknowledgement; wait for the PLC clock data to refresh when verifying the result.
+| Input | Meaning |
+| --- | --- |
+| `Date` | Host-local calendar fields, with a year in 2000..2099. |
+| Seven-integer array | `[YY, month, day, hour, minute, second, weekday]`; YY = 0..99 and Sunday = 0. No timezone conversion. |
+
+Missing values, strings, timestamps, invalid dates, out-of-range fields, and a
+weekday inconsistent with the array's calendar date are rejected before sending WRT.
+The method resolves after the PLC acknowledgement, without a readback result.
+Clock-register readback can lag the acknowledgement; allow the clock data to
+refresh before verifying the change. Do not automatically retry a failed write
+whose outcome is uncertain.
+
+The `kvhostlink-set-time` node passes `msg.payload` to this method, opens the
+shared connection before writing (including after a disconnect), preserves the
+input message on success, and reports errors to Catch nodes. See the
+[node usage and sample](USAGE_GUIDE.md#kvhostlink-set-time-node).

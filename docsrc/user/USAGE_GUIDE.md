@@ -7,6 +7,7 @@
 | `kvhostlink-connection` | Shared KEYENCE KV Host Link TCP/UDP connection config. |
 | `kvhostlink-read` | Reads one or more high-level addresses into `msg.payload`. |
 | `kvhostlink-write` | Writes one or more high-level address/value updates. |
+| `kvhostlink-set-time` | Sets the PLC clock from an explicit Date or clock-field array. |
 
 Programmatic callers use `readBitsSingleRequest` and
 `writeBitsSingleRequest` for contiguous direct-bit Boolean values, and
@@ -267,6 +268,32 @@ Success is always sent through output 1. `throw` reports failure through
 `done(error)` without a message, `msg.error` sends the failed message on output
 1, and `Second output` sends it only on output 2. The saved terminal count must
 match the selected mode exactly; conflicting old flows are rejected for review.
+
+## kvhostlink-set-time node
+
+Select the shared `kvhostlink-connection` and send the desired time in `msg.payload`.
+To use the Node-RED host's current local time, connect a manual Inject node to a
+Function node containing:
+
+```javascript
+msg.payload = new Date();
+return msg;
+```
+
+Alternatively, send a JSON array such as `[26, 10, 31, 12, 34, 56, 6]`:
+`[YY, month, day, hour, minute, second, weekday]`, with Sunday = 0.
+Date inputs use the host's local timezone; arrays specify PLC wall-clock time
+without timezone conversion. Years are 2000..2099. Missing or invalid input is rejected.
+
+The single output preserves the input message after the WRT acknowledgement;
+it does not verify a clock change. Route failures to a Catch node and check the
+PLC clock before deciding whether to repeat a failed write.
+
+Import the [clock-setting sample](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/kvhostlink-set-time.json)
+for manual setting, delayed `CM700..CM706` readback, clock comparison, and an
+independent read-only clock button. Configure the endpoint and PLC profile as
+described in the [sample instructions](https://github.com/fa-yoshinobu/node-red-contrib-plc-comm-kvhostlink/blob/main/examples/flows/README.md#clock-setting-and-readback).
+See the [API reference](API_REFERENCE.md#plc-clock-setting) for the client method.
 
 ## Address syntax
 
