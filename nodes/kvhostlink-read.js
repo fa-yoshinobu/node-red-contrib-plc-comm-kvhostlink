@@ -58,6 +58,9 @@ module.exports = function registerKvHostLinkRead(RED) {
           itemCount: addresses.length,
         });
         this.status({ fill: "green", shape: "dot", text: `${addresses.length} item(s)` });
+        if (this.errorHandling === "msg") {
+          delete msg.error;
+        }
         send(msg);
         done();
       } catch (error) {

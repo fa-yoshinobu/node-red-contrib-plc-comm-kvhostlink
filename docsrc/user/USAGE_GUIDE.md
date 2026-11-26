@@ -445,7 +445,7 @@ The connection metadata contains `host`, `port`, `transport`, and `timeout`.
 | Errors setting | Behavior |
 | --- | --- |
 | `Throw` | Calls Node-RED `done(error)`. |
-| `msg.error` | Adds the error object to `msg.error` and sends the message on output 1. |
+| `msg.error` | Sends the message on output 1. A failed read or write sets `msg.error`. A successful read or write removes any existing `msg.error`, including one set by an upstream node. |
 | `Second output` | Sends normal messages on output 1 and error messages on output 2. |
 
 JavaScript callers can classify failures by exported type/code:

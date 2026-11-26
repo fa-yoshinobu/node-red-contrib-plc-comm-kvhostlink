@@ -582,14 +582,17 @@ test("Node-RED HostLink error modes and output counts define one exact route", a
     const write = runtime.create("kvhostlink-write", writeConfig({ id: `write-error-${mode}`, errorHandling: mode, outputs }));
     state.fail = false;
     for (const node of [read, write]) {
-      const success = await invoke(node, {});
+      const upstreamError = new Error("upstream");
+      const success = await invoke(node, { error: upstreamError });
       assert.equal(success.error, undefined);
       assert.equal(success.sent.length, 1);
       assert.equal(Array.isArray(success.sent[0]), false);
+      if (mode === "msg") assert.equal(Object.hasOwn(success.sent[0], "error"), false);
+      else assert.equal(success.sent[0].error, upstreamError);
     }
-    state.fail = true;
     for (const node of [read, write]) {
-      const failedMsg = {};
+      state.fail = true;
+      const failedMsg = { payload: "original" };
       const failed = await invoke(node, failedMsg);
       if (mode === "throw") {
         assert.ok(failed.error instanceof Error);
@@ -599,6 +602,12 @@ test("Node-RED HostLink error modes and output counts define one exact route", a
         assert.equal(failed.sent.length, 1);
         assert.equal(failed.sent[0], failedMsg);
         assert.ok(failedMsg.error instanceof Error);
+        state.fail = false;
+        const retried = await invoke(node, failedMsg);
+        assert.equal(retried.error, undefined);
+        assert.deepEqual(retried.sent, [failedMsg]);
+        assert.equal(Object.hasOwn(failedMsg, "error"), false);
+        assert.deepEqual(failedMsg.payload, node === read ? { "DM100:U": 7 } : "original");
       } else {
         assert.equal(failed.error, undefined);
         assert.equal(failed.sent.length, 1);
